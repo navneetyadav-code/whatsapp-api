@@ -17,7 +17,14 @@ function enqueue_message(int $userId, ?int $apiKeyId, string $to, string $messag
         json_encode($payload, JSON_UNESCAPED_SLASHES),
     ]);
 
-    return (int) Database::pdo()->lastInsertId();
+    $insertId = (int) Database::pdo()->lastInsertId();
+
+    try {
+        worker_request('POST', 'queue/notify', ['user_id' => $userId], 1);
+    } catch (\Throwable $e) {
+    }
+
+    return $insertId;
 }
 
 function api_key_rate_status(array $apiKey): array

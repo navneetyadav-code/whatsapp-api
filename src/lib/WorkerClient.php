@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-function worker_request(string $method, string $path, array $payload = []): array
+function worker_request(string $method, string $path, array $payload = [], int $timeout = 20): array
 {
     $url = rtrim((string) app_config('worker.url'), '/') . '/' . ltrim($path, '/');
     $body = $payload ? json_encode($payload, JSON_UNESCAPED_SLASHES) : '';
@@ -11,7 +11,8 @@ function worker_request(string $method, string $path, array $payload = []): arra
     curl_setopt_array($ch, [
         CURLOPT_CUSTOMREQUEST => strtoupper($method),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 20,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_CONNECTTIMEOUT => min(3, $timeout),
         CURLOPT_HTTPHEADER => [
             'Content-Type: application/json',
             'X-Worker-Token: ' . app_config('security.worker_token'),
