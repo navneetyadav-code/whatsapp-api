@@ -491,16 +491,21 @@ async function startSession(userId, force = false, waitForReady = true) {
           const code = lastDisconnect?.error?.output?.statusCode;
           const isRestart = code === DisconnectReason.restartRequired;
           const isLoggedOut = code === DisconnectReason.loggedOut;
+          const isBadSession = code === DisconnectReason.badSession
+            || code === DisconnectReason.multideviceMismatch
+            || code === DisconnectReason.forbidden;
           const disconnectMessage = String(lastDisconnect?.error?.message || '');
           const isQrExpired = disconnectMessage.includes('QR refs attempts ended');
 
-          if (isLoggedOut) {
+          if (isLoggedOut || isBadSession) {
             try { await rm(authDir, { recursive: true, force: true }); } catch (e) {}
             session.state = 'idle';
             session.qr = null;
             session.hasQr = false;
             session.sock = null;
-            session.error = 'Device was unlinked. Please click Connect to scan again.';
+            session.error = isLoggedOut
+              ? 'Device was unlinked. Please click Connect to scan again.'
+              : 'Saved WhatsApp login was invalid. Click Connect to generate a fresh QR code.';
             await updateSessionRecord(userId, session);
             return;
           }
