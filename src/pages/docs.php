@@ -116,4 +116,17 @@ $response = curl_exec($ch);</code></pre>
 }</code></pre>
         <p class="muted">Use the dashboard queue table to track queued, processing, sent, failed, and cancelled states.</p>
     </section>
+
+    <section class="card code-card">
+        <div class="section-head compact">
+            <h2>Author & Legal Disclaimer</h2>
+            <span class="pill queued">Open Source</span>
+        </div>
+        <p class="muted">
+            Developed and maintained by <strong><a href="https://github.com/navneetyadav-code" target="_blank" rel="noopener noreferrer">Navneet Kumar Yadav</a></strong>.
+            This is an independent open-source automation library and is not affiliated with, endorsed by, or sponsored by Meta Platforms, Inc. or WhatsApp Inc.
+            <br><br>
+            For any copyright, removal, or takedown requests, contact: <a href="mailto:info.assistgroupofficial@gmail.com"><strong>info.assistgroupofficial@gmail.com</strong></a>.
+        </p>
+    </section>
 </section>

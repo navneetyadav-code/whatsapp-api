@@ -154,6 +154,12 @@ $currentPage = $_GET['page'] ?? 'dashboard';
                 <button type="submit" class="text-red-500 hover:text-red-700 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg></button>
             </form>
         </div>
+
+        <div class="px-3 pt-2 text-[10px] text-slate-400 border-t border-slate-200/70 space-y-0.5 leading-tight">
+            <div>Made by <a href="https://github.com/navneetyadav-code" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:underline">Navneet Kumar Yadav</a></div>
+            <div>Takedown: <a href="mailto:info.assistgroupofficial@gmail.com" class="hover:underline text-slate-500">info.assistgroupofficial@gmail.com</a></div>
+            <div class="text-[9px] text-slate-400">Independent project &bull; Not affiliated with Meta</div>
+        </div>
     </div>
 </aside>
 
