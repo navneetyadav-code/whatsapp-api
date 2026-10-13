@@ -1,5 +1,6 @@
 <?php
 $endpoint = public_url('api/send.php');
+$messagesEndpoint = public_url('api/messages.php');
 $showTestPage = current_user() && app_config('app.enable_test_page') && is_local_request();
 ?>
 
@@ -10,9 +11,10 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
             <div class="flex items-center gap-2 mb-1">
                 <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">REST API v1.0</span>
                 <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">Single API Key</span>
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Meta Cloud API Drop-In Compatible</span>
             </div>
             <h1 class="text-2xl font-bold text-slate-900 tracking-tight">API Documentation & Integration Guide</h1>
-            <p class="text-[13px] text-slate-500 mt-1 font-medium">Send WhatsApp messages, monitor delivery queues, and handle webhooks using our developer-friendly REST API.</p>
+            <p class="text-[13px] text-slate-500 mt-1 font-medium">Send WhatsApp messages, monitor delivery queues, and handle webhooks. Supports both our clean REST format and Meta WhatsApp Cloud API payloads.</p>
         </div>
         <?php if ($showTestPage): ?>
             <a href="<?= e(base_url('test-page.php')) ?>" class="px-4 py-2 text-[13px] font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg shadow-sm hover:bg-slate-50 transition-all inline-flex items-center gap-2">
@@ -29,15 +31,15 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
             </div>
             <h3 class="text-sm font-bold text-slate-900">Single Key Auth</h3>
-            <p class="text-xs text-slate-500 mt-1">Authenticate requests using only a single <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">X-API-Key</code> header. No secondary secret needed.</p>
+            <p class="text-xs text-slate-500 mt-1">Authenticate requests using only a single <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">X-API-Key</code> or <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-700">Authorization: Bearer</code> token. No secondary secret needed.</p>
         </div>
 
         <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
             <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
             </div>
-            <h3 class="text-sm font-bold text-slate-900">Background Worker</h3>
-            <p class="text-xs text-slate-500 mt-1">Messages are buffered into an async priority queue and sent through Baileys with humanized anti-ban delays.</p>
+            <h3 class="text-sm font-bold text-slate-900">Dual Compatibility</h3>
+            <p class="text-xs text-slate-500 mt-1">Accepts both our clean flat JSON format and official Meta WhatsApp Cloud API schemas with zero payload modification.</p>
         </div>
 
         <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
@@ -64,15 +66,54 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
             <div>
                 <h3 class="text-sm font-bold text-slate-900 mb-2">Authentication Headers</h3>
                 <div class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner">
-                    <span class="text-slate-400"># Pass your API Key in either the X-API-Key header or Bearer Token:</span><br>
+                    <span class="text-slate-400"># Pass your API Key in either the X-API-Key header or Bearer Token (Meta style):</span><br>
                     <span class="text-emerald-400">X-API-Key:</span> wa_live_YOUR_API_KEY_HERE<br>
+                    <span class="text-slate-400"># Or:</span><br>
+                    <span class="text-emerald-400">Authorization:</span> Bearer wa_live_YOUR_API_KEY_HERE<br>
                     <span class="text-emerald-400">Content-Type:</span> application/json
                 </div>
             </div>
 
             <!-- Parameters Table -->
             <div>
-                <h3 class="text-sm font-bold text-slate-900 mb-2">Request Body (JSON)</h3>
+                <h3 class="text-sm font-bold text-slate-900 mb-2">Request Body (Supported Formats)</h3>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                    <!-- Format 1: Clean Hub Format -->
+                    <div class="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Format A: Clean Flat JSON (Recommended)
+                            </span>
+                            <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Easiest</span>
+                        </div>
+                        <pre class="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">{
+  "to": "919876543210",
+  "message": "Hello World! 🚀",
+  "humanize": true
+}</pre>
+                    </div>
+
+                    <!-- Format 2: Meta Cloud API Format -->
+                    <div class="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span> Format B: Meta WhatsApp Cloud API
+                            </span>
+                            <span class="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Drop-In</span>
+                        </div>
+                        <pre class="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "919876543210",
+  "type": "text",
+  "text": {
+    "body": "Hello World! 🚀"
+  }
+}</pre>
+                    </div>
+                </div>
+
                 <div class="overflow-x-auto border border-slate-200 rounded-xl">
                     <table class="min-w-full divide-y divide-slate-200 text-xs">
                         <thead class="bg-slate-50">
@@ -91,7 +132,7 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
                                 <td class="px-4 py-3 text-slate-600">Recipient's phone number with country code (e.g. <code class="bg-slate-100 px-1 py-0.5 rounded">919876543210</code>) or 10-digit Indian number.</td>
                             </tr>
                             <tr>
-                                <td class="px-4 py-3 font-mono font-bold text-slate-900">message</td>
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900">message <span class="text-slate-400 font-normal">or</span> text.body</td>
                                 <td class="px-4 py-3 text-slate-500">string</td>
                                 <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Required</span></td>
                                 <td class="px-4 py-3 text-slate-600">The message content. Supports WhatsApp formatting (<code class="bg-slate-100 px-1 py-0.5 rounded">*bold*</code>, <code class="bg-slate-100 px-1 py-0.5 rounded">_italic_</code>, <code class="bg-slate-100 px-1 py-0.5 rounded">~strike~</code>).</td>
@@ -118,16 +159,16 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
     <!-- Code Examples Section -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-200">
-            <h2 class="text-base font-bold text-slate-900">Code Examples (Single API Key)</h2>
+            <h2 class="text-base font-bold text-slate-900">Code Examples (Dual-Compatible)</h2>
             <p class="text-xs text-slate-500 mt-0.5">Copy-paste ready snippets in multiple programming languages.</p>
         </div>
 
         <div class="p-6 space-y-6">
-            <!-- cURL -->
+            <!-- cURL: Standard Format -->
             <div>
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> cURL (Terminal / Bash)
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> cURL — Standard Clean Format
                     </span>
                 </div>
                 <pre class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>curl -X POST "<?= e($endpoint) ?>" \
@@ -140,11 +181,33 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
   }'</code></pre>
             </div>
 
+            <!-- cURL: Meta Cloud API Format -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span> cURL — Meta WhatsApp Cloud API Format (Drop-In)
+                    </span>
+                </div>
+                <pre class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>curl -X POST "<?= e($endpoint) ?>" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY_HERE" \
+  -d '{
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": "919876543210",
+    "type": "text",
+    "text": {
+      "preview_url": false,
+      "body": "Hello via Meta Cloud API format! 🌐"
+    }
+  }'</code></pre>
+            </div>
+
             <!-- Python -->
             <div>
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span> Python (requests)
+                        <span class="w-2 h-2 rounded-full bg-cyan-500"></span> Python (requests)
                     </span>
                 </div>
                 <pre class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>import requests
@@ -221,7 +284,7 @@ echo $response;</code></pre>
             <div>
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-cyan-500"></span> Go (net/http)
+                        <span class="w-2 h-2 rounded-full bg-teal-500"></span> Go (net/http)
                     </span>
                 </div>
                 <pre class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>package main
@@ -268,9 +331,22 @@ func main() {
   "status": "queued",
   "message_id": 142,
   "request_id": "req_671e8845f7b67",
-  "recipient": "919876543210"
+  "recipient": "919876543210",
+  "messaging_product": "whatsapp",
+  "contacts": [
+    {
+      "input": "919876543210",
+      "wa_id": "919876543210"
+    }
+  ],
+  "messages": [
+    {
+      "id": "wamid.2bad39f34245353e31eeeec923ce4aa5",
+      "message_status": "accepted"
+    }
+  ]
 }</code></pre>
-            <p class="text-xs text-slate-500 mt-2">The message is buffered into the worker's priority queue and scheduled for immediate background delivery.</p>
+            <p class="text-xs text-slate-500 mt-2">The message is buffered into the queue with both standard fields and Meta Cloud API fields for universal SDK compatibility.</p>
         </div>
 
         <!-- Error Response -->
@@ -281,9 +357,14 @@ func main() {
             </div>
             <pre class="bg-slate-900 text-rose-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>{
   "ok": false,
-  "error": "Invalid API key or key is disabled."
+  "error": "Invalid API key or access token.",
+  "meta_error": {
+    "message": "Invalid OAuth access token or API key.",
+    "type": "OAuthException",
+    "code": 190
+  }
 }</code></pre>
-            <p class="text-xs text-slate-500 mt-2">Check that your API key is active in your dashboard and that your WhatsApp Web session is currently Online.</p>
+            <p class="text-xs text-slate-500 mt-2">Returns standard error message along with structured Meta exception for third-party libraries.</p>
         </div>
     </div>
 
