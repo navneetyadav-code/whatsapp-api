@@ -23,7 +23,26 @@ final class Database
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
         ];
-        if (!empty(self::$config['ssl'])) {
+        $isSsl = !empty(self::$config['ssl']) || str_contains((string) (self::$config['dsn'] ?? ''), 'tidbcloud.com');
+        if ($isSsl) {
+            $caCandidates = [
+                '/etc/ssl/certs/ca-certificates.crt',
+                dirname(__DIR__, 2) . '/prod/isrgrootx1.pem',
+                dirname(__DIR__, 2) . '/produ/isrgrootx1.pem',
+            ];
+            $caFound = null;
+            foreach ($caCandidates as $ca) {
+                if (file_exists($ca)) {
+                    $caFound = $ca;
+                    break;
+                }
+            }
+
+            if ($caFound) {
+                $options[PDO::MYSQL_ATTR_SSL_CA] = $caFound;
+            } else {
+                $options[PDO::MYSQL_ATTR_SSL_CA] = true;
+            }
             $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
         }
 
