@@ -497,7 +497,43 @@ const initAttachmentUI = () => {
         });
     }
 };
+
+// Prevent virtual keyboard from shifting the website header/layout upwards on mobile
+const initMobileViewportKeyboardHandler = () => {
+    const resetWindowScroll = () => {
+        if (window.scrollY !== 0) {
+            window.scrollTo(0, 0);
+        }
+    };
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', resetWindowScroll);
+        window.visualViewport.addEventListener('scroll', resetWindowScroll);
+    }
+
+    window.addEventListener('scroll', resetWindowScroll, { passive: true });
+
+    // When focusing input/textarea on mobile, ensure smooth containment inside workspace
+    document.addEventListener('focusin', (e) => {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+            setTimeout(() => {
+                resetWindowScroll();
+                const workspace = document.getElementById('workspaceContent') || e.target.closest('.overflow-auto') || e.target.closest('.overflow-y-auto');
+                if (workspace && typeof e.target.scrollIntoView === 'function') {
+                    e.target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }, 120);
+        }
+    });
+
+    document.addEventListener('focusout', (e) => {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+            setTimeout(resetWindowScroll, 80);
+        }
+    });
+};
 const runInits = () => {
+    if (typeof initMobileViewportKeyboardHandler === 'function') initMobileViewportKeyboardHandler();
     if (typeof initAttachmentUI === 'function') initAttachmentUI();
     if (typeof initUIToggles === 'function') initUIToggles();
     if (typeof initPhoneInputs === 'function') initPhoneInputs();
