@@ -70,8 +70,8 @@ function setDeviceActionMessage(message, type = 'info') {
 function renderStatus(data) {
     const session = data.session || {};
     const state = session.state || 'idle';
-    const isConnected = state === 'connected';
     const isSleeping = Boolean(session.sleeping);
+    const hasLinkedDevice = state === 'connected' || (isSleeping && Boolean(session.phone || session.pushName));
 
     const statusBadge = document.getElementById('statusBadge');
     const statusIndicator = document.getElementById('statusIndicator');
@@ -98,19 +98,19 @@ function renderStatus(data) {
     const lastErrorText = document.getElementById('lastErrorText');
 
     // Overview Stats Update
-    if (statusText) statusText.textContent = isConnected ? (isSleeping ? 'Sleeping' : 'Online') : 'Offline';
+    if (statusText) statusText.textContent = hasLinkedDevice ? (isSleeping ? 'Sleeping' : 'Online') : 'Offline';
     if (topPhoneText) topPhoneText.textContent = session.phone || 'None';
     if (statusIndicator) {
         const pings = statusIndicator.querySelectorAll('span');
         pings.forEach(p => {
-            p.className = p.className.replace(/bg-\w+-\d+/g, isConnected ? (isSleeping ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-500');
+            p.className = p.className.replace(/bg-\w+-\d+/g, hasLinkedDevice ? (isSleeping ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-500');
         });
     }
 
     // Detail Panel Update
     if (statusBadge) {
-        statusBadge.textContent = state;
-        statusBadge.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex items-center gap-1.5 ' + (isConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200');
+        statusBadge.textContent = isSleeping && hasLinkedDevice ? 'sleeping' : state;
+        statusBadge.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex items-center gap-1.5 ' + (hasLinkedDevice ? (isSleeping ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200') : 'bg-slate-100 text-slate-700 border-slate-200');
     }
     
     if (phoneText) phoneText.textContent = session.phone || 'Not connected';
@@ -128,7 +128,7 @@ function renderStatus(data) {
     }
 
     // View Toggles
-    if (isConnected) {
+    if (hasLinkedDevice) {
         if (profileContainer) profileContainer.classList.remove('hidden');
         if (qrContainer) qrContainer.classList.add('hidden');
         

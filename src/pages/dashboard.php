@@ -47,7 +47,10 @@ if ($section === 'chatbot') {
     $stmt->execute([$user['id']]);
     $chatbotRules = $stmt->fetchAll();
 }
-$connectedCount = (($session['status'] ?? 'idle') === 'connected') ? 1 : 0;
+$deviceSleeping = !empty($session['sleeping']);
+$deviceHasIdentity = !empty($session['phone']) || !empty($session['push_name']);
+$deviceConnected = (($session['status'] ?? 'idle') === 'connected') || ($deviceSleeping && $deviceHasIdentity);
+$connectedCount = $deviceConnected ? 1 : 0;
 $sentCount = (int) ($stats['sent'] ?? 0);
 $failedCount = (int) ($stats['failed'] ?? 0);
 $queuedCount = (int) ($stats['queued'] ?? 0);
@@ -56,7 +59,6 @@ $deliveryTotal = max(1, $sentCount + $failedCount + $queuedCount + $processingCo
 $sentRate = (int) round(($sentCount / $deliveryTotal) * 100);
 $failureRate = (int) round(($failedCount / $deliveryTotal) * 100);
 $queueDepth = $queuedCount + $processingCount;
-$deviceConnected = (($session['status'] ?? 'idle') === 'connected');
 
 $contactsStmt = $pdo->prepare('SELECT * FROM contacts WHERE user_id = ? ORDER BY id DESC LIMIT 25');
 $contactsStmt->execute([$user['id']]);
@@ -546,10 +548,10 @@ function page_header(string $title, string $subtitle): void
                 <p class="text-[12px] font-semibold text-slate-500">Device Status</p>
                 <div class="flex items-center gap-2 mt-1">
                     <span id="statusIndicator" class="relative flex h-3 w-3">
-                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 <?= $deviceConnected ? 'bg-emerald-400' : 'bg-slate-400' ?>"></span>
-                      <span class="relative inline-flex rounded-full h-3 w-3 <?= $deviceConnected ? 'bg-emerald-500' : 'bg-slate-500' ?>"></span>
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 <?= $deviceConnected ? ($deviceSleeping ? 'bg-amber-400' : 'bg-emerald-400') : 'bg-slate-400' ?>"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 <?= $deviceConnected ? ($deviceSleeping ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-500' ?>"></span>
                     </span>
-                    <h3 class="text-xl font-bold text-slate-900 tracking-tight" id="statusText"><?= $deviceConnected ? 'Online' : 'Offline' ?></h3>
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight" id="statusText"><?= $deviceConnected ? ($deviceSleeping ? 'Sleeping' : 'Online') : 'Offline' ?></h3>
                 </div>
             </div>
             <div class="w-10 h-10 rounded-full flex items-center justify-center <?= $deviceConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-600' ?>">
@@ -584,7 +586,7 @@ function page_header(string $title, string $subtitle): void
                     <h2 class="text-[15px] font-bold text-slate-900 tracking-tight">Connection Details</h2>
                     <p class="text-[12px] text-slate-500 mt-0.5">Live session attributes.</p>
                 </div>
-                <span id="statusBadge" class="px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex items-center gap-1.5 <?= $deviceConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-700 border-slate-200' ?>"><?= $deviceConnected ? 'Connected' : 'Disconnected' ?></span>
+                <span id="statusBadge" class="px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex items-center gap-1.5 <?= $deviceConnected ? ($deviceSleeping ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200') : 'bg-slate-100 text-slate-700 border-slate-200' ?>"><?= $deviceConnected ? ($deviceSleeping ? 'Sleeping' : 'Connected') : 'Disconnected' ?></span>
             </div>
             <div class="p-6 space-y-4">
                 <div class="flex items-start gap-4">
