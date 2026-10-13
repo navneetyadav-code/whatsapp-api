@@ -373,7 +373,7 @@ async function recordWebhookDelivery(webhook, payload, status, error, attempt) {
 
 async function startSession(userId, force = false, waitForReady = true) {
   const session = getSession(userId);
-  if (!force && (session.state === 'connected' || session.starting)) {
+  if (!force && ((session.state === 'connected' && session.sock) || session.starting)) {
     if (waitForReady && session.starting) {
       await session.starting;
     }
@@ -448,14 +448,14 @@ async function startSession(userId, force = false, waitForReady = true) {
           session.hasQr = false;
 
           if (connection === 'open' && sock) {
-            session.state = 'idle';
+            session.state = 'connected';
             session.sock = null;
             sock.end?.();
             await updateSessionRecord(userId, session);
           }
 
           if (connection === 'close') {
-            session.state = 'idle';
+            session.state = session.phone ? 'connected' : 'idle';
             session.sock = null;
             session.error = null;
             await updateSessionRecord(userId, session);
@@ -1017,7 +1017,7 @@ app.post('/sessions/:userId/sleep', async (req, res) => {
   }
 
   session.sock = null;
-  session.state = 'idle';
+  session.state = session.phone ? 'connected' : 'idle';
   await updateSessionRecord(req.params.userId, session);
   res.json({ ok: true, session: publicSession(session) });
 });
