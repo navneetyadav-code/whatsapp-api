@@ -241,11 +241,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Sign in with Google
             </a>
 
+            <?php if (app_config('app.enable_registration')): ?>
             <!-- Footer -->
             <p class="mt-8 text-center text-sm font-medium text-gray-500">
                 Don't have an account? 
                 <a href="<?= e(base_url('index.php?page=register')) ?>" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Sign up</a>
             </p>
+            <?php endif; ?>
 
         </div>
     </div>
