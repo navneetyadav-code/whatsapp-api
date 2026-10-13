@@ -14,6 +14,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $userId = (int) $user['id'];
 
 if ($action === 'start') {
+    sync_session_status($userId, [
+        'state' => 'connecting',
+        'sleeping' => false,
+        'error' => null,
+    ]);
+
     $response = worker_request('POST', "sessions/{$userId}/start");
     if (!empty($response['ok'])) {
         sync_session_status($userId, $response['session'] ?? []);

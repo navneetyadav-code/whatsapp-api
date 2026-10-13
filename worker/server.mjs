@@ -371,10 +371,13 @@ async function recordWebhookDelivery(webhook, payload, status, error, attempt) {
   }
 }
 
-async function startSession(userId, force = false) {
+async function startSession(userId, force = false, waitForReady = true) {
   const session = getSession(userId);
   if (!force && (session.state === 'connected' || session.starting)) {
-    return session.starting || session;
+    if (waitForReady && session.starting) {
+      await session.starting;
+    }
+    return session;
   }
 
   if (force && session.sock) {
@@ -487,7 +490,8 @@ async function startSession(userId, force = false) {
           const code = lastDisconnect?.error?.output?.statusCode;
           const isRestart = code === DisconnectReason.restartRequired;
           const isLoggedOut = code === DisconnectReason.loggedOut;
-          const isQrExpired = lastDisconnect?.error?.message === 'QR refs attempts ended';
+          const disconnectMessage = String(lastDisconnect?.error?.message || '');
+          const isQrExpired = disconnectMessage.includes('QR refs attempts ended');
 
           if (isLoggedOut) {
             try { await rm(authDir, { recursive: true, force: true }); } catch (e) {}
@@ -590,9 +594,17 @@ async function startSession(userId, force = false) {
   })();
 
   try {
-    await session.starting;
+    if (waitForReady) {
+      await session.starting;
+    } else {
+      session.starting.catch((error) => {
+        logger.error({ error, userId }, 'Session startup failed');
+      });
+    }
   } finally {
-    session.starting = null;
+    if (waitForReady) {
+      session.starting = null;
+    }
   }
 
   return session;
@@ -947,7 +959,7 @@ app.post('/sessions/:userId/start', async (req, res) => {
   try {
     const existing = getSession(req.params.userId);
     const force = existing.state !== 'connected';
-    const session = await startSession(req.params.userId, force);
+    const session = await startSession(req.params.userId, force, false);
     res.json({ ok: true, session: publicSession(session) });
   } catch (error) {
     const session = getSession(req.params.userId);
