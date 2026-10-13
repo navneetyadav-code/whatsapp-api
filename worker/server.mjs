@@ -405,6 +405,7 @@ async function startSession(userId, force = false, waitForReady = true) {
         } catch (_) {}
       }
       if (!isRegistered) {
+        logger.info({ userId, authDir }, 'Removing stale unregistered WhatsApp auth before starting new QR flow');
         await rm(authDir, { recursive: true, force: true });
       }
     } catch (_) {}
@@ -508,8 +509,11 @@ async function startSession(userId, force = false, waitForReady = true) {
             session.state = 'connecting';
             session.error = null;
             session.sock = null;
+            session.qr = null;
+            session.hasQr = false;
+            await updateSessionRecord(userId, session);
             setTimeout(() => {
-              startSession(userId, true).catch((error) => {
+              startSession(userId, false).catch((error) => {
                 logger.error({ error, userId }, 'Restart handshake failed');
               });
             }, 600);
@@ -958,7 +962,7 @@ app.get('/sessions/:userId/status', (req, res) => {
 app.post('/sessions/:userId/start', async (req, res) => {
   try {
     const existing = getSession(req.params.userId);
-    const force = existing.state !== 'connected';
+    const force = !['connected', 'connecting', 'qr'].includes(existing.state);
     const session = await startSession(req.params.userId, force, false);
     res.json({ ok: true, session: publicSession(session) });
   } catch (error) {
