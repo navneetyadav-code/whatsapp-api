@@ -74,6 +74,7 @@ return [
         'session_name' => config_env('APP_SESSION_NAME', 'wa_api_hub'),
         'secure_cookies' => config_bool('APP_SECURE_COOKIES', $appEnv === 'production'),
         'enable_test_page' => config_bool('ENABLE_TEST_PAGE', $appEnv !== 'production'),
+        'enable_registration' => config_bool('ENABLE_REGISTRATION', true),
         'default_country_code' => config_env('DEFAULT_COUNTRY_CODE', 'in'),
         'enable_registration' => config_bool('ENABLE_REGISTRATION', false),
         'allow_new_devices' => config_bool('ALLOW_NEW_DEVICES', false),
