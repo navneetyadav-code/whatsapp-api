@@ -18,6 +18,44 @@ if ($userForLayout) {
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <title><?= e($seo['title']) ?></title>
     <meta name="description" content="<?= e($seo['description']) ?>">
+    <meta name="keywords" content="<?= e($seo['keywords']) ?>">
+    <meta name="author" content="Navneet Kumar Yadav">
+    <meta name="robots" content="<?= e($seo['robots']) ?>">
+    <link rel="canonical" href="<?= e($seo['canonical']) ?>">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="<?= e($seo['canonical']) ?>">
+    <meta property="og:title" content="<?= e($seo['title']) ?>">
+    <meta property="og:description" content="<?= e($seo['description']) ?>">
+    <meta property="og:site_name" content="WhatsApp API Hub">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<?= e($seo['title']) ?>">
+    <meta name="twitter:description" content="<?= e($seo['description']) ?>">
+
+    <!-- Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Free WhatsApp API Hub",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Linux, Windows, macOS, Docker",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Navneet Kumar Yadav",
+        "url": "https://github.com/navneetyadav-code"
+      },
+      "description": "Free open-source WhatsApp API Gateway and Dashboard powered by Baileys, PHP, Node.js, and MySQL."
+    }
+    </script>
     
     <!-- Old CSS for backward compatibility of non-dashboard pages -->
     <link rel="stylesheet" href="<?= e(base_url('assets/app.css')) ?>">
