@@ -19,7 +19,7 @@ import makeWASocket, {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv(resolve(__dirname, '..', '.env'));
 
-const PORT = Number(process.env.PORT || 3107);
+const PORT = Number(process.env.WORKER_PORT || 3107);
 const WORKER_TOKEN = process.env.WORKER_TOKEN || 'change-this-worker-token-before-production';
 const APP_ENV = process.env.APP_ENV || 'local';
 
