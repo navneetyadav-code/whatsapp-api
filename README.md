@@ -186,3 +186,21 @@ Yes. The worker can send webhook callbacks for sent and failed message events.
 ### Does it include rate limits?
 
 Yes. API keys support per-minute, per-hour, and per-day limits, plus optional IP allowlists.
+
+## Author & Maintainer
+
+Created with ❤️ by **[Navneet Kumar Yadav](https://github.com/navneetyadav-code)**.
+
+## Disclaimer & Legal Notice
+
+This project is an independent, community-driven, open-source automation library and is **not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with Meta Platforms, Inc., WhatsApp LLC, or any of their subsidiaries or affiliates.**
+
+WhatsApp is a registered trademark of WhatsApp LLC / Meta Platforms, Inc. The names WhatsApp as well as related names, marks, emblems, and images are registered trademarks of their respective owners.
+
+## Takedown / Copyright Removal Requests
+
+If you are a copyright or trademark owner or an agent thereof and believe that any content or material in this repository infringes upon your copyrights or marks, please submit a formal takedown or removal notice to:
+
+📧 **info.assistgroupofficial@gmail.com**
+
+All verified requests will be addressed promptly.
