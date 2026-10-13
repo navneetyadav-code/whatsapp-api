@@ -626,48 +626,19 @@ async function claimNextMessage() {
      WHERE status = 'processing' AND locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`
   );
 
-  try {
-    if (supportsSleepingColumn) {
-      await db.execute(
-        `UPDATE message_queue
-         SET status = 'processing', locked_at = NOW(), locked_by = ?, attempts = attempts + 1
-         WHERE id = (
-           SELECT id FROM (
-             SELECT message_queue.id
-             FROM message_queue
-             LEFT JOIN whatsapp_sessions
-               ON whatsapp_sessions.user_id = message_queue.user_id
-             WHERE message_queue.status = 'queued'
-               AND message_queue.available_at <= NOW()
-               AND COALESCE(whatsapp_sessions.sleeping, 0) = 0
-             ORDER BY message_queue.id ASC
-             LIMIT 1
-           ) AS next_message
-         )`,
-        [WORKER_ID]
-      );
-    } else {
-      await db.execute(
-        `UPDATE message_queue
-         SET status = 'processing', locked_at = NOW(), locked_by = ?, attempts = attempts + 1
-         WHERE id = (
-           SELECT id FROM (
-             SELECT id FROM message_queue
-             WHERE status = 'queued' AND available_at <= NOW()
-             ORDER BY id ASC
-             LIMIT 1
-           ) AS next_message
-         )`,
-        [WORKER_ID]
-      );
-    }
-  } catch (error) {
-    if (supportsSleepingColumn && isMissingSleepingColumnError(error)) {
-      supportsSleepingColumn = false;
-      return claimNextMessage();
-    }
-    throw error;
-  }
+  await db.execute(
+    `UPDATE message_queue
+     SET status = 'processing', locked_at = NOW(), locked_by = ?, attempts = attempts + 1
+     WHERE id = (
+       SELECT id FROM (
+         SELECT id FROM message_queue
+         WHERE status = 'queued' AND available_at <= NOW()
+         ORDER BY id ASC
+         LIMIT 1
+       ) AS next_message
+     )`,
+    [WORKER_ID]
+  );
 
   const [rows] = await db.execute(
     `SELECT * FROM message_queue
@@ -690,6 +661,13 @@ async function releaseMessageToQueue(message) {
 }
 
 async function sendQueuedMessage(message) {
+  let payload = {};
+  try {
+    payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : {};
+  } catch {
+    payload = {};
+  }
+
   const currentSession = getSession(String(message.user_id));
   currentSession.lastActivityAt = Date.now();
 
@@ -711,24 +689,45 @@ async function sendQueuedMessage(message) {
     }
   }
 
+  const isApiSend = payload?.source === 'api' || payload?.source === 'meta_compat_api';
+  const wasAsleep = Boolean(currentSession.sleeping || currentSession.wasSleeping || isApiSend);
+
   if (currentSession.sleeping) {
     currentSession.wasSleeping = true;
     currentSession.sleeping = false;
+    currentSession.lastActivityAt = Date.now();
     await updateSessionRecord(currentSession.userId, currentSession);
-    logger.info('Auto-waking session for user ' + currentSession.userId + ' to process queue.');
+    logger.info(`Auto-waking session for user ${currentSession.userId} to process message.`);
   }
 
   const session = await startSession(String(message.user_id));
-  await new Promise((resolve) => setTimeout(resolve, SEND_DELAY_MS));
 
-  if (session.sleeping) {
-    await releaseMessageToQueue(message);
-    return;
+  // If session is connecting / waking up, wait up to 25 seconds for socket to be ready
+  if (session.state !== 'connected' || !session.sock) {
+    logger.info(`Waiting for session ${message.user_id} to establish WhatsApp connection...`);
+    const maxWaitMs = 25000;
+    const startWait = Date.now();
+    while (Date.now() - startWait < maxWaitMs) {
+      if (session.state === 'connected' && session.sock) {
+        break;
+      }
+      if (session.state === 'error') {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   }
 
   if (session.state !== 'connected' || !session.sock) {
-    throw new Error('WhatsApp device is not connected.');
+    throw new Error('WhatsApp device is not connected or failed to wake up.');
   }
+
+  session.lastActivityAt = Date.now();
+  if (wasAsleep) {
+    session.wasSleeping = true;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, SEND_DELAY_MS));
 
   const recipient = normalizeRecipient(message.recipient);
   if (!recipient.jid) {
@@ -747,38 +746,22 @@ async function sendQueuedMessage(message) {
       recipient.jid = match.jid;
     }
 
-  // "Humanized Delivery" Presence & Delay
-  let isHumanized = false;
-  let isAudio = false;
-  try {
-    if (message.payload) {
-      const payload = typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload;
-      if (payload.humanize) isHumanized = true;
-      if (payload.media_url && payload.media_url.match(/\.(mp3|ogg|wav)$/i)) isAudio = true;
-    }
-  } catch (e) {
-    // skip
-  }
+    // "Humanized Delivery" Presence & Delay
+    const isHumanized = Boolean(payload?.humanize);
+    const isAudio = Boolean(payload?.media_url && String(payload.media_url).match(/\.(mp3|ogg|wav)$/i));
 
-  if (isHumanized && typeof session.sock.sendPresenceUpdate === 'function') {
-    const presenceStatus = isAudio ? 'recording' : 'composing';
-    try {
-      await session.sock.sendPresenceUpdate('available');
-      await session.sock.sendPresenceUpdate(presenceStatus, recipient.jid);
-      const delayMs = Math.floor(Math.random() * 3000) + 2000; // 2 to 5 seconds
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-      await session.sock.sendPresenceUpdate('paused', recipient.jid);
-    } catch (err) {
-      logger.warn({ err }, 'Failed to send presence update, continuing anyway.');
+    if (isHumanized && typeof session.sock.sendPresenceUpdate === 'function') {
+      const presenceStatus = isAudio ? 'recording' : 'composing';
+      try {
+        await session.sock.sendPresenceUpdate('available');
+        await session.sock.sendPresenceUpdate(presenceStatus, recipient.jid);
+        const delayMs = Math.floor(Math.random() * 3000) + 2000; // 2 to 5 seconds
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        await session.sock.sendPresenceUpdate('paused', recipient.jid);
+      } catch (err) {
+        logger.warn({ err }, 'Failed to send presence update, continuing anyway.');
+      }
     }
-  }
-  }
-
-  let payload = {};
-  try {
-    payload = message.payload ? JSON.parse(String(message.payload)) : {};
-  } catch {
-    payload = {};
   }
 
   const attachment = payload?.attachment;
@@ -930,20 +913,26 @@ async function processQueueOnce() {
       } catch (error) {
         await markMessageFailed(message, error.message);
       }
+      setImmediate(processQueueOnce);
     } else {
       const now = Date.now();
       for (const session of sessions.values()) {
         if (session.wasSleeping && !session.sleeping) {
           const lastActivity = session.lastActivityAt || now;
-          if (now - lastActivity > 5 * 60 * 1000) {
-            logger.info('Session for user ' + session.userId + ' was inactive for 5 minutes. Returning to sleep mode.');
+          if (now - lastActivity > 60 * 1000) {
+            logger.info(`Session for user ${session.userId} was inactive for 1 minute. Returning to sleep mode.`);
             session.wasSleeping = false;
             session.sleeping = true;
             session.qr = null;
             session.hasQr = false;
+            session.error = null;
             if (session.sock) {
-              session.sock.end?.();
+              try {
+                session.sock.end?.();
+              } catch (e) {}
             }
+            session.sock = null;
+            session.state = session.phone ? 'connected' : 'idle';
             await updateSessionRecord(session.userId, session);
           }
         }
@@ -955,6 +944,11 @@ async function processQueueOnce() {
     queueBusy = false;
   }
 }
+
+app.post('/queue/notify', (req, res) => {
+  setImmediate(processQueueOnce);
+  res.json({ ok: true });
+});
 
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'whatsapp-worker' });
@@ -1004,6 +998,7 @@ app.post('/sessions/:userId/logout', async (req, res) => {
 app.post('/sessions/:userId/sleep', async (req, res) => {
   const session = getSession(req.params.userId);
   session.sleeping = true;
+  session.wasSleeping = false;
   session.qr = null;
   session.hasQr = false;
   session.error = null;
@@ -1026,6 +1021,8 @@ app.post('/sessions/:userId/wake', async (req, res) => {
   try {
     const session = getSession(req.params.userId);
     session.sleeping = false;
+    session.wasSleeping = Boolean(req.query.autoSleep || req.body?.autoSleep);
+    session.lastActivityAt = Date.now();
     const started = await startSession(req.params.userId);
     res.json({ ok: true, session: publicSession(started) });
   } catch (error) {
