@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 if (current_user()) {
     redirect_to('index.php?page=dashboard');
@@ -12,16 +12,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim((string) ($_POST['phone'] ?? ''));
     $password = (string) ($_POST['password'] ?? '');
 
-    // If the user submits just 10 digits (without JS), assume default country
-    $defaultCountryPrefix = config_env('DEFAULT_COUNTRY_CODE', 'in') === 'in' ? '+91' : '';
-    if ($defaultCountryPrefix && preg_match('/^[0-9]{10}$/', $phone)) {
-        $phone = $defaultCountryPrefix . $phone;
+    // Normalize phone number
+    $cleanPhone = preg_replace('/[^\d+]/', '', $phone);
+    if (!str_starts_with($cleanPhone, '+')) {
+        $countryCode = config_env('DEFAULT_COUNTRY_CODE', '91');
+        $codeDigits = ($countryCode === 'in') ? '91' : preg_replace('/\D/', '', (string) $countryCode);
+        if (strlen($cleanPhone) === 10) {
+            $cleanPhone = '+' . ($codeDigits ?: '91') . $cleanPhone;
+        } elseif (!empty($codeDigits) && str_starts_with($cleanPhone, $codeDigits)) {
+            $cleanPhone = '+' . $cleanPhone;
+        } else {
+            $cleanPhone = '+' . $cleanPhone;
+        }
     }
+    $phone = $cleanPhone;
 
     if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 8) {
         $error = 'Enter a valid name, email, and password with at least 8 characters.';
-    } elseif (!preg_match('/^\+[1-9]\d{6,14}$/', $phone)) {
-        $error = 'Enter a valid international phone number.';
+    } elseif (!preg_match('/^\+[1-9]\d{7,14}$/', $phone)) {
+        $error = 'Enter a valid phone number with country code.';
     } else {
         try {
             register_user($name, $email, $phone, $password);
@@ -215,23 +224,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <!-- Phone Field -->
                 <div>
                     <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
-                    <div class="flex">
-                        <span class="inline-flex items-center px-3 text-sm text-gray-700 bg-gray-100 border border-r-0 border-gray-200 rounded-l-xl">
-                            <svg class="w-4 h-3 mr-1.5 border border-gray-200 shadow-sm" viewBox="0 0 225 150">
-                                <rect width="225" height="150" fill="#f93"/>
-                                <rect width="225" height="100" y="50" fill="#fff"/>
-                                <rect width="225" height="50" y="100" fill="#128807"/>
-                                <circle cx="112.5" cy="75" r="20" fill="none" stroke="#000088" stroke-width="3"/>
-                            </svg>
-                            +91
-                        </span>
-                        <input type="tel" id="phone" name="phone" 
-                               class="w-full px-3.5 py-2.5 text-sm rounded-none rounded-r-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
-                               placeholder="9876543210" 
-                               pattern="^[0-9]{10}$"
-                               title="Enter a 10 digit phone number"
-                               required>
-                    </div>
+                    <input type="tel" id="phone" name="phone" 
+                           class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
+                           placeholder="9876543210" 
+                           required>
                 </div>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -367,25 +363,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.addEventListener("DOMContentLoaded", function() {
             const phoneInput = document.querySelector('input[name="phone"]');
             if (phoneInput && window.intlTelInput) {
+                const defaultCc = "<?= e(config_env('DEFAULT_COUNTRY_CODE', 'in')) ?>";
+                const isoCode = (defaultCc === '91' || defaultCc === '+91') ? 'in' : defaultCc.toLowerCase();
                 const iti = window.intlTelInput(phoneInput, {
-                    initialCountry: "<?= e(config_env('DEFAULT_COUNTRY_CODE', 'in')) ?>", 
+                    initialCountry: isoCode, 
                     utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/js/utils.js",
                     separateDialCode: true,
-                    nationalMode: true
+                    nationalMode: false
                 });
 
                 const form = phoneInput.closest('form');
                 if (form) {
                     form.addEventListener('submit', function(e) {
-                        if (phoneInput.value.trim() !== '') {
-                            if (!iti.isValidNumber()) {
-                                e.preventDefault();
-                                alert("Please enter a valid phone number.");
-                                phoneInput.focus();
-                                return false;
+                        const val = phoneInput.value.trim();
+                        if (val !== '') {
+                            const fullNum = iti.getNumber();
+                            if (fullNum) {
+                                phoneInput.value = fullNum;
                             }
-                            // Replace input value with full E164 before submitting
-                            phoneInput.value = iti.getNumber();
                         }
                     });
                 }
