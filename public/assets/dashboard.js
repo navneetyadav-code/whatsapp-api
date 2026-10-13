@@ -10,15 +10,61 @@ const testForm = document.querySelector('#testForm');
 const testResult = document.querySelector('#testResult');
 
 async function callSession(action, options = {}) {
-    const response = await fetch(`session.php?action=${encodeURIComponent(action)}`, {
+    const requestUrl = `session.php?action=${encodeURIComponent(action)}`;
+    const requestOptions = {
         method: options.method || 'GET',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-Token': csrf,
         },
         body: options.body ? JSON.stringify(options.body) : undefined,
+    };
+
+    let response;
+    if (typeof fetch === 'function') {
+        response = await fetch(requestUrl, requestOptions);
+    } else {
+        response = await xhrJson(requestUrl, requestOptions);
+    }
+
+    const data = await response.json();
+    if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `Session request failed (${response.status})`);
+    }
+    return data;
+}
+
+function xhrJson(url, options) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(options.method || 'GET', url, true);
+        Object.entries(options.headers || {}).forEach(([key, value]) => xhr.setRequestHeader(key, value));
+        xhr.onload = () => resolve({
+            ok: xhr.status >= 200 && xhr.status < 300,
+            status: xhr.status,
+            json: async () => {
+                try {
+                    return JSON.parse(xhr.responseText || '{}');
+                } catch (error) {
+                    return { ok: false, error: xhr.responseText || 'Invalid worker response.' };
+                }
+            },
+        });
+        xhr.onerror = () => reject(new Error('Network error while contacting the worker.'));
+        xhr.send(options.body);
     });
-    return response.json();
+}
+
+function setDeviceActionMessage(message, type = 'info') {
+    const qrPlaceholder = document.getElementById('qrPlaceholder');
+    const span = qrPlaceholder?.querySelector('span');
+    if (span) {
+        span.textContent = message;
+        span.className = 'text-[12px] font-medium max-w-[190px] leading-relaxed ' + (type === 'error' ? 'text-rose-600' : 'text-slate-500');
+    }
+    if (type === 'error' && typeof window.showToast === 'function') {
+        window.showToast(message, 'error');
+    }
 }
 
 function renderStatus(data) {
@@ -48,6 +94,8 @@ function renderStatus(data) {
     
     const qrImage = document.getElementById('qrImage');
     const qrPlaceholder = document.getElementById('qrPlaceholder');
+    const lastErrorPanel = document.getElementById('lastErrorPanel');
+    const lastErrorText = document.getElementById('lastErrorText');
 
     // Overview Stats Update
     if (statusText) statusText.textContent = isConnected ? (isSleeping ? 'Sleeping' : 'Online') : 'Offline';
@@ -69,6 +117,15 @@ function renderStatus(data) {
     if (nameText) nameText.textContent = session.pushName || 'Unknown';
     if (profileName) profileName.textContent = session.pushName || 'Connected';
     if (lastConnectedText && session.connected_at) lastConnectedText.textContent = session.connected_at;
+    if (lastErrorPanel && lastErrorText) {
+        if (session.error) {
+            lastErrorText.textContent = session.error;
+            lastErrorPanel.classList.remove('hidden');
+        } else {
+            lastErrorText.textContent = '';
+            lastErrorPanel.classList.add('hidden');
+        }
+    }
 
     // View Toggles
     if (isConnected) {
@@ -132,27 +189,44 @@ async function refreshStatus() {
     try {
         renderStatus(await callSession('status'));
     } catch (error) {
-        statusBadge.textContent = 'worker off';
-        statusBadge.className = 'device-state-badge error';
+        if (statusBadge) {
+            statusBadge.textContent = 'worker off';
+            statusBadge.className = 'device-state-badge error';
+        }
+        setDeviceActionMessage(error.message || 'Worker is not reachable.', 'error');
     }
 }
 
-connectBtn?.addEventListener('click', async () => {
-    connectBtn.disabled = true;
+async function runDeviceAction(action, button, message) {
+    if (!button) return;
+    button.disabled = true;
+    setDeviceActionMessage(message);
     try {
-        renderStatus(await callSession('start', { method: 'POST' }));
+        renderStatus(await callSession(action, { method: 'POST' }));
+    } catch (error) {
+        setDeviceActionMessage(error.message || 'Could not update WhatsApp session.', 'error');
     } finally {
-        connectBtn.disabled = false;
+        button.disabled = false;
     }
-});
+}
 
-disconnectBtn?.addEventListener('click', async () => {
-    disconnectBtn.disabled = true;
-    try {
-        renderStatus(await callSession('logout', { method: 'POST' }));
-    } finally {
-        disconnectBtn.disabled = false;
+document.addEventListener('click', (event) => {
+    const actionButton = event.target.closest('[data-session-action]');
+    if (!actionButton) return;
+
+    event.preventDefault();
+    const action = actionButton.dataset.sessionAction;
+    if (action === 'logout' && actionButton.dataset.confirm && !confirm(actionButton.dataset.confirm)) {
+        return;
     }
+
+    const messages = {
+        start: 'Generating QR code...',
+        logout: 'Logging out device...',
+        sleep: 'Putting connection to sleep...',
+        wake: 'Waking up connection...',
+    };
+    runDeviceAction(action, actionButton, messages[action] || 'Updating WhatsApp session...');
 });
 
 testForm?.addEventListener('submit', async (event) => {
@@ -353,33 +427,7 @@ function insertTextAtCursor(textarea, insertText) {
 const sleepBtn = document.getElementById('sleepBtn');
 const wakeupBtn = document.getElementById('wakeupBtn');
 
-sleepBtn?.addEventListener('click', async () => {
-    sleepBtn.disabled = true;
-    try {
-        renderStatus(await callSession('sleep', { method: 'POST' }));
-    } finally {
-        sleepBtn.disabled = false;
-    }
-});
-
-wakeupBtn?.addEventListener('click', async () => {
-    wakeupBtn.disabled = true;
-    try {
-        renderStatus(await callSession('wake', { method: 'POST' }));
-    } finally {
-        wakeupBtn.disabled = false;
-    }
-});
 const resetBtn = document.getElementById('resetBtn');
-resetBtn?.addEventListener('click', async () => {
-    if(!confirm('Are you sure you want to reset the WhatsApp session? This will force a logout.')) return;
-    resetBtn.disabled = true;
-    try {
-        renderStatus(await callSession('logout', { method: 'POST' }));
-    } finally {
-        resetBtn.disabled = false;
-    }
-});
 
 
 

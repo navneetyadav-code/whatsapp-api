@@ -533,7 +533,7 @@ function page_header(string $title, string $subtitle): void
             <p class="text-[13px] text-slate-500 mt-1 font-medium">Connect and manage your WhatsApp Web linked device.</p>
         </div>
         <div class="flex gap-2">
-            <button type="button" id="disconnectBtn" class="px-3.5 py-2 text-[13px] font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg shadow-saas hover:bg-rose-50 hover:shadow-saas-hover focus:outline-none focus:ring-2 focus:ring-rose-200 transition-all text-center <?= $deviceConnected ? '' : 'hidden' ?>">
+            <button type="button" id="disconnectBtn" data-session-action="logout" class="px-3.5 py-2 text-[13px] font-semibold text-rose-600 bg-white border border-rose-200 rounded-lg shadow-saas hover:bg-rose-50 hover:shadow-saas-hover focus:outline-none focus:ring-2 focus:ring-rose-200 transition-all text-center <?= $deviceConnected ? '' : 'hidden' ?>">
                 Logout Device
             </button>
         </div>
@@ -621,37 +621,37 @@ function page_header(string $title, string $subtitle): void
                     </div>
                 </div>
                 
-                <?php if (!empty($session['last_error'])): ?>
-                <div class="w-full h-px bg-slate-100"></div>
-                <div class="flex items-start gap-4">
+                <div id="lastErrorPanel" class="<?= empty($session['last_error']) ? 'hidden' : '' ?>">
+                    <div class="w-full h-px bg-slate-100 mb-4"></div>
+                    <div class="flex items-start gap-4">
                     <div class="w-10 h-10 rounded-lg bg-rose-100 flex items-center justify-center text-rose-500 shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                     </div>
                     <div>
                         <p class="text-[12px] font-semibold text-rose-600">Last Error</p>
-                        <p class="text-[13px] font-mono text-rose-700 mt-0.5"><?= e($session['last_error']) ?></p>
+                        <p id="lastErrorText" class="text-[13px] font-mono text-rose-700 mt-0.5"><?= e($session['last_error'] ?? '') ?></p>
+                    </div>
                     </div>
                 </div>
-                <?php endif; ?>
             </div>
             
             <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3" id="deviceActions">
                 <!-- Connect / Sleep buttons toggled via JS -->
-                <button id="connectBtn" type="button" class="<?= $deviceConnected ? 'hidden' : '' ?> px-4 py-2.5 text-[13px] font-semibold text-white bg-brand-accent rounded-lg shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all flex items-center gap-2">
+                <button id="connectBtn" type="button" data-session-action="start" class="<?= $deviceConnected ? 'hidden' : '' ?> px-4 py-2.5 text-[13px] font-semibold text-white bg-brand-accent rounded-lg shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                     Connect via WhatsApp
                 </button>
 
-                <button id="sleepBtn" type="button" class="<?= !$deviceConnected || $deviceSleeping ? 'hidden' : '' ?> px-4 py-2 text-[13px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg shadow-sm hover:bg-amber-100 focus:outline-none transition-all flex items-center gap-2">
+                <button id="sleepBtn" type="button" data-session-action="sleep" class="<?= !$deviceConnected || $deviceSleeping ? 'hidden' : '' ?> px-4 py-2 text-[13px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg shadow-sm hover:bg-amber-100 focus:outline-none transition-all flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
                     Sleep Connection
                 </button>
                 
-                                <button id="resetBtn" type="button" class="px-4 py-2 text-[13px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg shadow-sm hover:bg-rose-100 focus:outline-none transition-all flex items-center gap-2">
+                                <button id="resetBtn" type="button" data-session-action="logout" data-confirm="Are you sure you want to reset the WhatsApp session? This will force a logout." class="px-4 py-2 text-[13px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg shadow-sm hover:bg-rose-100 focus:outline-none transition-all flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     Reset Session
                 </button>
-                <button id="wakeupBtn" type="button" class="<?= !$deviceConnected || !$deviceSleeping ? 'hidden' : '' ?> px-4 py-2 text-[13px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 focus:outline-none transition-all flex items-center gap-2">
+                <button id="wakeupBtn" type="button" data-session-action="wake" class="<?= !$deviceConnected || !$deviceSleeping ? 'hidden' : '' ?> px-4 py-2 text-[13px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm hover:bg-emerald-100 focus:outline-none transition-all flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                     Wake Up Connection
                 </button>
