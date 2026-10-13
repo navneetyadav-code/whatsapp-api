@@ -500,7 +500,7 @@ function page_header(string $title, string $subtitle): void
                         Message Content
                         <span class="text-slate-400 font-normal">Supports *bold*, _italic_, ~strikethrough~</span>
                     </label>
-                    <textarea name="message" data-presets='["{name}", "{phone}"]' class="wa-editor block w-full px-3.5 py-3 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-wa_light/20 focus:border-brand-wa_med bg-white transition-all shadow-sm placeholder:text-slate-300" placeholder="Type your WhatsApp message here..." required></textarea>
+                    <textarea name="message" data-presets='["{name}", "{phone}"]' class="wa-editor block w-full px-3.5 py-3 text-base md:text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-wa_light/20 focus:border-brand-wa_med bg-white transition-all shadow-sm placeholder:text-slate-300" placeholder="Type your WhatsApp message here..." required></textarea>
                 </div>
 
                 <!-- Footer Actions -->

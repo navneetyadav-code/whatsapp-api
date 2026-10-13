@@ -14,7 +14,7 @@ if ($userForLayout) {
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <title><?= e($seo['title']) ?></title>
     <meta name="description" content="<?= e($seo['description']) ?>">
@@ -80,10 +80,21 @@ if ($userForLayout) {
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
         }
+        /* Mobile keyboard, auto-zoom, and layout shift fixes */
+        @media screen and (max-width: 768px) {
+            input, textarea, select, .wa-editor {
+                font-size: 16px !important;
+            }
+            html, body {
+                height: 100%;
+                height: 100dvh;
+                overflow-x: hidden;
+            }
+        }
     </style>
     <?php endif; ?>
 </head>
-<body class="<?= $isAuthed ? 'flex h-screen overflow-hidden text-[13px]' : ($isPublicDocs ? 'docs-body' : 'auth-body') ?>">
+<body class="<?= $isAuthed ? 'flex h-screen h-[100dvh] overflow-hidden text-[13px]' : ($isPublicDocs ? 'docs-body' : 'auth-body') ?>">
 
 <?php if ($isAuthed): ?>
     <?php require __DIR__ . '/components/sidebar.php'; ?>
@@ -92,11 +103,11 @@ if ($userForLayout) {
     <div id="sidebarOverlay" class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-20 hidden md:hidden transition-opacity"></div>
 
     <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col h-screen min-w-0 bg-white relative">
+    <main class="flex-1 flex flex-col h-full md:h-screen min-w-0 bg-white relative overflow-hidden">
         <?php require __DIR__ . '/components/navbar.php'; ?>
         
         <!-- Scrollable Workspace -->
-        <div class="flex-1 overflow-auto custom-scrollbar bg-[#FAFAFA] p-4 md:p-6 lg:p-8">
+        <div id="workspaceContent" class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#FAFAFA] p-4 md:p-6 lg:p-8 overscroll-contain">
             <div class="max-w-6xl mx-auto space-y-6">
                 <?php foreach (flashes() as $flash): ?>
                     <div class="p-4 mb-4 text-sm rounded-lg <?= $flash['type'] === 'success' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800' ?>">

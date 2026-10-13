@@ -6,7 +6,7 @@ $pageLabels = [
     'queue' => 'Message Queue',
     'contacts' => 'Contacts',
     'message' => 'New Message',
-    'birthday-tasks' => 'Birthday Tasks',
+    'chatbot' => 'Chatbots',
     'webhooks' => 'Webhooks',
     'campaigns' => 'Campaigns',
 ];
