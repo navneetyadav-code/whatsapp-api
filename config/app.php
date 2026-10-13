@@ -64,7 +64,7 @@ return [
         'dsn' => config_env('DB_DSN', $defaultDsn),
         'user' => config_env('DB_USER', 'root'),
         'password' => config_env('DB_PASSWORD', ''),
-        'ssl' => config_bool('DB_SSL', false),
+        'ssl' => config_bool('DB_SSL', str_contains($dbHost, 'tidbcloud.com') || (string) $dbPort === '4000'),
     ],
     'app' => [
         'env' => $appEnv,
