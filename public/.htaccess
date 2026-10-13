@@ -1,3 +1,4 @@
 RewriteEngine On
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteRule ^robots\.txt$ robots.php [L]
+RewriteRule ^public/(.*)$ /$1 [L,R=301]

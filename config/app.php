@@ -69,8 +69,8 @@ return [
     'app' => [
         'env' => $appEnv,
         'name' => config_env('APP_NAME', 'WhatsApp API Hub'),
-        'public_url' => rtrim((string) config_env('APP_PUBLIC_URL', 'http://localhost/whatsapp-api/public'), '/'),
-        'base_path' => config_env('APP_BASE_PATH', '/whatsapp-api/public'),
+        'public_url' => rtrim((string) config_env('APP_PUBLIC_URL', $appEnv === 'production' ? '' : 'http://localhost/whatsapp-api/public'), '/'),
+        'base_path' => config_env('APP_BASE_PATH', $appEnv === 'production' ? '' : '/whatsapp-api/public'),
         'session_name' => config_env('APP_SESSION_NAME', 'wa_api_hub'),
         'secure_cookies' => config_bool('APP_SECURE_COOKIES', $appEnv === 'production'),
         'enable_test_page' => config_bool('ENABLE_TEST_PAGE', $appEnv !== 'production'),
