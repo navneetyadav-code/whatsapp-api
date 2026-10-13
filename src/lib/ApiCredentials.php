@@ -102,9 +102,9 @@ function authenticate_api_request(): ?array
         }
     }
 
-    // Fallback: check query params or POST body for single-key authentication
+    // Fallback: check query params or POST body for single-key authentication (supports Meta access_token)
     if (!$key) {
-        $key = $_GET['api_key'] ?? $_GET['key'] ?? $_POST['api_key'] ?? $_POST['key'] ?? '';
+        $key = $_GET['api_key'] ?? $_GET['key'] ?? $_GET['access_token'] ?? $_POST['api_key'] ?? $_POST['key'] ?? $_POST['access_token'] ?? '';
     }
 
     if (!is_string($key) || $key === '') {
