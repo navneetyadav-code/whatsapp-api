@@ -141,22 +141,49 @@ The Baileys background worker will initialize on `http://127.0.0.1:3107`.
 
 ## 📖 REST API Documentation & Code Examples
 
-The API endpoint accepts signed JSON requests authenticated with your `X-API-Key` header.
+The API gateway accepts signed JSON requests authenticated with your `X-API-Key` or `Authorization: Bearer` header. It natively supports both our clean REST format and official Meta WhatsApp Cloud API schemas.
 
-### Endpoint:
-`POST /api/send.php`
+### Endpoints:
+- **Standard Gateway:** `POST /api/send.php`
+- **Meta Cloud API Alias:** `POST /api/messages.php`
+- **Meta URL Rewrite:** `POST /v20.0/{PHONE_NUMBER_ID}/messages`
 
-### Request Headers:
+### Authentication Headers:
 ```http
 Content-Type: application/json
 X-API-Key: wa_live_your_api_key_here
+# OR (Meta Cloud API style):
+Authorization: Bearer wa_live_your_api_key_here
 ```
 
-### Request Body Parameters:
+### Request Body Parameters (Supported Formats):
+
+#### Format A: Standard Flat JSON (Recommended)
+```json
+{
+  "to": "919876543210",
+  "message": "Hello from Free WhatsApp API! 🚀",
+  "humanize": true
+}
+```
+
+#### Format B: Meta WhatsApp Cloud API (Drop-In)
+```json
+{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "to": "919876543210",
+  "type": "text",
+  "text": {
+    "body": "Hello via Meta Cloud API format! 🌐"
+  }
+}
+```
+
 | Field | Type | Required | Description | Example |
 | :--- | :---: | :---: | :--- | :--- |
 | `to` | string | **Yes** | Recipient phone number (international format or 10-digit Indian number) | `"919876543210"` |
-| `message` | string | **Yes** | Message text (supports WhatsApp markdown: `*bold*`, `_italic_`, `~strike~`) | `"Hello World!"` |
+| `message` <br>*(or `text.body`)* | string | **Yes** | Message text (supports WhatsApp markdown: `*bold*`, `_italic_`, `~strike~`) | `"Hello World!"` |
 | `humanize` | boolean | No | Adds randomized micro-delays between keystrokes to mimic human typing | `true` |
 | `campaign_id` | integer | No | Optional campaign reference ID for analytics | `1` |
 
@@ -212,7 +239,7 @@ response = requests.post(url, json=payload, headers=headers)
 print(response.json())
 ```
 
-#### 3. JavaScript / Node.js (`fetch`)
+#### 4. JavaScript / Node.js (`fetch`)
 ```javascript
 const response = await fetch("http://localhost/whatsapp-api/public/api/send.php", {
   method: "POST",
@@ -231,7 +258,7 @@ const data = await response.json();
 console.log(data);
 ```
 
-#### 4. PHP (`cURL`)
+#### 5. PHP (`cURL`)
 ```php
 $payload = [
     'to' => '919876543210',
@@ -255,7 +282,7 @@ curl_close($ch);
 echo $response;
 ```
 
-#### 5. Go (`net/http`)
+#### 6. Go (`net/http`)
 ```go
 package main
 
@@ -281,9 +308,16 @@ func main() {
 }
 ```
 
+#### 7. Interactive Terminal Program (`send_whatsapp.py`)
+Run our interactive CLI script directly in PowerShell or Terminal:
+```bash
+python send_whatsapp.py
+```
+It prompts you for recipient phone number and message text, automatically saves your API URL and key, and dispatches in real-time.
+
 ---
 
-### Response Format:
+### Response Format (Universal Dual-Compatible):
 
 #### Success Response (HTTP 200 OK):
 ```json
@@ -292,7 +326,20 @@ func main() {
   "status": "queued",
   "message_id": 42,
   "request_id": "req_671e8845f7b67",
-  "recipient": "919876543210"
+  "recipient": "919876543210",
+  "messaging_product": "whatsapp",
+  "contacts": [
+    {
+      "input": "919876543210",
+      "wa_id": "919876543210"
+    }
+  ],
+  "messages": [
+    {
+      "id": "wamid.2bad39f34245353e31eeeec923ce4aa5",
+      "message_status": "accepted"
+    }
+  ]
 }
 ```
 
@@ -300,7 +347,12 @@ func main() {
 ```json
 {
   "ok": false,
-  "error": "Rate limit exceeded. Try again in 60 seconds."
+  "error": "Rate limit exceeded. Try again in 60 seconds.",
+  "meta_error": {
+    "message": "Rate limit hit.",
+    "type": "OAuthException",
+    "code": 80007
+  }
 }
 ```
 
