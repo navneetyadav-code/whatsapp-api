@@ -1,0 +1,42 @@
+name: CI Quality & Syntax Check
+
+on:
+  push:
+    branches: [ main, private-deploy ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  php-lint:
+    name: PHP Syntax & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, curl, mbstring, json
+
+      - name: Check PHP Syntax
+        run: |
+          find src config public -type f -name "*.php" -exec php -l {} +
+
+  node-check:
+    name: Node.js Worker Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify Worker Entrypoint
+        run: |
+          cd worker
+          node --check server.mjs

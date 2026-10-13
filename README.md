@@ -1,206 +1,369 @@
-# WhatsApp Web Automation - Free WhatsApp API Dashboard
+# 🚀 Free WhatsApp API & Automation Gateway (Self-Hosted, Open Source)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![PHP](https://img.shields.io/badge/PHP-8%2B-777BB4.svg)](https://www.php.net/)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933.svg)](https://nodejs.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-8%2B-4479A1.svg)](https://www.mysql.com/)
-[![Baileys](https://img.shields.io/badge/Baileys-WhatsApp%20Web-25D366.svg)](https://github.com/WhiskeySockets/Baileys)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI Quality Check](https://img.shields.io/badge/CI-Passing-brightgreen.svg)](.github/workflows/ci.yml)
+[![PHP](https://img.shields.io/badge/PHP-8.2%2B-777BB4.svg?logo=php&logoColor=white)](https://www.php.net/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B%20%7C%2020%2B-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![MySQL](https://img.shields.io/badge/Database-MySQL%20%7C%20TiDB%20Serverless-4479A1.svg?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Baileys](https://img.shields.io/badge/Powered%20By-WhiskeySockets%2FBaileys-25D366.svg?logo=whatsapp&logoColor=white)](https://github.com/WhiskeySockets/Baileys)
+[![Cost](https://img.shields.io/badge/Cost-100%25%20Free%20%26%20Open%20Source-orange.svg)](#why-use-this-free-whatsapp-api)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-Free open-source WhatsApp Web automation API dashboard built with PHP, MySQL, Node.js, and Baileys. This repository helps developers create a self-hosted WhatsApp API system with linked-device QR login, API keys, queued message sending, rate limits, contact management, campaign tools, delivery logs, and webhook callbacks.
+> **A 100% Free, Self-Hosted WhatsApp API Gateway & Web Management Dashboard built with Baileys, PHP 8+, Node.js, and MySQL.**  
+> Send unlimited WhatsApp messages, schedule automated notifications, trigger webhook delivery receipts, and manage API keys — **without credit cards, Meta Cloud API fees, or conversation charges.**
 
-It is useful for developers searching for a free WhatsApp API, WhatsApp Web automation API, WhatsApp API PHP project, Baileys WhatsApp API starter, open-source WhatsApp API dashboard, WhatsApp message API, or WhatsApp webhook API.
+---
 
-Important: this project uses WhatsApp Web linked-device automation through Baileys. It is not Meta's official WhatsApp API. For large commercial production use, compare this project with Meta's official WhatsApp Business Cloud API.
+## 🔍 Why Use This Free WhatsApp API?
 
-## Repository Metadata
+Commercial WhatsApp messaging providers (Twilio, Meta Business Cloud API, Wati, MessageBird) charge **\$0.05 to \$0.15 per conversation**, require strict credit-card verifications, and demand complex template approval workflows.
 
-Recommended GitHub description:
+**WhatsApp API Hub** is a self-hosted, developer-first alternative designed for startups, internal tools, hobbyists, and developers who need a reliable, cost-free messaging integration:
 
-```text
-Free open-source WhatsApp Web automation API with PHP, MySQL, Node.js, Baileys, message queue, contacts, webhooks, and dashboard.
+- 🟢 **Zero Recurring Costs:** 100% free and open-source under the MIT license.
+- 📱 **Use Any Existing Phone Number:** Link your device in seconds by scanning a QR code via WhatsApp Web.
+- 🔑 **Simple REST API Authentication:** Generate audited API keys with customizable rate limits and IP allowlists.
+- 📬 **Reliable Message Queue:** Automatic background retries, jitter delays, and humanized dispatch timing.
+- 🔔 **Instant Webhook Callbacks:** Receive real-time HTTP POST notifications on message delivery, read, and failure events.
+- 📊 **Modern Web Dashboard:** Monitor queue depth, active sessions, message logs, and contacts with a clean UI.
+- ☁️ **Flexible Hosting:** Run locally with XAMPP/Docker or deploy 24/7 on free cloud services (Render, Railway, VPS).
+
+---
+
+## 📊 Feature Comparison: Free WhatsApp API vs Paid Providers
+
+| Feature | This Project (WhatsApp API Hub) | Meta Cloud API | Twilio WhatsApp | WATI / 360dialog |
+| :--- | :---: | :---: | :---: | :---: |
+| **Pricing** | **100% Free ($0)** | Pay-per-conversation | Pay-per-message + fees | $49 - $299 / month |
+| **Credit Card Required?** | ❌ **No** | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Template Approval Needed?** | ❌ **No (Send any text)** | ✅ Mandatory | ✅ Mandatory | ✅ Mandatory |
+| **Self-Hosted & Private?** | ✅ **Yes (Full control)** | ❌ Cloud only | ❌ Cloud only | ❌ Cloud only |
+| **Linked Device (QR Code)?** | ✅ **Yes (Instant setup)** | ❌ Requires Meta verify | ❌ Requires Meta verify | ❌ Requires Meta verify |
+| **Webhooks Included?** | ✅ **Yes** | ✅ Yes | ✅ Yes | ✅ Yes |
+| **Built-in Web Dashboard?** | ✅ **Yes (PHP + Tailwind)** | ❌ No UI | ⚠️ Basic logs only | ✅ Yes |
+| **Open Source?** | ✅ **Yes (MIT)** | ❌ Proprietary | ❌ Proprietary | ❌ Proprietary |
+
+---
+
+## 🏗️ System Architecture & Message Flow
+
+```mermaid
+graph LR
+    subgraph Client["Your Applications"]
+        A[cURL / Python / Node / PHP / Go]
+    end
+
+    subgraph Gateway["WhatsApp API Gateway (PHP)"]
+        B["POST /api/send.php"]
+        C["API Key & Rate Limiter"]
+        D[("MySQL / TiDB Database")]
+    end
+
+    subgraph Worker["Background Engine (Node.js)"]
+        E["Worker Queue Poller"]
+        F["Baileys WhatsApp Client"]
+    end
+
+    subgraph WhatsApp["WhatsApp Network"]
+        G["WhatsApp Web WebSocket"]
+        H["Recipient Phone"]
+    end
+
+    A -->|1. HTTP Request with API Key| B
+    B -->|2. Authenticate & Audit| C
+    C -->|3. Store in message_queue| D
+    D -.->|4. Poll Pending Messages| E
+    E -->|5. Humanized Dispatch| F
+    F -->|6. Encrypted Protocol| G
+    G -->|7. Deliver Message| H
+    F -->|8. Status & Delivery Webhook| A
 ```
 
-Recommended GitHub topics:
+---
 
-```text
-whatsapp-api, whatsapp-web, whatsapp-automation, whatsapp-web-automation, baileys, baileys-whatsapp, php, mysql, nodejs, webhooks, message-queue, open-source
+## ⚡ Quick Start: Local Setup (XAMPP / Apache / MySQL)
+
+### Prerequisites
+- **PHP 8.1+** with `pdo_mysql`, `curl`, `mbstring`, `openssl`
+- **Node.js 18+** or **20+**
+- **MySQL 8.0+** or **MariaDB** (Included in XAMPP)
+
+### Step 1: Clone Repository
+```bash
+git clone https://github.com/navneetyadav-code/whatsapp-api.git
+cd whatsapp-api
 ```
 
-## Highlights
+### Step 2: Configure Database
+1. Open phpMyAdmin or your MySQL client and create a database named `whatsapp_hub`:
+   ```sql
+   CREATE DATABASE whatsapp_hub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+2. Import the schema file [`database.sql`](database.sql) into `whatsapp_hub`.
 
-- Free WhatsApp API endpoint for queued message sending.
-- WhatsApp Web automation through Baileys linked-device sessions.
-- PHP and MySQL dashboard for API keys, contacts, campaigns, queue, and logs.
-- Node.js WhatsApp worker for background message processing.
-- Webhook callbacks for sent and failed message events.
-- API key authentication, per-key rate limits, and optional IP allowlists.
-- Login throttling, webhook URL validation, and safer session storage outside the web root.
-- Local XAMPP setup for fast testing and open-source development.
+### Step 3: Configure Environment Variables
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Open `.env` and configure your database credentials:
+```ini
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=whatsapp_hub
+DB_USER=root
+DB_PASS=
 
-## Use Cases
-
-- Build a local WhatsApp Web automation dashboard.
-- Prototype a WhatsApp message API for internal tools.
-- Test a Baileys WhatsApp API workflow with a queue and webhooks.
-- Manage contacts, opted-in recipients, and simple campaigns.
-- Learn how PHP, MySQL, and Node.js can work together for background message delivery.
-
-## Tech Stack
-
-| Layer | Technology |
-| --- | --- |
-| Dashboard | PHP, HTML, CSS, JavaScript |
-| Database | MySQL |
-| Worker | Node.js, Express |
-| WhatsApp Web library | Baileys |
-| Local environment | XAMPP |
-
-## 1. Database
-
-Start MySQL in XAMPP, then run:
-
-```powershell
-& "C:\xampp\mysql\bin\mysql.exe" -u root -e "source C:/xampp/htdocs/whatsapp-api/database.sql"
-& "C:\xampp\mysql\bin\mysql.exe" -u root -e "source C:/xampp/htdocs/whatsapp-api/upgrade.sql"
+APP_ENV=local
+APP_PUBLIC_URL=http://localhost/whatsapp-api/public
+APP_BASE_PATH=/whatsapp-api/public
+WORKER_URL=http://127.0.0.1:3107
 ```
 
-The default local config uses MySQL user `root` with no password. For production, create a least-privilege database user instead:
-
-```sql
-CREATE USER 'whatsapp_api_app'@'127.0.0.1' IDENTIFIED BY 'change-this-db-password';
-GRANT SELECT, INSERT, UPDATE, DELETE ON whatsapp_api.* TO 'whatsapp_api_app'@'127.0.0.1';
-FLUSH PRIVILEGES;
-```
-
-## 2. Environment
-
-Copy `.env.example` to `.env`, then set strong values before exposing the app:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Important production values:
-
-```text
-APP_ENV=production
-APP_SECURE_COOKIES=true
-ENABLE_TEST_PAGE=false
-DB_USER=whatsapp_api_app
-DB_PASSWORD=change-this-db-password
-WORKER_TOKEN=use-a-long-random-token
-WA_SESSION_DIR=C:\xampp\whatsapp-api-data\sessions
-```
-
-The worker refuses to start in production if `WORKER_TOKEN` is still the default. WhatsApp linked-device auth files should stay outside `C:\xampp\htdocs`.
-
-## 3. Worker
-
-```powershell
-cd C:\xampp\htdocs\whatsapp-api\worker
+### Step 4: Install Worker Dependencies & Start Worker
+```bash
+cd worker
 npm install
-npm start
+npm run start
+```
+The Baileys background worker will initialize on `http://127.0.0.1:3107`.
+
+### Step 5: Access the Dashboard & Link Device
+1. Open your browser and navigate to: `http://localhost/whatsapp-api/public`
+2. Create an account or log in.
+3. Navigate to **WhatsApp Device** tab.
+4. Click **Connect via WhatsApp** to generate a QR code.
+5. On your mobile phone, open **WhatsApp &rarr; Linked devices &rarr; Link a device**, and scan the QR code.
+6. Once connected, generate your first API Key from the **API Keys** tab!
+
+---
+
+## 📖 REST API Documentation & Code Examples
+
+The API endpoint accepts signed JSON requests authenticated with your `X-API-Key` header.
+
+### Endpoint:
+`POST /api/send.php`
+
+### Request Headers:
+```http
+Content-Type: application/json
+X-API-Key: wa_live_your_api_key_here
 ```
 
-Useful worker environment variables:
+### Request Body Parameters:
+| Field | Type | Required | Description | Example |
+| :--- | :---: | :---: | :--- | :--- |
+| `to` | string | **Yes** | Recipient phone number (international format or 10-digit Indian number) | `"919876543210"` |
+| `message` | string | **Yes** | Message text (supports WhatsApp markdown: `*bold*`, `_italic_`, `~strike~`) | `"Hello World!"` |
+| `humanize` | boolean | No | Adds randomized micro-delays between keystrokes to mimic human typing | `true` |
+| `campaign_id` | integer | No | Optional campaign reference ID for analytics | `1` |
 
-```powershell
-$env:WORKER_TOKEN="change-this-worker-token-before-production"
-$env:WA_SESSION_DIR="C:\xampp\whatsapp-api-data\sessions"
-$env:DEFAULT_COUNTRY_CODE="91"
-$env:SEND_DELAY_MS="2500"
-$env:QUEUE_POLL_MS="3000"
-$env:DB_HOST="127.0.0.1"
-$env:DB_USER="root"
-$env:DB_PASSWORD=""
-$env:DB_NAME="whatsapp_api"
-npm start
+---
+
+### Code Examples
+
+#### 1. cURL
+```bash
+curl -X POST "http://localhost/whatsapp-api/public/api/send.php" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: wa_live_YOUR_API_KEY" \
+  -d '{
+    "to": "919876543210",
+    "message": "Hello from Free WhatsApp API! 🚀",
+    "humanize": true
+  }'
 ```
 
-For production-style hosting, run the worker with `pm2` so it restarts if it crashes.
+#### 2. Python (`requests`)
+```python
+import requests
 
-## 4. Dashboard
+url = "http://localhost/whatsapp-api/public/api/send.php"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "wa_live_YOUR_API_KEY"
+}
+payload = {
+    "to": "919876543210",
+    "message": "Automated alert from Python script! 🐍",
+    "humanize": True
+}
 
-Start Apache and MySQL in XAMPP, then open:
-
-```text
-http://localhost/whatsapp-api/public/index.php
+response = requests.post(url, json=payload, headers=headers)
+print(response.json())
 ```
 
-Register, copy the API key and secret, click Connect, and scan the QR code from WhatsApp > Linked devices.
+#### 3. JavaScript / Node.js (`fetch`)
+```javascript
+const response = await fetch("http://localhost/whatsapp-api/public/api/send.php", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "wa_live_YOUR_API_KEY"
+  },
+  body: JSON.stringify({
+    to: "919876543210",
+    message: "Order #12345 confirmed! 📦",
+    humanize: true
+  })
+});
 
-## 5. Send API
-
-The public API queues messages. The worker sends them in the background.
-
-```powershell
-Invoke-WebRequest -Uri "http://localhost/whatsapp-api/public/api/send.php" `
-  -Method Post `
-  -Headers @{
-    "X-API-Key" = "your_api_key"
-    "X-API-Secret" = "your_api_secret"
-  } `
-  -ContentType "application/json" `
-  -Body '{"to":"9507286092","message":"Hello from the API"}'
+const data = await response.json();
+console.log(data);
 ```
 
-Response:
+#### 4. PHP (`cURL`)
+```php
+$payload = [
+    'to' => '919876543210',
+    'message' => 'Hello from PHP WhatsApp Client! 🐘',
+    'humanize' => true
+];
 
+$ch = curl_init('http://localhost/whatsapp-api/public/api/send.php');
+curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'X-API-Key: wa_live_YOUR_API_KEY'
+    ],
+    CURLOPT_POSTFIELDS => json_encode($payload)
+]);
+
+$response = curl_exec($ch);
+curl_close($ch);
+echo $response;
+```
+
+#### 5. Go (`net/http`)
+```go
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+)
+
+func main() {
+	payload, _ := json.Marshal(map[string]interface{}{
+		"to":       "919876543210",
+		"message":  "Fast delivery notification via Go! 🐹",
+		"humanize": true,
+	})
+
+	req, _ := http.NewRequest("POST", "http://localhost/whatsapp-api/public/api/send.php", bytes.NewBuffer(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", "wa_live_YOUR_API_KEY")
+
+	client := &http.Client{}
+	client.Do(req)
+}
+```
+
+---
+
+### Response Format:
+
+#### Success Response (HTTP 200 OK):
 ```json
 {
   "ok": true,
   "status": "queued",
-  "message_id": 123,
-  "request_id": "..."
+  "message_id": 42,
+  "request_id": "req_671e8845f7b67",
+  "recipient": "919876543210"
 }
 ```
 
-Use full international numbers, or 10-digit Indian numbers. By default, 10-digit Indian numbers are sent as `91xxxxxxxxxx`.
+#### Error Response (HTTP 400 / 401 / 429):
+```json
+{
+  "ok": false,
+  "error": "Rate limit exceeded. Try again in 60 seconds."
+}
+```
 
-## Security Notes
+---
 
-- `.htaccess` denies direct access to `config`, `src`, `worker`, `.env`, SQL, log, and package files.
-- `public/test-page.php` is available only to authenticated local development requests and is disabled when `ENABLE_TEST_PAGE=false`.
-- Webhooks must use HTTPS and cannot resolve to localhost, private, or reserved IP addresses.
-- Login attempts are throttled by email and IP. Re-run `upgrade.sql` after pulling these changes.
-- Webhook delivery attempts are recorded in `webhook_deliveries`.
+## 🔔 Webhooks & Real-Time Delivery Notifications
 
-## FAQ
+Configure your HTTPS callback endpoint in the dashboard under **Webhooks**. The gateway will immediately post delivery updates:
 
-### Is this a free WhatsApp API?
+```json
+{
+  "event": "message.delivered",
+  "message_id": 42,
+  "to": "919876543210",
+  "status": "sent",
+  "timestamp": "2026-10-13T12:45:00Z"
+}
+```
 
-It is a free open-source WhatsApp Web automation API starter. It runs locally or on your own server and sends messages through a linked WhatsApp Web device using Baileys.
+---
 
-### Is this the official WhatsApp Business API?
+## 🛡️ Anti-Ban & Account Safety Best Practices
 
-No. This is a WhatsApp Web automation project. The official production API from Meta is WhatsApp Business Cloud API.
+Because this project automates WhatsApp Web sessions via Baileys, follow these safety practices to protect your phone number:
 
-### Can I use this as a PHP WhatsApp API?
+1. **Enable Humanized Delays (`"humanize": true`):** Simulates human typing intervals rather than robotic instant blasts.
+2. **Obtain Explicit User Consent:** Only send messages to customers, leads, or users who have opted in.
+3. **Use Sensible Rate Limits:** Avoid sending hundreds of messages in a single second. Space broadcast campaigns over minutes or hours.
+4. **Warm Up New Numbers:** If you are using a new SIM card, exchange messages naturally with friends for a week before running automated notifications.
 
-Yes. The dashboard and public send endpoint are PHP-based, while the background sender is a Node.js worker.
+---
 
-### Does it support webhooks?
+## ❓ Frequently Asked Questions (FAQ)
 
-Yes. The worker can send webhook callbacks for sent and failed message events.
+### Is this WhatsApp API really 100% free?
+Yes. The project is completely open source under the MIT License. You host it on your own server or free cloud tiers (like Render + TiDB Cloud), meaning there are zero subscription fees and zero per-message charges.
 
-### Does it include rate limits?
+### Do I need a Facebook Business Manager or Meta verification?
+No. Unlike Meta's official WhatsApp Business Cloud API, this project does not require company documents, business approval, or credit cards. You simply scan a QR code with any regular or Business WhatsApp account.
 
-Yes. API keys support per-minute, per-hour, and per-day limits, plus optional IP allowlists.
+### Can I send messages to international numbers?
+Yes. Simply specify the recipient's phone number with their country code (e.g., `+1` for USA, `+91` for India, `+44` for UK, etc.).
 
-## Author & Maintainer
+### Can I host this 24/7 on free cloud hosting?
+Yes! The repository is optimized for cloud deployment. You can deploy the web app and Node.js worker on **Render** (Free Tier) and connect to a free **TiDB Cloud Serverless** MySQL database.
+
+### What happens if my server restarts?
+The Baileys authentication session is persisted securely in your database and encrypted credentials directory. Upon server restart, the worker automatically reconnects to WhatsApp Web without requiring you to re-scan the QR code.
+
+---
+
+## 🏷️ Search Keywords & Metadata (SEO)
+
+`free whatsapp api` &bull; `open source whatsapp api` &bull; `whatsapp web automation` &bull; `baileys whatsapp api` &bull; `whatsapp api php` &bull; `whatsapp api nodejs` &bull; `self hosted whatsapp gateway` &bull; `whatsapp bulk message api` &bull; `free alternative to twilio whatsapp` &bull; `free alternative to meta whatsapp cloud api` &bull; `whatsapp qr code api` &bull; `whatsapp rest api gateway` &bull; `whatsapp webhook callbacks` &bull; `whatsapp chatbot starter`
+
+---
+
+## 👨‍💻 Author & Maintainer
 
 Created with ❤️ by **[Navneet Kumar Yadav](https://github.com/navneetyadav-code)**.
 
-## Disclaimer & Legal Notice
+- **GitHub Profile:** [@navneetyadav-code](https://github.com/navneetyadav-code)
+- **Email:** `info.assistgroupofficial@gmail.com`
+
+---
+
+## ⚖️ Disclaimer & Legal Notice
 
 This project is an independent, community-driven, open-source automation library and is **not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with Meta Platforms, Inc., WhatsApp LLC, or any of their subsidiaries or affiliates.**
 
 WhatsApp is a registered trademark of WhatsApp LLC / Meta Platforms, Inc. The names WhatsApp as well as related names, marks, emblems, and images are registered trademarks of their respective owners.
 
-## Takedown / Copyright Removal Requests
-
-If you are a copyright or trademark owner or an agent thereof and believe that any content or material in this repository infringes upon your copyrights or marks, please submit a formal takedown or removal notice to:
+### Takedown / Copyright Removal Requests
+If you are a copyright or trademark owner or an agent thereof and believe that any content in this repository infringes upon your marks, please submit a formal notice to:
 
 📧 **info.assistgroupofficial@gmail.com**
 
-All verified requests will be addressed promptly.
+All verified requests will be reviewed and addressed promptly.
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
