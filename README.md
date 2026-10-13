@@ -23,6 +23,7 @@ Commercial WhatsApp messaging providers (Twilio, Meta Business Cloud API, Wati, 
 - 🟢 **Zero Recurring Costs:** 100% free and open-source under the MIT license.
 - 📱 **Use Any Existing Phone Number:** Link your device in seconds by scanning a QR code via WhatsApp Web.
 - 🔑 **Simple REST API Authentication:** Generate audited API keys with customizable rate limits and IP allowlists.
+- 🔄 **Meta Cloud API Drop-In Compatible:** Seamlessly accepts both our clean JSON format and official Meta WhatsApp Cloud API payloads (`messaging_product`, `text.body`, `template`).
 - 📬 **Reliable Message Queue:** Automatic background retries, jitter delays, and humanized dispatch timing.
 - 🔔 **Instant Webhook Callbacks:** Receive real-time HTTP POST notifications on message delivery, read, and failure events.
 - 📊 **Modern Web Dashboard:** Monitor queue depth, active sessions, message logs, and contacts with a clean UI.
@@ -163,7 +164,7 @@ X-API-Key: wa_live_your_api_key_here
 
 ### Code Examples
 
-#### 1. cURL
+#### 1. cURL (Standard Clean Format)
 ```bash
 curl -X POST "http://localhost/whatsapp-api/public/api/send.php" \
   -H "Content-Type: application/json" \
@@ -175,7 +176,24 @@ curl -X POST "http://localhost/whatsapp-api/public/api/send.php" \
   }'
 ```
 
-#### 2. Python (`requests`)
+#### 2. cURL (Meta WhatsApp Cloud API Format — Drop-In)
+```bash
+curl -X POST "http://localhost/whatsapp-api/public/api/send.php" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer wa_live_YOUR_API_KEY" \
+  -d '{
+    "messaging_product": "whatsapp",
+    "recipient_type": "individual",
+    "to": "919876543210",
+    "type": "text",
+    "text": {
+      "preview_url": false,
+      "body": "Hello via Meta Cloud API format! 🌐"
+    }
+  }'
+```
+
+#### 3. Python (`requests`)
 ```python
 import requests
 
@@ -336,7 +354,7 @@ The Baileys authentication session is persisted securely in your database and en
 
 ## 🏷️ Search Keywords & Metadata (SEO)
 
-`free whatsapp api` &bull; `open source whatsapp api` &bull; `whatsapp web automation` &bull; `baileys whatsapp api` &bull; `whatsapp api php` &bull; `whatsapp api nodejs` &bull; `self hosted whatsapp gateway` &bull; `whatsapp bulk message api` &bull; `free alternative to twilio whatsapp` &bull; `free alternative to meta whatsapp cloud api` &bull; `whatsapp qr code api` &bull; `whatsapp rest api gateway` &bull; `whatsapp webhook callbacks` &bull; `whatsapp chatbot starter`
+`free whatsapp api` &bull; `open source whatsapp api` &bull; `whatsapp web automation` &bull; `baileys whatsapp api` &bull; `whatsapp api php` &bull; `whatsapp api nodejs` &bull; `self hosted whatsapp gateway` &bull; `whatsapp bulk message api` &bull; `free alternative to twilio whatsapp` &bull; `free alternative to meta whatsapp cloud api` &bull; `meta whatsapp cloud api drop-in replacement` &bull; `whatsapp qr code api` &bull; `whatsapp rest api gateway` &bull; `whatsapp webhook callbacks` &bull; `whatsapp chatbot starter`
 
 ---
 
