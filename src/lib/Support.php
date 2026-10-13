@@ -197,28 +197,43 @@ function validate_webhook_url(?string $url): ?string
 }
 
 function seo_meta(?string $page): array {
-    $baseUrl = rtrim(app_config('app.public_url'), '/');
+    $baseUrl = rtrim((string) app_config('app.public_url'), '/');
     $defaults = [
-        'title' => 'WhatsApp API Hub',
-        'description' => 'A robust WhatsApp API Hub for managing messages, campaigns, and API integrations.',
-        'keywords' => 'whatsapp, api, hub, messaging, campaigns',
-        'canonical' => $baseUrl . '/index.php?page=' . $page,
+        'title' => 'Free WhatsApp API Gateway & Dashboard | Self-Hosted Open Source',
+        'description' => '100% Free WhatsApp API Gateway built with PHP, Node.js, MySQL & Baileys. Self-hosted REST API for sending messages, media, webhooks, and automation without Meta Cloud fees.',
+        'keywords' => 'free whatsapp api, open source whatsapp api, whatsapp api php, baileys whatsapp api, self hosted whatsapp api, whatsapp gateway, whatsapp web automation, whatsapp webhook api, free whatsapp api github',
+        'canonical' => $baseUrl . '/index.php?page=' . ($page ?? 'dashboard'),
         'type' => 'website',
-        'robots' => 'index, follow'
+        'robots' => 'index, follow',
+        'author' => 'Navneet Kumar Yadav',
     ];
 
     switch ($page) {
         case 'dashboard':
-            $defaults['title'] = 'Dashboard | WhatsApp API Hub';
+            $defaults['title'] = 'Dashboard | Free WhatsApp API Gateway';
+            $defaults['description'] = 'Manage WhatsApp linked devices, view live queue depth, monitor delivery statistics, and generate secure REST API keys.';
             break;
         case 'login':
-            $defaults['title'] = 'Login | WhatsApp API Hub';
+            $defaults['title'] = 'Login | Free WhatsApp API Hub';
+            $defaults['description'] = 'Sign in to your self-hosted WhatsApp API Dashboard to manage messaging campaigns, webhooks, and API keys.';
             break;
         case 'register':
-            $defaults['title'] = 'Register | WhatsApp API Hub';
+            $defaults['title'] = 'Create Free Account | WhatsApp API Hub';
+            $defaults['description'] = 'Get started with self-hosted WhatsApp Web automation, multi-tenant message queues, and REST API endpoints.';
             break;
         case 'docs':
-            $defaults['title'] = 'Documentation | WhatsApp API Hub';
+            $defaults['title'] = 'REST API Documentation & Code Examples | Free WhatsApp API';
+            $defaults['description'] = 'Complete REST API documentation for cURL, Python, Node.js, PHP, and Go. Send WhatsApp messages, manage delivery queues, and configure webhooks.';
+            break;
+        case 'message':
+            $defaults['title'] = 'Send WhatsApp Message | Free WhatsApp API Hub';
+            break;
+        case 'queue':
+            $defaults['title'] = 'Live Message Queue & Delivery Logs | WhatsApp API';
+            break;
+        case 'credentials':
+        case 'api-keys':
+            $defaults['title'] = 'REST API Keys & Authentication | Free WhatsApp API';
             break;
     }
 
