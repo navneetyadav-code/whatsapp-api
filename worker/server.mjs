@@ -43,7 +43,12 @@ const DEFAULT_COUNTRY_CODE = resolveDefaultCountryCode(process.env.DEFAULT_COUNT
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
 const SEND_DELAY_MS = Number(process.env.SEND_DELAY_MS || 2500);
 const QUEUE_POLL_MS = Number(process.env.QUEUE_POLL_MS || 3000);
-const SESSION_DIR = resolve(process.env.WA_SESSION_DIR || join(__dirname, '..', '..', '..', 'whatsapp-api-data', 'sessions'));
+const defaultSessionDir = process.platform === 'win32'
+  ? resolve(__dirname, '..', '..', '..', 'whatsapp-api-data', 'sessions')
+  : '/var/www/html/whatsapp-api-data/sessions';
+const SESSION_DIR = process.env.WA_SESSION_DIR && !process.env.WA_SESSION_DIR.includes('\\')
+  ? resolve(process.env.WA_SESSION_DIR)
+  : defaultSessionDir;
 const sessions = new Map();
 let supportsSleepingColumn = true;
 
@@ -379,13 +384,30 @@ async function startSession(userId, force = false) {
     } catch (e) {}
     session.sock = null;
   }
+  session.starting = null;
 
   session.state = 'connecting';
   session.sleeping = false;
   session.error = null;
 
+  const authDir = join(SESSION_DIR, `user_${userId}`);
+  if (force) {
+    try {
+      const credsFile = join(authDir, 'creds.json');
+      let isRegistered = false;
+      if (existsSync(credsFile)) {
+        try {
+          const parsed = JSON.parse(readFileSync(credsFile, 'utf8') || '{}');
+          isRegistered = Boolean(parsed.registered);
+        } catch (_) {}
+      }
+      if (!isRegistered) {
+        await rm(authDir, { recursive: true, force: true });
+      }
+    } catch (_) {}
+  }
+
   session.starting = (async () => {
-    const authDir = join(SESSION_DIR, `user_${userId}`);
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
     
     let version;
@@ -398,7 +420,7 @@ async function startSession(userId, force = false) {
 
     const sock = makeWASocket({
       auth: state,
-      browser: Browsers.windows('Desktop'),
+      browser: Browsers.ubuntu('Chrome'),
       logger,
       printQRInTerminal: false,
       syncFullHistory: false,
@@ -442,10 +464,12 @@ async function startSession(userId, force = false) {
           session.qr = await QRCode.toDataURL(qr, { margin: 1, width: 320 });
           session.hasQr = true;
           session.state = 'qr';
+          session.error = null;
           await updateSessionRecord(userId, session);
         }
 
         if (connection === 'open') {
+          session.starting = null;
           session.state = 'connected';
           session.sleeping = false;
           session.qr = null;
@@ -459,6 +483,7 @@ async function startSession(userId, force = false) {
         }
 
         if (connection === 'close') {
+          session.starting = null;
           const code = lastDisconnect?.error?.output?.statusCode;
           const isRestart = code === DisconnectReason.restartRequired;
           const isLoggedOut = code === DisconnectReason.loggedOut;
@@ -488,6 +513,7 @@ async function startSession(userId, force = false) {
           }
 
           if (isQrExpired) {
+            try { await rm(authDir, { recursive: true, force: true }); } catch (e) {}
             session.state = 'idle';
             session.qr = null;
             session.hasQr = false;
@@ -497,7 +523,8 @@ async function startSession(userId, force = false) {
             return;
           }
 
-          const shouldReconnect = !session.sleeping;
+          const wasConnected = session.state === 'connected' || Boolean(session.phone);
+          const shouldReconnect = !session.sleeping && wasConnected;
           session.state = session.sleeping ? 'idle' : (shouldReconnect ? 'disconnected' : 'idle');
           session.qr = null;
           session.hasQr = false;
