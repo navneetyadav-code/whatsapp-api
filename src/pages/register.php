@@ -5,7 +5,12 @@ if (current_user()) {
 }
 
 $allowRegistration = (bool) app_config('app.enable_registration');
-$restrictedNotice = (string) (app_config('app.restricted_notice') ?: 'This is not allowed in current architecture. Contact info.assistgroupofficial@gmail.com');
+$restrictedNotice = (string) (app_config('app.restricted_notice') ?: 'New registrations are disabled on this private instance.');
+
+if (!$allowRegistration) {
+    flash('error', $restrictedNotice);
+    redirect_to('index.php?page=login');
+}
 
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
