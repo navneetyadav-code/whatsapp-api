@@ -29,6 +29,15 @@ function base_url(string $path = ''): string
 function public_url(string $path = ''): string
 {
     $baseUrl = rtrim((string) app_config('app.public_url'), '/');
+    if ($baseUrl === '' || !preg_match('#^https?://#i', $baseUrl)) {
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+        $scheme = $isHttps ? 'https' : 'http';
+        $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $prefix = $baseUrl !== '' ? '/' . ltrim($baseUrl, '/') : '';
+        $baseUrl = $scheme . '://' . $host . $prefix;
+    }
     return $path !== '' ? $baseUrl . '/' . ltrim($path, '/') : $baseUrl;
 }
 
