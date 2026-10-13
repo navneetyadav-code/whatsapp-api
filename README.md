@@ -191,6 +191,13 @@ Authorization: Bearer wa_live_your_api_key_here
 
 ### Code Examples
 
+> 💡 **Looking for complete, runnable projects?** Check out our dedicated [`quickstart/`](quickstart/) folder with ready-to-run source code in **5 languages**:
+> - [🐍 Python Quickstart](quickstart/python/) (`send.py` — zero dependencies)
+> - [⚡ Node.js Quickstart](quickstart/nodejs/) (`send.js` — native `fetch`)
+> - [🐘 PHP Quickstart](quickstart/php/) (`WhatsAppClient.php`, `send.php`)
+> - [🐹 Go Quickstart](quickstart/go/) (`main.go` — native `net/http`)
+> - [☕ Java Quickstart](quickstart/java/) (`SendWhatsApp.java` — Java 8 to 21+)
+
 #### 1. cURL (Standard Clean Format)
 ```bash
 curl -X POST "http://localhost/whatsapp-api/public/api/send.php" \

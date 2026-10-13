@@ -386,6 +386,45 @@ func main() {
         </div>
     </div>
 
+    <!-- Multi-Language Quickstart Directory Card -->
+    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">5 Languages</span>
+                <h3 class="text-base font-bold text-slate-900 mt-1">Multi-Language Quickstart Programs Included</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Ready-to-run source code projects in your favorite language are available in the <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">quickstart/</code> folder:</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mt-4">
+            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">🐍 Python</span>
+                <p class="text-[11px] text-slate-500 mt-1">Zero-dep CLI & library</p>
+                <code class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded block mt-2 font-mono text-emerald-700">python send.py</code>
+            </div>
+            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">⚡ Node.js</span>
+                <p class="text-[11px] text-slate-500 mt-1">Native fetch (Node 18+)</p>
+                <code class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded block mt-2 font-mono text-emerald-700">node send.js</code>
+            </div>
+            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">🐘 PHP</span>
+                <p class="text-[11px] text-slate-500 mt-1">OOP Client & cURL</p>
+                <code class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded block mt-2 font-mono text-emerald-700">php send.php</code>
+            </div>
+            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">🐹 Go</span>
+                <p class="text-[11px] text-slate-500 mt-1">Native net/http CLI</p>
+                <code class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded block mt-2 font-mono text-emerald-700">go run main.go</code>
+            </div>
+            <div class="p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <span class="text-xs font-bold text-slate-800 flex items-center gap-1">☕ Java</span>
+                <p class="text-[11px] text-slate-500 mt-1">Java 8 to 21+ compatible</p>
+                <code class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded block mt-2 font-mono text-emerald-700">java SendWhatsApp.java</code>
+            </div>
+        </div>
+    </div>
+
     <!-- Python Interactive CLI Tool Card -->
     <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
