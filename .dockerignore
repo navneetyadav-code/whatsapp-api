@@ -1,0 +1,9 @@
+.git
+.github
+.env
+node_modules
+worker/node_modules
+vendor
+scratch
+*.log
+whatsapp-api-data

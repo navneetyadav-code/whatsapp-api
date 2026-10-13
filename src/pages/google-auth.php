@@ -44,7 +44,8 @@ if (isset($_GET['code'])) {
 
     $tokenData = json_decode((string) $response, true);
     if ($status !== 200 || empty($tokenData['access_token'])) {
-        flash('error', 'Failed to authenticate with Google.');
+        $errorMessage = $tokenData['error_description'] ?? $tokenData['error'] ?? 'Failed to authenticate with Google.';
+        flash('error', 'Google Error: ' . $errorMessage);
         redirect_to('index.php?page=login');
     }
 

@@ -315,7 +315,7 @@ function page_header(string $title, string $subtitle): void
                         <th class="px-5 py-3.5 text-right">Time</th>
                     </tr>
                 </thead>
-                <tbody class="text-[13px] divide-y divide-slate-100">
+                <tbody id="recentQueueTable" class="text-[13px] divide-y divide-slate-100">
                     <?php foreach (array_slice($messages, 0, 5) as $message): ?>
                         <tr class="hover:bg-slate-50/80 transition-colors group cursor-default">
                             <td class="px-5 py-3">
@@ -676,12 +676,12 @@ function page_header(string $title, string $subtitle): void
                 <h2 class="text-[16px] font-bold text-slate-900">Pair Device</h2>
                 <p class="text-[13px] text-slate-500 mt-1 mb-6 max-w-[250px]">Open WhatsApp on your phone, tap <strong>Linked devices</strong>, and scan the QR code to connect.</p>
                 
-                <div class="p-3 bg-white border border-slate-200 rounded-2xl shadow-sm inline-block" id="qrBox">
-                    <div id="qrPlaceholder" class="w-[250px] h-[250px] bg-slate-50 rounded-xl flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200">
-                        <svg class="w-8 h-8 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                        <span class="text-[12px] font-medium max-w-[150px] text-center">Click Connect to generate QR code</span>
+                <div class="relative w-[280px] h-[280px] bg-white border border-slate-200/90 rounded-2xl shadow-sm p-3.5 flex items-center justify-center mx-auto" id="qrBox">
+                    <div id="qrPlaceholder" style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important;" class="w-full h-full bg-slate-50/80 rounded-xl border-2 border-dashed border-slate-200 p-4 text-center">
+                        <svg class="w-9 h-9 mb-2.5 text-slate-400 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                        <span class="text-[12px] font-medium text-slate-500 max-w-[170px] leading-relaxed">Click Connect to generate QR code</span>
                     </div>
-                    <img id="qrImage" alt="WhatsApp QR code" class="w-[250px] h-[250px] rounded-xl hidden">
+                    <img id="qrImage" alt="WhatsApp QR code" class="w-full h-full rounded-xl object-contain block mx-auto hidden shadow-sm" style="aspect-ratio: 1/1;">
                 </div>
             </div>
         </section>
@@ -913,8 +913,13 @@ function page_header(string $title, string $subtitle): void
 <?php elseif ($section === 'queue'): ?>
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Message Queue</h1>
-            <p class="text-[13px] text-slate-500 mt-1 font-medium">Track queued, processing, sent, failed, and cancelled messages.</p>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+                Message Queue
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-sm flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Live Auto-Refresh
+                </span>
+            </h1>
+            <p class="text-[13px] text-slate-500 mt-1 font-medium">Track queued, processing, sent, failed, and cancelled messages in real-time.</p>
         </div>
     </div>
     

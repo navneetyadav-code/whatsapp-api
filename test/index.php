@@ -1,11 +1,11 @@
 <?php
+$defaultApiUrl = 'http://localhost/wa/public/api/send.php';
+$apiUrl = !empty($_POST['api_url']) ? trim($_POST['api_url']) : $defaultApiUrl;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $to = $_POST['phone'] ?? '';
     $message = $_POST['message'] ?? '';
     $apiKey = $_POST['api_key'] ?? '';
-
-    // URL to your ngrok tunnel pointing to XAMPP
-    $apiUrl = 'https://slightly-ascend-unreal.ngrok-free.dev/whatsapp-api/public/api/send.php';
 
     $payload = json_encode([
         'to' => $to,
@@ -19,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Authorization: Bearer ' . $apiKey,
+        'X-Api-Key: ' . $apiKey,
         'ngrok-skip-browser-warning: true'
     ]);
 
@@ -54,18 +55,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h2>WhatsApp API Tester</h2>
         <p style="font-size: 14px; color: #64748b; margin-bottom: 1.5rem;">Test your free WhatsApp API hosted on Ngrok.</p>
         
-        <form method="POST">
+        <form method="POST" autocomplete="off" data-form-type="other">
+            <div class="form-group">
+                <label>API Endpoint URL</label>
+                <input type="text" name="api_url" placeholder="http://localhost/wa/public/api/send.php" required value="<?= htmlspecialchars($apiUrl) ?>">
+            </div>
             <div class="form-group">
                 <label>API Key (Bearer Token)</label>
-                <input type="text" name="api_key" placeholder="wa_live_..." required value="<?= htmlspecialchars($_POST['api_key'] ?? '') ?>">
+                <input type="text" name="api_key" placeholder="wa_live_..." required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" value="<?= htmlspecialchars($_POST['api_key'] ?? 'wa_live_671e8845f7b671e32922c05079c8d423298fd0aa79b9dfc6') ?>">
             </div>
             <div class="form-group">
                 <label>Recipient Phone Number (with Country Code)</label>
-                <input type="text" name="phone" placeholder="919876543210" required value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>">
+                <input type="tel" inputmode="tel" name="phone" placeholder="919876543210" required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" data-lpignore="true" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>">
             </div>
             <div class="form-group">
                 <label>Message</label>
-                <textarea name="message" rows="4" required placeholder="Type your test message..."><?= htmlspecialchars($_POST['message'] ?? '') ?></textarea>
+                <textarea name="message" rows="4" required placeholder="Type your test message..." autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" data-form-type="other" data-lpignore="true"><?= htmlspecialchars($_POST['message'] ?? '') ?></textarea>
             </div>
             <button type="submit">Send Message</button>
         </form>

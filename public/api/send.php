@@ -25,7 +25,7 @@ if (!$rate['allowed']) {
 }
 
 $data = request_json();
-$to = trim((string) ($data['to'] ?? $data['recipient'] ?? ''));
+$to = normalize_phone(trim((string) ($data['to'] ?? $data['recipient'] ?? '')));
 $message = trim((string) ($data['message'] ?? ''));
 
 if ($to === '' || $message === '') {
