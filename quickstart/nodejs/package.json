@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-quickstart-nodejs",
+  "version": "1.0.0",
+  "description": "WhatsApp API Hub Node.js Quickstart Client",
+  "main": "send.js",
+  "scripts": {
+    "start": "node send.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-api",
+    "baileys",
+    "rest-api"
+  ],
+  "author": "Navneet Kumar Yadav",
+  "license": "MIT"
+}
