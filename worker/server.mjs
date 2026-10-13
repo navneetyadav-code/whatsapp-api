@@ -10,6 +10,7 @@ import { rm } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import makeWASocket, {
+  Browsers,
   DisconnectReason,
   fetchLatestBaileysVersion,
   useMultiFileAuthState
@@ -21,7 +22,24 @@ loadEnv(resolve(__dirname, '..', '.env'));
 const PORT = Number(process.env.PORT || 3107);
 const WORKER_TOKEN = process.env.WORKER_TOKEN || 'change-this-worker-token-before-production';
 const APP_ENV = process.env.APP_ENV || 'local';
-const DEFAULT_COUNTRY_CODE = String(process.env.DEFAULT_COUNTRY_CODE || '91').replace(/\D/g, '');
+
+const ISO_TO_DIAL = {
+  in: '91', us: '1', ca: '1', gb: '44', uk: '44', au: '61',
+  ae: '971', pk: '92', bd: '880', ng: '234', br: '55', id: '62',
+  ph: '63', my: '60', sg: '65', sa: '966', de: '49', fr: '33',
+  es: '34', it: '39', ru: '7', za: '27', ke: '254', eg: '20'
+};
+
+function resolveDefaultCountryCode(val) {
+  const raw = String(val || '').trim().toLowerCase();
+  if (ISO_TO_DIAL[raw]) {
+    return ISO_TO_DIAL[raw];
+  }
+  const digits = raw.replace(/\D/g, '');
+  return digits || '91';
+}
+
+const DEFAULT_COUNTRY_CODE = resolveDefaultCountryCode(process.env.DEFAULT_COUNTRY_CODE || '91');
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
 const SEND_DELAY_MS = Number(process.env.SEND_DELAY_MS || 2500);
 const QUEUE_POLL_MS = Number(process.env.QUEUE_POLL_MS || 3000);
@@ -44,9 +62,11 @@ mkdirSync(SESSION_DIR, { recursive: true });
 
 const db = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
+  port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'whatsapp_api',
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   waitForConnections: true,
   connectionLimit: 5
 });
@@ -346,10 +366,18 @@ async function recordWebhookDelivery(webhook, payload, status, error, attempt) {
   }
 }
 
-async function startSession(userId) {
+async function startSession(userId, force = false) {
   const session = getSession(userId);
-  if (['connected', 'connecting', 'qr'].includes(session.state) || session.starting) {
+  if (!force && (session.state === 'connected' || session.starting)) {
     return session.starting || session;
+  }
+
+  if (force && session.sock) {
+    try {
+      session.sock.ev.removeAllListeners();
+      session.sock.end?.();
+    } catch (e) {}
+    session.sock = null;
   }
 
   session.state = 'connecting';
@@ -359,14 +387,26 @@ async function startSession(userId) {
   session.starting = (async () => {
     const authDir = join(SESSION_DIR, `user_${userId}`);
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
-    const { version } = await fetchLatestBaileysVersion();
+    
+    let version;
+    try {
+      const versionInfo = await fetchLatestBaileysVersion();
+      version = versionInfo?.version;
+    } catch (e) {
+      logger.warn('Failed to fetch latest Baileys version online, using default.');
+    }
 
     const sock = makeWASocket({
       auth: state,
-      browser: ['Chrome', 'Windows', '10.0'],
+      browser: Browsers.windows('Desktop'),
       logger,
       printQRInTerminal: false,
-      version
+      syncFullHistory: false,
+      markOnlineOnConnect: true,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000,
+      ...(version ? { version } : {})
     });
 
     session.sock = sock;
@@ -402,6 +442,7 @@ async function startSession(userId) {
           session.qr = await QRCode.toDataURL(qr, { margin: 1, width: 320 });
           session.hasQr = true;
           session.state = 'qr';
+          await updateSessionRecord(userId, session);
         }
 
         if (connection === 'open') {
@@ -410,7 +451,8 @@ async function startSession(userId) {
           session.qr = null;
           session.hasQr = false;
           session.error = null;
-          session.phone = sock.user?.id || null;
+          const rawId = sock.user?.id || '';
+          session.phone = rawId ? rawId.split(':')[0].split('@')[0] : null;
           session.pushName = sock.user?.name || sock.user?.verifiedName || null;
           try { session.profilePicture = await sock.profilePictureUrl(sock.user.id, 'image'); } catch(e) { session.profilePicture = null; }
           await updateSessionRecord(userId, session);
@@ -418,7 +460,44 @@ async function startSession(userId) {
 
         if (connection === 'close') {
           const code = lastDisconnect?.error?.output?.statusCode;
-          const shouldReconnect = code !== DisconnectReason.loggedOut && !session.sleeping;
+          const isRestart = code === DisconnectReason.restartRequired;
+          const isLoggedOut = code === DisconnectReason.loggedOut;
+          const isQrExpired = lastDisconnect?.error?.message === 'QR refs attempts ended';
+
+          if (isLoggedOut) {
+            try { await rm(authDir, { recursive: true, force: true }); } catch (e) {}
+            session.state = 'idle';
+            session.qr = null;
+            session.hasQr = false;
+            session.sock = null;
+            session.error = 'Device was unlinked. Please click Connect to scan again.';
+            await updateSessionRecord(userId, session);
+            return;
+          }
+
+          if (isRestart) {
+            session.state = 'connecting';
+            session.error = null;
+            session.sock = null;
+            setTimeout(() => {
+              startSession(userId, true).catch((error) => {
+                logger.error({ error, userId }, 'Restart handshake failed');
+              });
+            }, 600);
+            return;
+          }
+
+          if (isQrExpired) {
+            session.state = 'idle';
+            session.qr = null;
+            session.hasQr = false;
+            session.sock = null;
+            session.error = 'QR code expired. Click Connect to generate a new QR code.';
+            await updateSessionRecord(userId, session);
+            return;
+          }
+
+          const shouldReconnect = !session.sleeping;
           session.state = session.sleeping ? 'idle' : (shouldReconnect ? 'disconnected' : 'idle');
           session.qr = null;
           session.hasQr = false;
@@ -427,7 +506,7 @@ async function startSession(userId) {
           await updateSessionRecord(userId, session);
 
           if (shouldReconnect) {
-            setTimeout(() => startSession(userId).catch((error) => {
+            setTimeout(() => startSession(userId, false).catch((error) => {
               logger.error({ error, userId }, 'Reconnect failed');
             }), 2500);
           }
@@ -611,10 +690,13 @@ async function sendQueuedMessage(message) {
 
   if (!recipient.isGroup && !recipient.isLid && typeof session.sock.onWhatsApp === 'function') {
     const matches = await session.sock.onWhatsApp(recipient.jid);
-    const exists = Array.isArray(matches) && matches.some((match) => match.exists);
-    if (!exists) {
+    const match = Array.isArray(matches) ? matches.find((m) => m.exists) : null;
+    if (!match) {
       await markMessageFailed(message, `The number ${recipient.normalizedTo} is not registered on WhatsApp.`, recipient.normalizedTo);
       return;
+    }
+    if (match.jid) {
+      recipient.jid = match.jid;
     }
 
   // "Humanized Delivery" Presence & Delay
@@ -836,7 +918,9 @@ app.get('/sessions/:userId/status', (req, res) => {
 
 app.post('/sessions/:userId/start', async (req, res) => {
   try {
-    const session = await startSession(req.params.userId);
+    const existing = getSession(req.params.userId);
+    const force = existing.state !== 'connected';
+    const session = await startSession(req.params.userId, force);
     res.json({ ok: true, session: publicSession(session) });
   } catch (error) {
     const session = getSession(req.params.userId);
@@ -852,15 +936,20 @@ app.post('/sessions/:userId/logout', async (req, res) => {
 
   try {
     if (session.sock) {
-      await session.sock.logout();
+      session.sock.ev.removeAllListeners();
+      await session.sock.logout().catch(() => {});
       session.sock.end?.();
     }
-    await rm(authDir, { recursive: true, force: true });
   } catch (error) {
     session.error = error.message;
+  } finally {
+    try {
+      await rm(authDir, { recursive: true, force: true });
+    } catch (e) {}
   }
 
   sessions.set(req.params.userId, emptySession(req.params.userId));
+  await updateSessionRecord(req.params.userId, emptySession(req.params.userId));
   res.json({ ok: true, session: publicSession(getSession(req.params.userId)) });
 });
 
@@ -921,15 +1010,18 @@ app.post('/sessions/:userId/send', async (req, res) => {
   try {
     if (!recipient.isGroup && !recipient.isLid && typeof session.sock.onWhatsApp === 'function') {
       const matches = await session.sock.onWhatsApp(recipient.jid);
-      const exists = Array.isArray(matches) && matches.some((match) => match.exists);
+      const match = Array.isArray(matches) ? matches.find((m) => m.exists) : null;
 
-      if (!exists) {
+      if (!match) {
         res.status(404).json({
           ok: false,
           error: `The number ${recipient.normalizedTo} is not registered on WhatsApp.`,
           normalizedTo: recipient.normalizedTo
         });
         return;
+      }
+      if (match.jid) {
+        recipient.jid = match.jid;
       }
     }
 

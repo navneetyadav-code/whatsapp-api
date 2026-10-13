@@ -80,12 +80,14 @@ function message_stats(int $userId): array
     return $stats;
 }
 
-function recent_messages(int $userId, int $limit = 15): array
+function recent_messages(int $userId, int $limit = 25): array
 {
     $stmt = Database::pdo()->prepare(
-        'SELECT message_queue.*, api_keys.key_prefix
+        'SELECT message_queue.*, api_keys.key_prefix, contacts.name AS contact_name
          FROM message_queue
          LEFT JOIN api_keys ON api_keys.id = message_queue.api_key_id
+         LEFT JOIN contacts ON contacts.user_id = message_queue.user_id 
+             AND (contacts.phone = message_queue.recipient OR contacts.phone = message_queue.normalized_recipient)
          WHERE message_queue.user_id = ?
          ORDER BY message_queue.id DESC
          LIMIT ' . max(1, min(100, $limit))

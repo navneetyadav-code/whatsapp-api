@@ -9,7 +9,7 @@ require_once dirname(__DIR__) . '/src/bootstrap.php';
 
 $page = $_GET['page'] ?? 'dashboard';
 $publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth'];
-$dashboardPages = ['dashboard', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot'];
+$dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -120,6 +120,7 @@ if ($page === 'message-send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($type === 'number') {
             $phone = trim((string) ($_POST['manual_number'] ?? ''));
             if (!$phone) throw new Exception('Phone number required');
+            $phone = normalize_phone($phone);
             enqueue_message((int) $user['id'], null, $phone, $message, $payload);
             $queuedCount = 1;
         } elseif ($type === 'contact') {
@@ -351,6 +352,16 @@ if ($page === 'webhook' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     ]);
     flash('success', 'Webhook settings saved.');
     redirect_to('index.php?page=webhooks');
+}
+
+if ($page === 'google-auth') {
+    require dirname(__DIR__) . '/src/pages/google-auth.php';
+    exit;
+}
+
+if ($page === 'forgot-password') {
+    require dirname(__DIR__) . '/src/pages/forgot-password.php';
+    exit;
 }
 
 if (!in_array($page, $publicPages, true)) {

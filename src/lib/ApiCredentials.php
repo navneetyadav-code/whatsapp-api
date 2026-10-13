@@ -73,15 +73,28 @@ function update_api_key_limits(int $userId, int $keyId, array $data): void
 function authenticate_api_request(): ?array
 {
     $key = $_SERVER['HTTP_X_API_KEY'] ?? '';
-    $secret = $_SERVER['HTTP_X_API_SECRET'] ?? '';
-    $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    $secret = !empty($_SERVER['HTTP_X_API_SECRET']) ? $_SERVER['HTTP_X_API_SECRET'] : null;
+    $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+
+    if (!$authorization && function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        $authorization = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        if (!$key) {
+            $key = $headers['X-Api-Key'] ?? $headers['x-api-key'] ?? '';
+        }
+        if (!$secret && !empty($headers['X-Api-Secret'])) {
+            $secret = $headers['X-Api-Secret'];
+        } elseif (!$secret && !empty($headers['x-api-secret'])) {
+            $secret = $headers['x-api-secret'];
+        }
+    }
 
     // If using Bearer authentication
     if (!$key && str_starts_with($authorization, 'Bearer ')) {
         $token = substr($authorization, 7);
         if (str_contains($token, ':')) {
             // Backwards compatibility for key:secret format
-            [$key, $secret] = array_pad(explode(':', $token, 2), 2, '');
+            [$key, $secret] = array_pad(explode(':', $token, 2), 2, null);
         } else {
             // Modern Single-Token format (API Key acts as the sole token)
             $key = $token;
@@ -107,7 +120,7 @@ function authenticate_api_request(): ?array
     }
 
     // Only verify secret if it was explicitly provided (legacy dual-auth method)
-    if ($secret !== null && !password_verify($secret, $apiKey['secret_hash'] ?? '')) {
+    if (!empty($secret) && !password_verify($secret, $apiKey['secret_hash'] ?? '')) {
         return null;
     }
 

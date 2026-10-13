@@ -1811,7 +1811,10 @@ button.ghost,
 
 #qrPlaceholder {
     color: var(--muted);
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 8px;
     text-align: center;
 }

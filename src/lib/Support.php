@@ -26,6 +26,13 @@ function base_url(string $path = ''): string
     return rtrim((string) app_config('app.base_path'), '/') . '/' . ltrim($path, '/');
 }
 
+function public_url(string $path = ''): string
+{
+    $baseUrl = rtrim((string) app_config('app.public_url'), '/');
+    return $path !== '' ? $baseUrl . '/' . ltrim($path, '/') : $baseUrl;
+}
+
+
 function redirect_to(string $path): never
 {
     header('Location: ' . base_url($path));
@@ -34,12 +41,37 @@ function redirect_to(string $path): never
 
 function normalize_phone(string $phone): string {
     $phone = trim($phone);
-    // If the user submits just 10 digits (without JS), assume default country
-    $defaultCountryPrefix = config_env('DEFAULT_COUNTRY_CODE', 'in') === 'in' ? '+91' : '';
-    if ($defaultCountryPrefix && preg_match('/^[0-9]{10}$/', $phone)) {
-        return $defaultCountryPrefix . $phone;
+    if ($phone === '') {
+        return '';
     }
-    return $phone;
+    if (str_ends_with($phone, '@g.us') || str_ends_with($phone, '@lid') || str_ends_with($phone, '@s.whatsapp.net')) {
+        return $phone;
+    }
+
+    $default = strtolower((string) config_env('DEFAULT_COUNTRY_CODE', 'in'));
+    $isoMap = [
+        'in' => '91', 'us' => '1', 'ca' => '1', 'gb' => '44', 'uk' => '44',
+        'au' => '61', 'ae' => '971', 'pk' => '92', 'bd' => '880', 'ng' => '234'
+    ];
+    $countryDial = $isoMap[$default] ?? preg_replace('/\D/', '', $default);
+    if ($countryDial === '') {
+        $countryDial = '91';
+    }
+
+    $digits = preg_replace('/\D/', '', $phone);
+    if (str_starts_with($phone, '+')) {
+        return '+' . $digits;
+    }
+    if (str_starts_with($digits, '00')) {
+        return '+' . substr($digits, 2);
+    }
+    if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+        return '+' . $countryDial . substr($digits, 1);
+    }
+    if (strlen($digits) === 10) {
+        return '+' . $countryDial . $digits;
+    }
+    return '+' . $digits;
 }
 
 function e(?string $value): string

@@ -93,7 +93,14 @@ function renderStatus(data) {
         
         // Buttons
         if (connectBtn) connectBtn.classList.remove('hidden');
-        if (disconnectBtn) disconnectBtn.classList.add('hidden'); if(resetBtn) resetBtn.classList.add('hidden');
+        if (disconnectBtn) disconnectBtn.classList.add('hidden');
+        if (resetBtn) {
+            if (['qr', 'disconnected', 'error', 'connecting'].includes(state) || Boolean(session.error)) {
+                resetBtn.classList.remove('hidden');
+            } else {
+                resetBtn.classList.add('hidden');
+            }
+        }
         if (sleepBtn) sleepBtn.classList.add('hidden');
         if (wakeupBtn) wakeupBtn.classList.add('hidden');
 
@@ -106,7 +113,17 @@ function renderStatus(data) {
             qrImage.classList.add('hidden');
             qrPlaceholder.classList.remove('hidden');
             const span = qrPlaceholder.querySelector('span');
-            if (span) span.textContent = state === 'qr' ? 'Waiting for QR...' : 'Click connect to generate QR code';
+            if (span) {
+                if (session.error) {
+                    span.textContent = session.error;
+                } else if (state === 'connecting') {
+                    span.textContent = 'Generating QR code...';
+                } else if (state === 'qr') {
+                    span.textContent = 'Waiting for QR code...';
+                } else {
+                    span.textContent = 'Click Connect to generate QR code';
+                }
+            }
         }
     }
 }
@@ -419,6 +436,7 @@ const initPhoneInputs = () => {
             separateDialCode: true,
             nationalMode: true
         });
+        input._iti = iti;
 
         const form = input.closest('form');
         if (form) {
@@ -445,6 +463,24 @@ if (composeForm) {
     composeForm.addEventListener('submit', async (e) => {
         if (e.defaultPrevented) return;
         
+        const recipientMode = composeForm.querySelector('[name="recipient_mode"]')?.value;
+        if (recipientMode === 'number') {
+            const manualInput = composeForm.querySelector('input[name="manual_number"]');
+            if (manualInput && manualInput.value.trim() !== '') {
+                if (manualInput._iti) {
+                    if (!manualInput._iti.isValidNumber()) {
+                        const errorMap = ["Invalid number", "Invalid country code", "Too short", "Too long", "Invalid number"];
+                        const errorCode = manualInput._iti.getValidationError();
+                        window.showToast("Phone number error: " + (errorMap[errorCode] || "Invalid number"), "error");
+                        manualInput.focus();
+                        e.preventDefault();
+                        return;
+                    }
+                    manualInput.value = manualInput._iti.getNumber();
+                }
+            }
+        }
+
         e.preventDefault();
         
         const submitBtn = composeForm.querySelector('button[type="submit"]');
@@ -532,12 +568,151 @@ const initMobileViewportKeyboardHandler = () => {
         }
     });
 };
+// Queue Live Polling (Real-time updates without page reload)
+const initQueueLivePolling = () => {
+    const tableBody = document.getElementById('liveQueueTable');
+    const recentBody = document.getElementById('recentQueueTable');
+    if (!tableBody && !recentBody) return;
+
+    const queuedBadge = document.getElementById('liveQueuedCount');
+    const processingBadge = document.getElementById('liveProcessingCount');
+    const failedBadge = document.getElementById('liveQueueFailedCount');
+
+    const statusColors = {
+        'queued': 'bg-slate-100 text-slate-700 border-slate-200',
+        'processing': 'bg-blue-50 text-blue-700 border-blue-200',
+        'sent': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        'failed': 'bg-rose-50 text-rose-700 border-rose-200',
+        'cancelled': 'bg-orange-50 text-orange-700 border-orange-200'
+    };
+    const dotColors = {
+        'queued': 'bg-slate-500',
+        'processing': 'bg-blue-500 animate-pulse',
+        'sent': 'bg-emerald-500',
+        'failed': 'bg-rose-500',
+        'cancelled': 'bg-orange-500'
+    };
+
+    let isPolling = false;
+
+    const updateQueue = async () => {
+        if (isPolling) return;
+        isPolling = true;
+
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentPage = urlParams.get('p') || '1';
+
+            const res = await fetch(`session.php?action=queue-status&p=${encodeURIComponent(currentPage)}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (!data.ok) return;
+
+            // Update counter badges
+            if (queuedBadge && data.stats) queuedBadge.textContent = data.stats.queued;
+            if (processingBadge && data.stats) processingBadge.textContent = data.stats.processing;
+            if (failedBadge && data.stats) failedBadge.textContent = data.stats.failed;
+
+            // Update full queue table
+            if (tableBody) {
+                if (!data.messages || data.messages.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="7" class="px-6 py-12 text-center text-[13px] text-slate-500">The queue is empty. New API requests will appear here.</td></tr>';
+                } else {
+                    const rowsHtml = data.messages.map(msg => {
+                        const sc = statusColors[msg.status] || 'bg-slate-100 text-slate-700 border-slate-200';
+                        const dc = dotColors[msg.status] || 'bg-slate-500';
+                        const capStatus = msg.status.charAt(0).toUpperCase() + msg.status.slice(1);
+                        const safeBody = (msg.body || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                        const previewBody = safeBody.length > 60 ? safeBody.substring(0, 60) + '...' : safeBody;
+                        const safeError = (msg.error_message || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+                        let actions = '';
+                        if (msg.status === 'queued') {
+                            actions = `<form method="post" action="index.php?page=message-cancel">
+                                <input type="hidden" name="csrf_token" value="${data.csrf_token || ''}">
+                                <input type="hidden" name="id" value="${msg.id}">
+                                <button type="submit" class="px-2.5 py-1.5 text-[12px] font-semibold text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors shadow-sm">Cancel</button>
+                            </form>`;
+                        } else if (['failed', 'cancelled'].includes(msg.status)) {
+                            actions = `<form method="post" action="index.php?page=message-retry">
+                                <input type="hidden" name="csrf_token" value="${data.csrf_token || ''}">
+                                <input type="hidden" name="id" value="${msg.id}">
+                                <button type="submit" class="px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-colors shadow-sm">Retry</button>
+                            </form>`;
+                        }
+
+                        return `<tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="px-6 py-4 text-[13px] font-mono text-slate-500">#${msg.id}</td>
+                            <td class="px-6 py-4 text-[13px] font-medium text-slate-900">${msg.recipient}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex inline-flex items-center gap-1.5 ${sc}">
+                                    <span class="w-1.5 h-1.5 rounded-full ${dc}"></span>
+                                    ${capStatus}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-[13px] text-slate-600 font-mono">${msg.attempts}/${msg.max_attempts}</td>
+                            <td class="px-6 py-4 text-[13px] text-slate-600 truncate max-w-xs" title="${safeBody}">${previewBody}</td>
+                            <td class="px-6 py-4 text-[12px] text-rose-600 max-w-xs truncate" title="${safeError}">${safeError}</td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex items-center justify-end gap-2">${actions}</div>
+                            </td>
+                        </tr>`;
+                    }).join('');
+
+                    tableBody.innerHTML = rowsHtml;
+                }
+            }
+
+            // Update dashboard recent activity table
+            if (recentBody) {
+                if (!data.messages || data.messages.length === 0) {
+                    recentBody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-slate-500">No messages have been queued yet.</td></tr>';
+                } else {
+                    recentBody.innerHTML = data.messages.slice(0, 5).map(msg => {
+                        let badge = '';
+                        if (msg.status === 'sent') {
+                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Sent</span>';
+                        } else if (msg.status === 'failed') {
+                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Failed</span>';
+                        } else if (msg.status === 'queued' || msg.status === 'processing') {
+                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Pending</span>';
+                        } else {
+                            badge = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> ${msg.status.charAt(0).toUpperCase() + msg.status.slice(1)}</span>`;
+                        }
+                        const safeBody = (msg.body || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                        const previewBody = safeBody.length > 40 ? safeBody.substring(0, 40) + '...' : safeBody;
+                        const time = msg.created_at ? msg.created_at.substring(11, 19) : '';
+
+                        return `<tr class="hover:bg-slate-50/80 transition-colors group cursor-default">
+                            <td class="px-5 py-3">${badge}</td>
+                            <td class="px-5 py-3"><div class="flex items-center gap-2.5"><span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">MSG</span><span class="font-mono text-slate-700 text-[12px] tracking-tight">Outgoing</span></div></td>
+                            <td class="px-5 py-3 text-slate-600 font-mono text-[12px] tracking-tight">${msg.recipient}</td>
+                            <td class="px-5 py-3 text-slate-500 hidden sm:table-cell font-medium truncate max-w-xs">${previewBody}</td>
+                            <td class="px-5 py-3 text-right text-slate-400 text-[12px] group-hover:text-slate-600 transition-colors">${time}</td>
+                        </tr>`;
+                    }).join('');
+                }
+            }
+        } catch (err) {
+            // network hiccup silent ignore
+        } finally {
+            isPolling = false;
+        }
+    };
+
+    setInterval(updateQueue, 3000);
+};
+
 const runInits = () => {
     if (typeof initMobileViewportKeyboardHandler === 'function') initMobileViewportKeyboardHandler();
     if (typeof initAttachmentUI === 'function') initAttachmentUI();
     if (typeof initUIToggles === 'function') initUIToggles();
     if (typeof initPhoneInputs === 'function') initPhoneInputs();
     if (typeof initRichTextEditor === 'function') initRichTextEditor();
+    if (typeof initQueueLivePolling === 'function') initQueueLivePolling();
 };
 
 if (document.readyState === 'loading') {

@@ -54,11 +54,17 @@ if ($appEnv === 'production' && $workerToken === 'change-this-worker-token-befor
     throw new RuntimeException('Set a strong WORKER_TOKEN before running in production.');
 }
 
+$dbHost = config_env('DB_HOST', '127.0.0.1');
+$dbPort = config_env('DB_PORT', '3306');
+$dbName = config_env('DB_NAME', 'whatsapp_api');
+$defaultDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
+
 return [
     'db' => [
-        'dsn' => config_env('DB_DSN', 'mysql:host=127.0.0.1;dbname=whatsapp_api;charset=utf8mb4'),
+        'dsn' => config_env('DB_DSN', $defaultDsn),
         'user' => config_env('DB_USER', 'root'),
         'password' => config_env('DB_PASSWORD', ''),
+        'ssl' => config_bool('DB_SSL', false),
     ],
     'app' => [
         'env' => $appEnv,
