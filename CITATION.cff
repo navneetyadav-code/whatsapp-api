@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this free WhatsApp API software in your research, product, or project, please cite it as below."
+authors:
+  - family-names: "Yadav"
+    given-names: "Navneet Kumar"
+    affiliation: "Assist Group"
+title: "Free WhatsApp API & Automation Gateway: Self-Hosted REST API via Baileys, PHP & Node.js"
+version: 1.0.0
+date-released: 2026-10-13
+url: "https://github.com/navneetyadav-code/whatsapp-api"
+repository-code: "https://github.com/navneetyadav-code/whatsapp-api"
+keywords:
+  - "whatsapp-api"
+  - "free-whatsapp-api"
+  - "whatsapp-web-automation"
+  - "baileys"
+  - "php"
+  - "nodejs"
+  - "mysql"
+  - "message-queue"
+  - "webhooks"
+license: MIT
