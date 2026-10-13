@@ -102,6 +102,11 @@ function authenticate_api_request(): ?array
         }
     }
 
+    // Fallback: check query params or POST body for single-key authentication
+    if (!$key) {
+        $key = $_GET['api_key'] ?? $_GET['key'] ?? $_POST['api_key'] ?? $_POST['key'] ?? '';
+    }
+
     if (!is_string($key) || $key === '') {
         return null;
     }
