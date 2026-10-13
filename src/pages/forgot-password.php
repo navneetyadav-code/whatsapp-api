@@ -51,26 +51,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($viaPhone && $phone !== '') {
             $sysKey = app_config('system_api.key');
-            $sysSecret = app_config('system_api.secret');
+            $apiKeyId = null;
+            $userId = 1;
 
-            if ($sysKey && $sysSecret) {
-                $apiUrl = rtrim((string) app_config('app.public_url'), '/') . '/api/send.php';
-                $ch = curl_init($apiUrl);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_POST, true);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-                    'to' => $phone,
-                    'message' => "Your WhatsApp API Hub password reset OTP is: *$otp*\nIt expires in 15 minutes."
-                ]));
-                curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                    'Content-Type: application/json',
-                    'X-API-Key: ' . $sysKey,
-                    'X-API-Secret: ' . $sysSecret,
-                ]);
-                curl_exec($ch);
-                curl_close($ch);
-                $sentVia[] = 'WhatsApp';
+            if ($sysKey) {
+                $stmtKey = Database::pdo()->prepare('SELECT id, user_id FROM api_keys WHERE key_hash = ? LIMIT 1');
+                $stmtKey->execute([hash('sha256', $sysKey)]);
+                $keyRow = $stmtKey->fetch();
+                if ($keyRow) {
+                    $apiKeyId = (int) $keyRow['id'];
+                    $userId = (int) $keyRow['user_id'];
+                }
             }
+
+            $msgBody = "Your WhatsApp API Hub password reset OTP is: *$otp*\nIt expires in 15 minutes.";
+            enqueue_message($userId, $apiKeyId, $phone, $msgBody);
+            $sentVia[] = 'WhatsApp';
         }
 
         json_response(['ok' => true, 'sent_via' => $sentVia]);
