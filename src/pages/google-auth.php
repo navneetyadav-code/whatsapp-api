@@ -81,6 +81,12 @@ if (isset($_GET['code'])) {
         $_SESSION['user_id'] = (int) $user['id'];
         redirect_to('index.php?page=dashboard');
     } else {
+        // Check if registration is permitted
+        if (!app_config('app.enable_registration')) {
+            flash('error', (string) app_config('app.restricted_notice'));
+            redirect_to('index.php?page=login');
+        }
+
         // New user, register them
         $randomPassword = bin2hex(random_bytes(16)); // Secure random password
         $phone = ''; // Google doesn't provide phone by default in this scope

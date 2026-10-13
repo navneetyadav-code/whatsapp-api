@@ -124,3 +124,24 @@ function logout_user(): void
     }
     session_destroy();
 }
+
+function is_owner(?array $user): bool
+{
+    if (!$user || empty($user['id'])) {
+        return false;
+    }
+
+    if ((int) $user['id'] === 1) {
+        return true;
+    }
+
+    $adminEmails = (string) (app_config('app.admin_email') ?? '');
+    $adminList = array_filter(array_map(
+        static fn (string $item): string => mb_strtolower(trim($item)),
+        explode(',', $adminEmails)
+    ));
+
+    $userEmail = mb_strtolower(trim((string) ($user['email'] ?? '')));
+    return in_array($userEmail, $adminList, true);
+}
+

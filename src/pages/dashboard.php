@@ -4,6 +4,10 @@ $user = $user ?? require_auth();
 $section = $_GET['page'] ?? 'dashboard';
 $pdo = Database::pdo();
 
+$allowNewDevices = (bool) app_config('app.allow_new_devices');
+$isOwner = is_owner($user);
+$restrictedNotice = (string) (app_config('app.restricted_notice') ?: 'This is not allowed in current architecture. Contact info.assistgroupofficial@gmail.com');
+
 $sessionStmt = $pdo->prepare('SELECT * FROM whatsapp_sessions WHERE user_id = ? LIMIT 1');
 $sessionStmt->execute([$user['id']]);
 $session = $sessionStmt->fetch() ?: ['status' => 'idle'];
@@ -529,6 +533,15 @@ function page_header(string $title, string $subtitle): void
     <div class="h-8"></div>
 
 <?php elseif ($section === 'device'): ?>
+    <?php if (!$isOwner && !$allowNewDevices): ?>
+    <div class="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3 shadow-sm">
+        <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        <div>
+            <h4 class="text-sm font-bold text-amber-950">Device Linking Restricted</h4>
+            <p class="text-xs text-amber-800 mt-0.5"><?= e($restrictedNotice) ?></p>
+        </div>
+    </div>
+    <?php endif; ?>
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
             <h1 class="text-2xl font-bold text-slate-900 tracking-tight">WhatsApp Device</h1>
@@ -638,11 +651,17 @@ function page_header(string $title, string $subtitle): void
             </div>
             
             <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3" id="deviceActions">
+                <?php if ($isOwner || $allowNewDevices): ?>
                 <!-- Connect / Sleep buttons toggled via JS -->
                 <button id="connectBtn" type="button" data-session-action="start" class="<?= $deviceConnected ? 'hidden' : '' ?> px-4 py-2.5 text-[13px] font-semibold text-white bg-brand-accent rounded-lg shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                     Connect via WhatsApp
                 </button>
+                <?php else: ?>
+                <div class="text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg font-medium">
+                    New device linking is disabled.
+                </div>
+                <?php endif; ?>
 
                 <button id="sleepBtn" type="button" data-session-action="sleep" class="<?= !$deviceConnected || $deviceSleeping ? 'hidden' : '' ?> px-4 py-2 text-[13px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg shadow-sm hover:bg-amber-100 focus:outline-none transition-all flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
@@ -672,6 +691,13 @@ function page_header(string $title, string $subtitle): void
             </div>
 
             <div id="qrContainer" class="<?= $deviceConnected ? 'hidden' : '' ?> flex flex-col items-center w-full">
+                <?php if (!$isOwner && !$allowNewDevices): ?>
+                <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mb-4 border border-amber-200">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <h2 class="text-[16px] font-bold text-slate-900">Device Linking Restricted</h2>
+                <p class="text-[13px] text-amber-800 mt-2 max-w-[280px] leading-relaxed font-medium"><?= e($restrictedNotice) ?></p>
+                <?php else: ?>
                 <div class="w-16 h-16 bg-brand-wa_light/10 text-brand-wa_med rounded-2xl flex items-center justify-center mb-4">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                 </div>
@@ -685,6 +711,7 @@ function page_header(string $title, string $subtitle): void
                     </div>
                     <img id="qrImage" alt="WhatsApp QR code" class="w-full h-full rounded-xl object-contain block mx-auto hidden shadow-sm" style="aspect-ratio: 1/1;">
                 </div>
+                <?php endif; ?>
             </div>
         </section>
     </div>
