@@ -4,6 +4,11 @@ if (current_user()) {
     redirect_to('index.php?page=dashboard');
 }
 
+if (!app_config('app.enable_registration')) {
+    flash('error', 'New registrations are disabled on this private instance.');
+    redirect_to('index.php?page=login');
+}
+
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
