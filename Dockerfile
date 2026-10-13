@@ -32,9 +32,10 @@ RUN mkdir -p /var/www/html/whatsapp-api-data/sessions /var/log/supervisor \
 # Install worker dependencies
 RUN cd /var/www/html/worker && npm install --omit=dev
 
-# Copy supervisor configuration
+# Copy supervisor configuration and set entrypoint
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN chmod +x /var/www/html/docker/entrypoint.sh
 
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/var/www/html/docker/entrypoint.sh"]
