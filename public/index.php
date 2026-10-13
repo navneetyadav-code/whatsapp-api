@@ -3,7 +3,7 @@
 declare(strict_types=1);
 if (function_exists('opcache_reset')) { opcache_reset(); }
 
-if (!file_exists(dirname(__DIR__) . '/.env')) { header('Location: ../setup.php'); exit; }
+if (!file_exists(dirname(__DIR__) . '/.env') && !getenv('DB_HOST') && !getenv('APP_ENV')) { header('Location: ../setup.php'); exit; }
 
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 

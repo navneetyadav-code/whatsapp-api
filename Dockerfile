@@ -23,8 +23,10 @@ WORKDIR /var/www/html
 # Copy repository files
 COPY . /var/www/html
 
-# Create session directory and set permissions
+# Create session directory, dummy .env, and set permissions
 RUN mkdir -p /var/www/html/whatsapp-api-data/sessions /var/log/supervisor \
+    && touch /var/www/html/.env \
+    && ln -sf /var/www/html/public /var/www/html/public/public \
     && chown -R www-data:www-data /var/www/html
 
 # Install worker dependencies
