@@ -7,7 +7,7 @@ if (function_exists('opcache_reset')) { opcache_reset(); }
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 
 $page = $_GET['page'] ?? 'dashboard';
-$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth'];
+$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts'];
 $dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -355,6 +355,11 @@ if ($page === 'webhook' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if ($page === 'google-auth') {
     require dirname(__DIR__) . '/src/pages/google-auth.php';
+    exit;
+}
+
+if ($page === 'google-contacts') {
+    require dirname(__DIR__) . '/src/pages/google-contacts.php';
     exit;
 }
 
