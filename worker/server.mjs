@@ -13,6 +13,7 @@ import makeWASocket, {
   Browsers,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
   useMultiFileAuthState
 } from '@whiskeysockets/baileys';
 
@@ -131,7 +132,8 @@ function emptySession(userId) {
     pushName: null,
     error: null,
     sock: null,
-    starting: null
+    starting: null,
+    reconnectTimer: null
   };
 }
 
@@ -371,6 +373,22 @@ async function recordWebhookDelivery(webhook, payload, status, error, attempt) {
   }
 }
 
+function destroySocket(session) {
+  if (!session) return;
+  if (session.reconnectTimer) {
+    clearTimeout(session.reconnectTimer);
+    session.reconnectTimer = null;
+  }
+  if (session.sock) {
+    try {
+      session.sock.ev.removeAllListeners();
+      session.sock.ws?.close?.();
+      session.sock.end?.();
+    } catch (_) {}
+    session.sock = null;
+  }
+}
+
 async function startSession(userId, force = false, waitForReady = true) {
   const session = getSession(userId);
   if (!force && ((session.state === 'connected' && session.sock) || session.starting)) {
@@ -380,13 +398,7 @@ async function startSession(userId, force = false, waitForReady = true) {
     return session;
   }
 
-  if (force && session.sock) {
-    try {
-      session.sock.ev.removeAllListeners();
-      session.sock.end?.();
-    } catch (e) {}
-    session.sock = null;
-  }
+  destroySocket(session);
   session.starting = null;
 
   session.state = 'connecting';
@@ -423,7 +435,10 @@ async function startSession(userId, force = false, waitForReady = true) {
     }
 
     const sock = makeWASocket({
-      auth: state,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, logger)
+      },
       browser: Browsers.ubuntu('Chrome'),
       logger,
       printQRInTerminal: false,
@@ -432,6 +447,7 @@ async function startSession(userId, force = false, waitForReady = true) {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
+      getMessage: async () => undefined,
       ...(version ? { version } : {})
     });
 
@@ -440,6 +456,16 @@ async function startSession(userId, force = false, waitForReady = true) {
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', async (update) => {
+      // Guard: Ignore events from superseded sockets
+      if (session.sock !== sock) {
+        try {
+          sock.ev.removeAllListeners();
+          sock.ws?.close?.();
+          sock.end?.();
+        } catch (_) {}
+        return;
+      }
+
       try {
         const { connection, lastDisconnect, qr } = update;
 
@@ -447,16 +473,15 @@ async function startSession(userId, force = false, waitForReady = true) {
           session.qr = null;
           session.hasQr = false;
 
-          if (connection === 'open' && sock) {
+          if (connection === 'open') {
             session.state = 'connected';
-            session.sock = null;
-            sock.end?.();
+            destroySocket(session);
             await updateSessionRecord(userId, session);
           }
 
           if (connection === 'close') {
             session.state = session.phone ? 'connected' : 'idle';
-            session.sock = null;
+            destroySocket(session);
             session.error = null;
             await updateSessionRecord(userId, session);
           }
@@ -489,20 +514,26 @@ async function startSession(userId, force = false, waitForReady = true) {
         if (connection === 'close') {
           session.starting = null;
           const code = lastDisconnect?.error?.output?.statusCode;
+          const disconnectMessage = String(lastDisconnect?.error?.message || '');
           const isRestart = code === DisconnectReason.restartRequired;
           const isLoggedOut = code === DisconnectReason.loggedOut;
           const isBadSession = code === DisconnectReason.badSession
             || code === DisconnectReason.multideviceMismatch
             || code === DisconnectReason.forbidden;
-          const disconnectMessage = String(lastDisconnect?.error?.message || '');
+          const isReplaced = code === DisconnectReason.connectionReplaced
+            || disconnectMessage.toLowerCase().includes('conflict')
+            || disconnectMessage.toLowerCase().includes('replaced');
           const isQrExpired = disconnectMessage.includes('QR refs attempts ended');
 
           if (isLoggedOut || isBadSession) {
+            destroySocket(session);
             try { await rm(authDir, { recursive: true, force: true }); } catch (e) {}
             session.state = 'idle';
             session.qr = null;
             session.hasQr = false;
-            session.sock = null;
+            session.phone = null;
+            session.pushName = null;
+            session.profilePicture = null;
             session.error = isLoggedOut
               ? 'Device was unlinked. Please click Connect to scan again.'
               : 'Saved WhatsApp login was invalid. Click Connect to generate a fresh QR code.';
@@ -511,26 +542,37 @@ async function startSession(userId, force = false, waitForReady = true) {
           }
 
           if (isRestart) {
+            destroySocket(session);
             session.state = 'connecting';
             session.error = null;
-            session.sock = null;
             session.qr = null;
             session.hasQr = false;
             await updateSessionRecord(userId, session);
-            setTimeout(() => {
+            session.reconnectTimer = setTimeout(() => {
+              session.reconnectTimer = null;
               startSession(userId, false).catch((error) => {
                 logger.error({ error, userId }, 'Restart handshake failed');
               });
-            }, 600);
+            }, 1000);
+            return;
+          }
+
+          if (isReplaced) {
+            destroySocket(session);
+            session.state = 'disconnected';
+            session.qr = null;
+            session.hasQr = false;
+            session.error = 'WhatsApp connection was replaced by another active session. Click Connect to reconnect.';
+            await updateSessionRecord(userId, session);
             return;
           }
 
           if (isQrExpired) {
+            destroySocket(session);
             try { await rm(authDir, { recursive: true, force: true }); } catch (e) {}
             session.state = 'idle';
             session.qr = null;
             session.hasQr = false;
-            session.sock = null;
             session.error = 'QR code expired. Click Connect to generate a new QR code.';
             await updateSessionRecord(userId, session);
             return;
@@ -538,17 +580,20 @@ async function startSession(userId, force = false, waitForReady = true) {
 
           const wasConnected = session.state === 'connected' || Boolean(session.phone);
           const shouldReconnect = !session.sleeping && wasConnected;
+          destroySocket(session);
           session.state = session.sleeping ? 'idle' : (shouldReconnect ? 'disconnected' : 'idle');
           session.qr = null;
           session.hasQr = false;
-          session.sock = null;
           session.error = lastDisconnect?.error?.message || null;
           await updateSessionRecord(userId, session);
 
           if (shouldReconnect) {
-            setTimeout(() => startSession(userId, false).catch((error) => {
-              logger.error({ error, userId }, 'Reconnect failed');
-            }), 2500);
+            session.reconnectTimer = setTimeout(() => {
+              session.reconnectTimer = null;
+              startSession(userId, false).catch((error) => {
+                logger.error({ error, userId }, 'Reconnect failed');
+              });
+            }, 3000);
           }
         }
       } catch (error) {
@@ -560,6 +605,9 @@ async function startSession(userId, force = false, waitForReady = true) {
     });
 
     sock.ev.on('messages.upsert', async (m) => {
+      // Guard: Ignore messages from superseded sockets
+      if (session.sock !== sock) return;
+
       try {
         if (m.type !== 'notify') return;
         for (const msg of m.messages) {
@@ -926,12 +974,7 @@ async function processQueueOnce() {
             session.qr = null;
             session.hasQr = false;
             session.error = null;
-            if (session.sock) {
-              try {
-                session.sock.end?.();
-              } catch (e) {}
-            }
-            session.sock = null;
+            destroySocket(session);
             session.state = session.phone ? 'connected' : 'idle';
             await updateSessionRecord(session.userId, session);
           }
@@ -980,11 +1023,11 @@ app.post('/sessions/:userId/logout', async (req, res) => {
     if (session.sock) {
       session.sock.ev.removeAllListeners();
       await session.sock.logout().catch(() => {});
-      session.sock.end?.();
     }
   } catch (error) {
     session.error = error.message;
   } finally {
+    destroySocket(session);
     try {
       await rm(authDir, { recursive: true, force: true });
     } catch (e) {}
@@ -1003,15 +1046,8 @@ app.post('/sessions/:userId/sleep', async (req, res) => {
   session.hasQr = false;
   session.error = null;
 
-  try {
-    if (session.sock) {
-      session.sock.end?.();
-    }
-  } catch (error) {
-    session.error = error.message;
-  }
+  destroySocket(session);
 
-  session.sock = null;
   session.state = session.phone ? 'connected' : 'idle';
   await updateSessionRecord(req.params.userId, session);
   res.json({ ok: true, session: publicSession(session) });
