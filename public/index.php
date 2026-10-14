@@ -6,7 +6,35 @@ if (function_exists('opcache_reset')) { opcache_reset(); }
 
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 
-$page = $_GET['page'] ?? 'dashboard';
+// Determine requested route from clean URL path or fallback to query parameter
+$requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+$basePath = rtrim((string) app_config('app.base_path'), '/');
+if ($basePath !== '' && str_starts_with($requestUri, $basePath)) {
+    $requestUri = substr($requestUri, strlen($basePath));
+}
+$path = trim($requestUri, '/');
+if (str_starts_with($path, 'index.php')) {
+    $path = trim(substr($path, 9), '/');
+}
+
+$page = $path !== '' ? explode('/', $path)[0] : ($_GET['page'] ?? 'dashboard');
+
+// 301 Permanent Redirect for legacy /index.php?page=foo to professional /foo
+if ($_SERVER['REQUEST_METHOD'] === 'GET'
+    && !empty($_GET['page'])
+    && str_contains($_SERVER['REQUEST_URI'] ?? '', 'index.php')
+    && !isset($_GET['code'])
+    && !isset($_GET['state'])
+) {
+    $targetPage = (string) $_GET['page'];
+    $queryParams = $_GET;
+    unset($queryParams['page']);
+    $queryString = http_build_query($queryParams);
+    $cleanTarget = ($targetPage === 'dashboard' ? '' : $targetPage) . ($queryString !== '' ? '?' . $queryString : '');
+    header('HTTP/1.1 301 Moved Permanently');
+    redirect_to($cleanTarget);
+}
+
 $publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts'];
 $dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot'];
 
