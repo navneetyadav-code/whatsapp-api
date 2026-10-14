@@ -233,7 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <!-- Google Login Button -->
-            <a href="<?= e(base_url('index.php?page=google-auth')) ?>" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 active:scale-[0.98]">
+            <a href="<?= e(base_url('google-auth')) ?>" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 active:scale-[0.98]">
                 <svg class="w-4 h-4" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -246,10 +246,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <!-- Footer -->
             <p class="mt-8 text-center text-sm font-medium text-gray-500">
                 Don't have an account? 
-                <a href="<?= e(base_url('index.php?page=register')) ?>" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Sign up</a>
+                <a href="<?= e(base_url('register')) ?>" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Sign up</a>
             </p>
 
-            <div class="mt-6 pt-4 border-t border-gray-100 text-center space-y-1">
+            <div class="mt-6 pt-4 border-t border-gray-100 text-center space-y-1.5">
+                <div class="flex flex-wrap items-center justify-center gap-3 text-xs text-gray-500 pb-1 font-medium">
+                    <a href="<?= e(base_url('')) ?>" class="hover:text-gray-900 transition-colors">Home</a>
+                    <span>&bull;</span>
+                    <a href="<?= e(base_url('privacy')) ?>" class="hover:text-gray-900 transition-colors">Privacy Policy</a>
+                    <span>&bull;</span>
+                    <a href="<?= e(base_url('terms')) ?>" class="hover:text-gray-900 transition-colors">Terms of Service</a>
+                    <span>&bull;</span>
+                    <a href="<?= e(base_url('docs')) ?>" class="hover:text-gray-900 transition-colors">Docs</a>
+                </div>
                 <p class="text-xs text-gray-500">
                     Made by <a href="https://github.com/navneetyadav-code" target="_blank" rel="noopener noreferrer" class="font-semibold text-gray-800 hover:underline">Navneet Kumar Yadav</a>
                 </p>
