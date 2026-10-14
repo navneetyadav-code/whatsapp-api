@@ -1,5 +1,5 @@
 <?php
-$currentPage = $_GET['page'] ?? 'dashboard';
+$currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
 ?>
 <!-- Sidebar (Collapsible on tablet, Drawer on mobile) -->
 <aside id="sidebar" class="bg-[#F8FAFC] border-r border-slate-200 text-slate-600 w-64 flex-shrink-0 flex flex-col transition-transform duration-300 z-30 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0">

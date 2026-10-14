@@ -1,7 +1,7 @@
 <?php
 
 $user = $user ?? require_auth();
-$section = $_GET['page'] ?? 'dashboard';
+$section = $page ?? ($_GET['page'] ?? 'dashboard');
 $pdo = Database::pdo();
 
 $allowNewDevices = (bool) app_config('app.allow_new_devices');

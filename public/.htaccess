@@ -7,3 +7,8 @@ RewriteRule ^public/(.*)$ /$1 [L,R=301]
 RewriteRule ^v[0-9.]+/([0-9]+)/messages/?$ api/send.php [L,QSA]
 RewriteRule ^api/messages/?$ api/send.php [L,QSA]
 RewriteRule ^messages/?$ api/send.php [L,QSA]
+
+# Clean URL Routing: Route all requests that are not existing files/directories to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [L,QSA]
