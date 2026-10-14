@@ -22,6 +22,7 @@ if ($userForLayout) {
     <meta name="author" content="Navneet Kumar Yadav">
     <meta name="robots" content="<?= e($seo['robots']) ?>">
     <link rel="canonical" href="<?= e($seo['canonical']) ?>">
+    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
