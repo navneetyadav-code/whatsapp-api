@@ -679,13 +679,13 @@ const initQueueLivePolling = () => {
 
                         let actions = '';
                         if (msg.status === 'queued') {
-                            actions = `<form method="post" action="index.php?page=message-cancel">
+                            actions = `<form method="post" action="message-cancel">
                                 <input type="hidden" name="csrf_token" value="${data.csrf_token || ''}">
                                 <input type="hidden" name="id" value="${msg.id}">
                                 <button type="submit" class="px-2.5 py-1.5 text-[12px] font-semibold text-rose-600 bg-white border border-rose-200 rounded hover:bg-rose-50 transition-colors shadow-sm">Cancel</button>
                             </form>`;
                         } else if (['failed', 'cancelled'].includes(msg.status)) {
-                            actions = `<form method="post" action="index.php?page=message-retry">
+                            actions = `<form method="post" action="message-retry">
                                 <input type="hidden" name="csrf_token" value="${data.csrf_token || ''}">
                                 <input type="hidden" name="id" value="${msg.id}">
                                 <button type="submit" class="px-2.5 py-1.5 text-[12px] font-semibold text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-colors shadow-sm">Retry</button>

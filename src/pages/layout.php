@@ -1,7 +1,7 @@
 <?php
 $userForLayout = current_user();
 $isAuthed = (bool) $userForLayout;
-$currentPage = $_GET['page'] ?? 'dashboard';
+$currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
 $seo = seo_meta($currentPage);
 $isPublicDocs = !$isAuthed && $currentPage === 'docs';
 $initials = 'AD';

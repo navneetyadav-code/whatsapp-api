@@ -23,11 +23,31 @@ function app_config(?string $key = null): mixed
 
 function base_url(string $path = ''): string
 {
-    return rtrim((string) app_config('app.base_path'), '/') . '/' . ltrim($path, '/');
+    // Automatically convert legacy 'index.php?page=foo' into professional '/foo'
+    if (preg_match('#^index\.php\?page=([a-zA-Z0-9_-]+)(?:&(.*))?$#', $path, $matches)) {
+        $cleanPath = $matches[1];
+        if (!empty($matches[2])) {
+            $cleanPath .= '?' . $matches[2];
+        }
+        $path = $cleanPath;
+    }
+
+    $base = rtrim((string) app_config('app.base_path'), '/');
+    $clean = ltrim($path, '/');
+    return $clean === '' ? ($base !== '' ? $base : '/') : ($base !== '' ? $base . '/' . $clean : '/' . $clean);
 }
 
 function public_url(string $path = ''): string
 {
+    // Automatically convert legacy 'index.php?page=foo' into professional '/foo'
+    if (preg_match('#^index\.php\?page=([a-zA-Z0-9_-]+)(?:&(.*))?$#', $path, $matches)) {
+        $cleanPath = $matches[1];
+        if (!empty($matches[2])) {
+            $cleanPath .= '?' . $matches[2];
+        }
+        $path = $cleanPath;
+    }
+
     $baseUrl = rtrim((string) app_config('app.public_url'), '/');
     if ($baseUrl === '' || !preg_match('#^https?://#i', $baseUrl)) {
         $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
@@ -202,7 +222,7 @@ function seo_meta(?string $page): array {
         'title' => 'Free WhatsApp API Gateway & Dashboard | Self-Hosted Open Source',
         'description' => '100% Free WhatsApp API Gateway built with PHP, Node.js, MySQL & Baileys. Self-hosted REST API for sending messages, media, webhooks, and automation without Meta Cloud fees.',
         'keywords' => 'free whatsapp api, open source whatsapp api, whatsapp api php, baileys whatsapp api, self hosted whatsapp api, whatsapp gateway, whatsapp web automation, whatsapp webhook api, free whatsapp api github',
-        'canonical' => $baseUrl . '/index.php?page=' . ($page ?? 'dashboard'),
+        'canonical' => $baseUrl . '/' . ($page === 'dashboard' ? '' : ltrim($page ?? '', '/')),
         'type' => 'website',
         'robots' => 'index, follow',
         'author' => 'Navneet Kumar Yadav',
