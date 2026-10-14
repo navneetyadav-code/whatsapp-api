@@ -17,7 +17,13 @@ if (str_starts_with($path, 'index.php')) {
     $path = trim(substr($path, 9), '/');
 }
 
-$page = $path !== '' ? explode('/', $path)[0] : ($_GET['page'] ?? 'dashboard');
+if ($path !== '') {
+    $page = explode('/', $path)[0];
+} elseif (!empty($_GET['page'])) {
+    $page = (string) $_GET['page'];
+} else {
+    $page = current_user() !== null ? 'dashboard' : 'home';
+}
 
 // 301 Permanent Redirect for legacy /index.php?page=foo to professional /foo
 if ($_SERVER['REQUEST_METHOD'] === 'GET'
@@ -35,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
     redirect_to($cleanTarget);
 }
 
-$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts'];
+$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home'];
 $dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -393,6 +399,21 @@ if ($page === 'google-contacts') {
 
 if ($page === 'forgot-password') {
     require dirname(__DIR__) . '/src/pages/forgot-password.php';
+    exit;
+}
+
+if ($page === 'privacy' || $page === 'privacy-policy') {
+    require dirname(__DIR__) . '/src/pages/privacy.php';
+    exit;
+}
+
+if ($page === 'terms' || $page === 'terms-of-service' || $page === 'tos') {
+    require dirname(__DIR__) . '/src/pages/terms.php';
+    exit;
+}
+
+if ($page === 'home') {
+    require dirname(__DIR__) . '/src/pages/home.php';
     exit;
 }
 
