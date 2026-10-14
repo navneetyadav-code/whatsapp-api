@@ -245,26 +245,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Don't have an account? 
                 <a href="<?= e(base_url('register')) ?>" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Sign up</a>
             </p>
-
-            <div class="mt-6 pt-4 border-t border-gray-100 text-center space-y-1.5">
-                <div class="flex flex-wrap items-center justify-center gap-3 text-xs text-gray-500 pb-1 font-medium">
-                    <a href="<?= e(base_url('')) ?>" class="hover:text-gray-900 transition-colors">Home</a>
-                    <span>&bull;</span>
-                    <a href="<?= e(base_url('privacy')) ?>" class="hover:text-gray-900 transition-colors">Privacy Policy</a>
-                    <span>&bull;</span>
-                    <a href="<?= e(base_url('terms')) ?>" class="hover:text-gray-900 transition-colors">Terms of Service</a>
-                    <span>&bull;</span>
-                    <a href="<?= e(base_url('docs')) ?>" class="hover:text-gray-900 transition-colors">Docs</a>
-                </div>
-                <p class="text-xs text-gray-500">
-                    Made by <a href="https://github.com/navneetyadav-code" target="_blank" rel="noopener noreferrer" class="font-semibold text-gray-800 hover:underline">Navneet Kumar Yadav</a>
-                </p>
-                <p class="text-[11px] text-gray-400">
-                    Takedown / Removal: <a href="mailto:info.assistgroupofficial@gmail.com" class="text-gray-600 hover:underline">info.assistgroupofficial@gmail.com</a>
-                </p>
-                <p class="text-[10px] text-gray-400">
-                    Not affiliated with, sponsored by, or endorsed by Meta or WhatsApp.
-                </p>
             </div>
 
         </div>
