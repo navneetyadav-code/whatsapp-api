@@ -10,7 +10,7 @@ $pageLabels = [
     'webhooks' => 'Webhooks',
     'campaigns' => 'Campaigns',
 ];
-$title = $pageLabels[$_GET['page'] ?? 'dashboard'] ?? 'Overview';
+$title = $pageLabels[$page ?? ($_GET['page'] ?? 'dashboard')] ?? 'Overview';
 ?>
 <!-- Top Navbar (Glassmorphic SaaS Style) -->
 <header class="h-14 glass-header border-b border-slate-200 flex items-center justify-between px-5 shrink-0 z-10 sticky top-0">

@@ -1,7 +1,7 @@
 <?php
 
 $user = $user ?? require_auth();
-$section = $_GET['page'] ?? 'dashboard';
+$section = $page ?? ($_GET['page'] ?? 'dashboard');
 $pdo = Database::pdo();
 
 $sessionStmt = $pdo->prepare('SELECT * FROM whatsapp_sessions WHERE user_id = ? LIMIT 1');
