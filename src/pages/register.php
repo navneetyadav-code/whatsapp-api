@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/css/intlTelInput.css">`r`n    <style>.iti { width: 100%; }</style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/css/intlTelInput.css">    <style>.iti { width: 100%; }</style>
     <script>
         tailwind.config = {
             theme: {
@@ -241,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="relative flex items-center">
                             <input type="password" id="password" name="password" 
                                    class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 pr-10" 
-                                   placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
+                                   placeholder="Password" 
                                    required>
                             <!-- Toggle Password Button -->
                             <button type="button" onclick="togglePassword('password', 'eye-icon')" class="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none flex items-center justify-center p-1" aria-label="Toggle password visibility">
@@ -259,7 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="relative flex items-center">
                             <input type="password" id="confirmPassword" name="confirmPassword" 
                                    class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 pr-10" 
-                                   placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
+                                   placeholder="confirm password" 
                                    required>
                             <!-- Toggle Confirm Password Button -->
                             <button type="button" onclick="togglePassword('confirmPassword', 'eye-icon-confirm')" class="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none flex items-center justify-center p-1" aria-label="Toggle confirm password visibility">
@@ -312,28 +312,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Already have an account? 
                 <a href="<?= e(base_url('login')) ?>" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Log in</a>
             </p>
-
-            <div class="mt-6 pt-4 border-t border-gray-100 text-center space-y-1.5">
-                <div class="flex flex-wrap items-center justify-center gap-3 text-xs text-gray-500 pb-1 font-medium">
-                    <a href="<?= e(base_url('')) ?>" class="hover:text-gray-900 transition-colors">Home</a>
-                    <span>&bull;</span>
-                    <a href="<?= e(base_url('privacy')) ?>" class="hover:text-gray-900 transition-colors">Privacy Policy</a>
-                    <span>&bull;</span>
-                    <a href="<?= e(base_url('terms')) ?>" class="hover:text-gray-900 transition-colors">Terms of Service</a>
-                    <span>&bull;</span>
-                    <a href="<?= e(base_url('docs')) ?>" class="hover:text-gray-900 transition-colors">Docs</a>
-                </div>
-                <p class="text-xs text-gray-500">
-                    Made by <a href="https://github.com/navneetyadav-code" target="_blank" rel="noopener noreferrer" class="font-semibold text-gray-800 hover:underline">Navneet Kumar Yadav</a>
-                </p>
-                <p class="text-[11px] text-gray-400">
-                    Takedown / Removal: <a href="mailto:info.assistgroupofficial@gmail.com" class="text-gray-600 hover:underline">info.assistgroupofficial@gmail.com</a>
-                </p>
-                <p class="text-[10px] text-gray-400">
-                    Not affiliated with, sponsored by, or endorsed by Meta or WhatsApp.
-                </p>
-            </div>
-
         </div>
     </div>
 
