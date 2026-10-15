@@ -408,50 +408,85 @@ function assert_safe_media_url(string $url): string
  */
 function download_remote_media(string $url, int $maxBytes = 20971520): array
 {
-    $safeUrl = assert_safe_media_url($url);
-
     $uploadDir = dirname(__DIR__, 2) . '/public/uploads/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
     }
 
+    $currentUrl = $url;
+    $maxRedirects = 3;
+    $redirectsFollowed = 0;
     $tmpPath = $uploadDir . 'tmp_' . bin2hex(random_bytes(12)) . '.bin';
-    $fp = fopen($tmpPath, 'w+b');
-    if (!$fp) {
-        throw new RuntimeException('Unable to create temporary file for media download.');
+    $contentType = '';
+
+    while ($redirectsFollowed <= $maxRedirects) {
+        $safeUrl = assert_safe_media_url($currentUrl);
+
+        $fp = fopen($tmpPath, 'w+b');
+        if (!$fp) {
+            throw new RuntimeException('Unable to create temporary file for media download.');
+        }
+
+        $ch = curl_init($safeUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $fp,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_TIMEOUT => 25,
+            CURLOPT_CONNECTTIMEOUT => 7,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_USERAGENT => 'WhatsApp-API-Hub-MediaDownloader/1.0',
+            CURLOPT_NOPROGRESS => false,
+            CURLOPT_PROGRESSFUNCTION => static function ($resource, $downloadSize, $downloaded) use ($maxBytes): int {
+                if ($downloaded > $maxBytes || $downloadSize > $maxBytes) {
+                    return 1; // Abort download immediately if exceeded max bytes
+                }
+                return 0;
+            },
+        ]);
+
+        $success = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $redirectUrl = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL);
+        $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        fclose($fp);
+
+        if (in_array($httpCode, [301, 302, 303, 307, 308], true)) {
+            if (file_exists($tmpPath)) {
+                unlink($tmpPath);
+            }
+            if ($redirectUrl === '') {
+                throw new RuntimeException('Received redirect without Location header.');
+            }
+            if (!filter_var($redirectUrl, FILTER_VALIDATE_URL)) {
+                $baseParts = parse_url($currentUrl);
+                $scheme = $baseParts['scheme'] ?? 'https';
+                $host = $baseParts['host'] ?? '';
+                $port = !empty($baseParts['port']) ? ':' . $baseParts['port'] : '';
+                $redirectUrl = $scheme . '://' . $host . $port . '/' . ltrim($redirectUrl, '/');
+            }
+            $currentUrl = $redirectUrl;
+            $redirectsFollowed++;
+            continue;
+        }
+
+        if (!$success || $httpCode < 200 || $httpCode >= 300) {
+            if (file_exists($tmpPath)) {
+                unlink($tmpPath);
+            }
+            throw new RuntimeException('Failed to download media from URL: ' . ($curlError ?: "HTTP {$httpCode}"));
+        }
+
+        break;
     }
 
-    $ch = curl_init($safeUrl);
-    curl_setopt_array($ch, [
-        CURLOPT_FILE => $fp,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS => 3,
-        CURLOPT_TIMEOUT => 25,
-        CURLOPT_CONNECTTIMEOUT => 7,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_USERAGENT => 'WhatsApp-API-Hub-MediaDownloader/1.0',
-        CURLOPT_NOPROGRESS => false,
-        CURLOPT_PROGRESSFUNCTION => static function ($resource, $downloadSize, $downloaded) use ($maxBytes): int {
-            if ($downloaded > $maxBytes || $downloadSize > $maxBytes) {
-                return 1; // Abort download immediately if exceeded max bytes
-            }
-            return 0;
-        },
-    ]);
-
-    $success = curl_exec($ch);
-    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-    fclose($fp);
-
-    if (!$success || $httpCode < 200 || $httpCode >= 300) {
+    if ($redirectsFollowed > $maxRedirects) {
         if (file_exists($tmpPath)) {
             unlink($tmpPath);
         }
-        throw new RuntimeException('Failed to download media from URL: ' . ($curlError ?: "HTTP {$httpCode}"));
+        throw new RuntimeException('Too many redirects encountered while downloading media.');
     }
 
     $fileSize = (int) (file_exists($tmpPath) ? filesize($tmpPath) : 0);
