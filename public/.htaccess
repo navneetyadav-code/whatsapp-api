@@ -6,7 +6,9 @@ RewriteRule ^public/(.*)$ /$1 [L,R=301]
 # Meta WhatsApp Cloud API URL Compatibility (e.g. /v20.0/123456/messages or /api/messages)
 RewriteRule ^v[0-9.]+/([0-9]+)/messages/?$ api/send.php [L,QSA]
 RewriteRule ^api/messages/?$ api/send.php [L,QSA]
+RewriteRule ^api/send/?$ api/send.php [L,QSA]
 RewriteRule ^messages/?$ api/send.php [L,QSA]
+RewriteRule ^send/?$ api/send.php [L,QSA]
 
 # Clean URL Routing: Route all requests that are not existing files/directories to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
