@@ -816,7 +816,17 @@ async function sendQueuedMessage(message) {
   let outgoingMessage;
 
   if (attachment?.path) {
-    if (!existsSync(attachment.path)) {
+    const rawPath = String(attachment.path);
+    const resolvedPath = resolve(rawPath);
+    const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
+
+    if (!resolvedPath.startsWith(allowedUploadsDir)) {
+      logger.warn({ path: rawPath, resolvedPath }, 'Security alert: Attachment path is outside allowed uploads directory.');
+      await markMessageFailed(message, 'Attachment path is invalid or restricted.', recipient.normalizedTo);
+      return;
+    }
+
+    if (!existsSync(resolvedPath)) {
       await markMessageFailed(message, 'Attachment file is missing from storage.', recipient.normalizedTo);
       return;
     }
@@ -831,7 +841,7 @@ async function sendQueuedMessage(message) {
       commonMedia.caption = String(message.body || '');
     }
 
-    const fileStats = statSync(attachment.path);
+    const fileStats = statSync(resolvedPath);
     if (!fileStats.isFile()) {
       await markMessageFailed(message, 'Attachment path is invalid.', recipient.normalizedTo);
       return;
@@ -925,8 +935,12 @@ async function markMessageSent(message, result, normalizedTo) {
   // Ephemeral media cleanup to conserve disk space
   try {
     const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
-    if (payload?.attachment?.is_temp && payload.attachment.path && existsSync(payload.attachment.path)) {
-      await rm(payload.attachment.path, { force: true });
+    if (payload?.attachment?.is_temp && payload.attachment.path) {
+      const resolvedPath = resolve(String(payload.attachment.path));
+      const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
+      if (resolvedPath.startsWith(allowedUploadsDir) && existsSync(resolvedPath)) {
+        await rm(resolvedPath, { force: true });
+      }
     }
   } catch (_) {}
 }
@@ -960,8 +974,12 @@ async function markMessageFailed(message, error, normalizedTo = null) {
     // Cleanup temporary media if final attempt failed
     try {
       const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
-      if (payload?.attachment?.is_temp && payload.attachment.path && existsSync(payload.attachment.path)) {
-        await rm(payload.attachment.path, { force: true });
+      if (payload?.attachment?.is_temp && payload.attachment.path) {
+        const resolvedPath = resolve(String(payload.attachment.path));
+        const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
+        if (resolvedPath.startsWith(allowedUploadsDir) && existsSync(resolvedPath)) {
+          await rm(resolvedPath, { force: true });
+        }
       }
     } catch (_) {}
   }
