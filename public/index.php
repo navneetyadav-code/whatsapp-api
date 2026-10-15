@@ -1,8 +1,25 @@
 <?php
 
 declare(strict_types=1);
-if (function_exists('opcache_reset')) { opcache_reset(); }
 
+/**
+ * WhatsApp API Hub — Web Front Controller & Application Entry Point
+ *
+ * Routes incoming web traffic to public landing pages, authentication flows,
+ * or authenticated dashboard views. Handles clean URL rewrites and CSRF-protected
+ * state mutations.
+ *
+ * Architecture & Routing:
+ *   - Public routes: home, docs, login, register, forgot-password, google-auth, google-contacts, privacy, terms
+ *   - Dashboard sections: dashboard (overview), device (Baileys pairing), message (composer),
+ *     queue (delivery monitor), api-keys (credentials), contacts (address book),
+ *     campaigns (broadcasts), chatbot (auto-reply rules), webhooks (notifications), audit (logs)
+ *   - POST handlers: credentials, api-key-status, api-key-limits, api-key-delete,
+ *     message-send, message-retry, message-cancel, contact-create, contact-import,
+ *     contact-delete, campaign-create, chatbot-create, chatbot-status, chatbot-delete, webhook, logout
+ */
+
+if (function_exists('opcache_reset')) { opcache_reset(); }
 
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 
