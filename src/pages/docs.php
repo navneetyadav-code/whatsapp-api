@@ -78,14 +78,14 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
             <div>
                 <h3 class="text-sm font-bold text-slate-900 mb-2">Request Body (Supported Formats)</h3>
                 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                     <!-- Format 1: Clean Hub Format -->
                     <div class="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Format A: Clean Flat JSON (Recommended)
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Format A: Flat Text JSON
                             </span>
-                            <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Easiest</span>
+                            <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Text</span>
                         </div>
                         <pre class="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">{
   "to": "919876543210",
@@ -98,18 +98,35 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
                     <div class="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-blue-500"></span> Format B: Meta WhatsApp Cloud API
+                                <span class="w-2 h-2 rounded-full bg-blue-500"></span> Format B: Meta Cloud API Media
                             </span>
                             <span class="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Drop-In</span>
                         </div>
                         <pre class="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">{
   "messaging_product": "whatsapp",
-  "recipient_type": "individual",
   "to": "919876543210",
-  "type": "text",
-  "text": {
-    "body": "Hello World! 🚀"
+  "type": "document",
+  "document": {
+    "link": "https://example.com/invoice.pdf",
+    "caption": "Your monthly invoice",
+    "filename": "invoice.pdf"
   }
+}</pre>
+                    </div>
+
+                    <!-- Format 3: Clean Hub Media Format -->
+                    <div class="border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-purple-500"></span> Format C: Direct Media / URL
+                            </span>
+                            <span class="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">Media</span>
+                        </div>
+                        <pre class="bg-slate-900 text-slate-200 p-3 rounded-lg font-mono text-[11px] overflow-x-auto">{
+  "to": "919876543210",
+  "type": "image",
+  "media_url": "https://example.com/photo.jpg",
+  "caption": "Photo from API! 📸"
 }</pre>
                     </div>
                 </div>
@@ -132,10 +149,28 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
                                 <td class="px-4 py-3 text-slate-600">Recipient's phone number with country code (e.g. <code class="bg-slate-100 px-1 py-0.5 rounded">919876543210</code>) or 10-digit Indian number.</td>
                             </tr>
                             <tr>
-                                <td class="px-4 py-3 font-mono font-bold text-slate-900">message <span class="text-slate-400 font-normal">or</span> text.body</td>
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900">message <span class="text-slate-400 font-normal">/</span> caption</td>
                                 <td class="px-4 py-3 text-slate-500">string</td>
-                                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Required</span></td>
-                                <td class="px-4 py-3 text-slate-600">The message content. Supports WhatsApp formatting (<code class="bg-slate-100 px-1 py-0.5 rounded">*bold*</code>, <code class="bg-slate-100 px-1 py-0.5 rounded">_italic_</code>, <code class="bg-slate-100 px-1 py-0.5 rounded">~strike~</code>).</td>
+                                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Conditional</span></td>
+                                <td class="px-4 py-3 text-slate-600">The message text or media caption. Optional if a media file/URL is provided. Supports WhatsApp formatting (<code class="bg-slate-100 px-1 py-0.5 rounded">*bold*</code>, <code class="bg-slate-100 px-1 py-0.5 rounded">_italic_</code>).</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900">media_url <span class="text-slate-400 font-normal">or</span> link</td>
+                                <td class="px-4 py-3 text-slate-500">string (URL)</td>
+                                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Optional</span></td>
+                                <td class="px-4 py-3 text-slate-600">Direct HTTP/HTTPS link to an image, PDF, document, audio, or video file. Downloaded securely with SSRF protection.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900">type</td>
+                                <td class="px-4 py-3 text-slate-500">string</td>
+                                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Optional</span></td>
+                                <td class="px-4 py-3 text-slate-600"><code class="bg-slate-100 px-1 py-0.5 rounded">image</code>, <code class="bg-slate-100 px-1 py-0.5 rounded">document</code>, <code class="bg-slate-100 px-1 py-0.5 rounded">video</code>, or <code class="bg-slate-100 px-1 py-0.5 rounded">audio</code>. Auto-detected from file extension if omitted.</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3 font-mono font-bold text-slate-900">file / attachment</td>
+                                <td class="px-4 py-3 text-slate-500">binary file</td>
+                                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Optional</span></td>
+                                <td class="px-4 py-3 text-slate-600">Local binary file uploaded via multipart/form-data (<code class="bg-slate-100 px-1 py-0.5 rounded">curl -F "file=@invoice.pdf"</code>). Up to 20MB.</td>
                             </tr>
                             <tr>
                                 <td class="px-4 py-3 font-mono font-bold text-slate-900">humanize</td>
@@ -201,6 +236,40 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
       "body": "Hello via Meta Cloud API format! 🌐"
     }
   }'</code></pre>
+            </div>
+
+            <!-- cURL: Send Media via URL (Images, PDFs, Videos, Audio) -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span> cURL — Send Media via Public URL (Images, PDFs, Videos, Audio)
+                    </span>
+                    <span class="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">New Feature</span>
+                </div>
+                <pre class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>curl -X POST "<?= e($endpoint) ?>" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -d '{
+    "to": "919876543210",
+    "type": "image",
+    "media_url": "https://example.com/invoice-1024.jpg",
+    "caption": "Your payment receipt has been verified! 🧾"
+  }'</code></pre>
+            </div>
+
+            <!-- cURL: Direct Local File Upload (Multipart Form) -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span> cURL — Direct File Upload from Terminal (Multipart/form-data)
+                    </span>
+                    <span class="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Binary File</span>
+                </div>
+                <pre class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>curl -X POST "<?= e($endpoint) ?>" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -F "to=919876543210" \
+  -F "file=@/path/to/annual_report.pdf" \
+  -F "caption=Attached is the annual financial statement."</code></pre>
             </div>
 
             <!-- Python -->

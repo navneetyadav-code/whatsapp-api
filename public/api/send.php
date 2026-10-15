@@ -46,13 +46,37 @@ if ($rawTo === '' && !empty($data['contacts'][0]['wa_id'])) {
 }
 $to = normalize_phone($rawTo);
 
-// 2. Message extraction (supports both your standard 'message' and Meta Cloud API formats)
+// 2. Media ingestion & validation (multipart uploads, remote URLs, or Base64)
+$attachment = null;
+$mediaError = null;
+try {
+    $attachment = parse_api_media_payload($data, $_FILES ?? []);
+} catch (Throwable $e) {
+    $mediaError = $e->getMessage();
+}
+
+if ($mediaError !== null) {
+    $requestId = log_api_request((int) $user['user_id'], (int) $user['id'], 'send', 422, $mediaError);
+    json_response([
+        'ok' => false,
+        'error' => $mediaError,
+        'request_id' => $requestId,
+        'meta_error' => [
+            'message' => $mediaError,
+            'type' => 'OAuthException',
+            'code' => 100,
+        ],
+    ], 422);
+}
+
+// 3. Message / Caption extraction (supports Hub message/caption and Meta formats)
 $message = '';
-if (isset($data['message']) && is_string($data['message'])) {
-    // Standard Hub format
+if (isset($data['caption']) && is_string($data['caption'])) {
+    $message = trim($data['caption']);
+} elseif (isset($data['message']) && is_string($data['message'])) {
     $message = trim($data['message']);
 } elseif (isset($data['text']) && is_array($data['text']) && isset($data['text']['body'])) {
-    // Meta Cloud API text format: {"type": "text", "text": {"body": "..."}}
+    // Meta Cloud API text format
     $message = trim((string) $data['text']['body']);
 } elseif (isset($data['template']) && is_array($data['template'])) {
     // Meta Cloud API template format
@@ -71,39 +95,42 @@ if (isset($data['message']) && is_string($data['message'])) {
     }
     $message = !empty($params) ? implode(' ', $params) : "[$templateName]";
 } elseif (isset($data['image']) && is_array($data['image'])) {
-    $caption = trim((string) ($data['image']['caption'] ?? ''));
-    $link = trim((string) ($data['image']['link'] ?? ''));
-    $message = $caption !== '' ? $caption : $link;
+    $message = trim((string) ($data['image']['caption'] ?? ''));
 } elseif (isset($data['document']) && is_array($data['document'])) {
-    $caption = trim((string) ($data['document']['caption'] ?? ''));
-    $link = trim((string) ($data['document']['link'] ?? ''));
-    $message = $caption !== '' ? $caption : $link;
+    $message = trim((string) ($data['document']['caption'] ?? ''));
 } elseif (isset($data['video']) && is_array($data['video'])) {
-    $caption = trim((string) ($data['video']['caption'] ?? ''));
-    $link = trim((string) ($data['video']['link'] ?? ''));
-    $message = $caption !== '' ? $caption : $link;
+    $message = trim((string) ($data['video']['caption'] ?? ''));
 } elseif (isset($data['body']) && is_string($data['body'])) {
     $message = trim($data['body']);
 }
 
-if ($to === '' || $message === '') {
+// 4. Validate requirements: Recipient is required AND at least one of (message or media) must be provided
+if ($to === '' || ($message === '' && $attachment === null)) {
     $requestId = log_api_request((int) $user['user_id'], (int) $user['id'], 'send', 422, 'Missing fields.');
     json_response([
         'ok' => false,
-        'error' => 'Fields "to" and "message" (or Meta "text.body") are required.',
+        'error' => 'Field "to" and either a "message" or media attachment are required.',
         'request_id' => $requestId,
         'meta_error' => [
-            'message' => 'Invalid parameter: "to" and "text.body" or "message" are required.',
+            'message' => 'Invalid parameter: "to" and either "text.body" or media object are required.',
             'type' => 'OAuthException',
             'code' => 100,
         ],
     ], 422);
 }
 
+$payloadType = $attachment ? ($attachment['type'] ?? 'document') : 'text';
 $payload = [
     'source' => !empty($data['messaging_product']) ? 'meta_compat_api' : 'api',
-    'type' => 'text',
+    'type' => $payloadType,
 ];
+
+if ($attachment !== null) {
+    $payload['attachment'] = $attachment;
+    if (!empty($data['ptt']) || !empty($data['audio']['ptt'])) {
+        $payload['ptt'] = true;
+    }
+}
 if (!empty($data['humanize']) || !empty($user['allow_humanize'])) {
     $payload['humanize'] = true;
 }
@@ -124,6 +151,8 @@ json_response([
     'message_id' => $messageId,
     'request_id' => $requestId,
     'recipient' => $cleanTo,
+    'type' => $payloadType,
+    'has_media' => $attachment !== null,
 
     // Meta WhatsApp Cloud API compatibility fields
     'messaging_product' => 'whatsapp',
@@ -140,3 +169,4 @@ json_response([
         ],
     ],
 ], 200);
+
