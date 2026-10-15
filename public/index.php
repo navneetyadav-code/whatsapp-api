@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
     redirect_to($cleanTarget);
 }
 
-$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home'];
+$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home', 'api', 'send', 'messages'];
 $dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -431,6 +431,11 @@ if ($page === 'terms' || $page === 'terms-of-service' || $page === 'tos') {
 
 if ($page === 'home') {
     require dirname(__DIR__) . '/src/pages/home.php';
+    exit;
+}
+
+if ($page === 'api' || $page === 'messages' || $page === 'send') {
+    require __DIR__ . '/api/send.php';
     exit;
 }
 
