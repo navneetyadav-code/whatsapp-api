@@ -841,6 +841,12 @@ async function sendQueuedMessage(message) {
       outgoingMessage = { image: { url: attachment.path }, ...commonMedia };
     } else if (attachmentType === 'video') {
       outgoingMessage = { video: { url: attachment.path }, ...commonMedia };
+    } else if (attachmentType === 'audio') {
+      outgoingMessage = {
+        audio: { url: attachment.path },
+        mimetype: attachment.mime || 'audio/mp4',
+        ptt: Boolean(payload?.ptt || attachment.ptt)
+      };
     } else {
       outgoingMessage = { document: { url: attachment.path }, ...commonMedia };
     }
@@ -915,6 +921,14 @@ async function markMessageSent(message, result, normalizedTo) {
     to: normalizedTo,
     provider_message_id: result?.key?.id || null
   });
+
+  // Ephemeral media cleanup to conserve disk space
+  try {
+    const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+    if (payload?.attachment?.is_temp && payload.attachment.path && existsSync(payload.attachment.path)) {
+      await rm(payload.attachment.path, { force: true });
+    }
+  } catch (_) {}
 }
 
 async function markMessageFailed(message, error, normalizedTo = null) {
@@ -942,6 +956,14 @@ async function markMessageFailed(message, error, normalizedTo = null) {
       to: normalizedTo || message.recipient,
       error
     });
+
+    // Cleanup temporary media if final attempt failed
+    try {
+      const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+      if (payload?.attachment?.is_temp && payload.attachment.path && existsSync(payload.attachment.path)) {
+        await rm(payload.attachment.path, { force: true });
+      }
+    } catch (_) {}
   }
 }
 
