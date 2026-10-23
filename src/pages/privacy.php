@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 $user = current_user();
-$seoTitle = 'Privacy Policy | WhatsApp API Hub';
+$seoTitle = 'Privacy Policy | WhatsGateway';
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
@@ -11,7 +11,7 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($seoTitle) ?></title>
-    <meta name="description" content="Public Privacy Policy for WhatsApp API Hub. Explains how data, Google OAuth accounts, and contacts are collected, protected, and used in accordance with Google API User Data Policies.">
+    <meta name="description" content="Public Privacy Policy for WhatsGateway. Explains how data, Google OAuth accounts, and contacts are collected, protected, and used in accordance with Google API User Data Policies.">
     <link rel="canonical" href="<?= e(public_url('privacy')) ?>">
     <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
     <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
@@ -40,9 +40,9 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
     <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <a href="<?= e(base_url('')) ?>" class="flex items-center gap-2.5 text-slate-900 group">
-                <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WA API Hub Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-slate-200/50">
+                <img src="<?= e(base_url('assets/favicon.png')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-slate-200/50">
                 <div class="leading-tight">
-                    <span class="font-bold text-slate-900 text-[15px] tracking-tight block">WhatsApp API Hub</span>
+                    <span class="font-bold text-slate-900 text-[15px] tracking-tight block">WhatsGateway</span>
                     <span class="text-[10px] text-slate-400 font-medium block">Self-Hosted Developer Platform</span>
                 </div>
             </a>
@@ -82,7 +82,7 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
             <section class="space-y-3">
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">1. Introduction</h2>
                 <p>
-                    Welcome to <strong>WhatsApp API Hub</strong> ("we", "our", or "the Platform"), an open-source, self-hosted WhatsApp automation and REST API gateway developed by <strong>Navneet Kumar Yadav</strong>. We take the privacy and confidentiality of your personal and business data very seriously.
+                    Welcome to <strong>WhatsGateway</strong> ("we", "our", or "the Platform"), an open-source, self-hosted WhatsApp automation and REST API gateway developed by <strong>Navneet Kumar Yadav</strong>. We take the privacy and confidentiality of your personal and business data very seriously.
                 </p>
                 <p>
                     This Privacy Policy details how we collect, use, store, protect, and process your information when you access or interact with our website, dashboard, APIs, Google OAuth authentication, and Google Contacts integration features.
@@ -112,7 +112,7 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
                     3. Google API Services User Data Policy Compliance (Limited Use Disclosure)
                 </h2>
                 <p class="text-amber-900 text-xs md:text-sm leading-relaxed">
-                    <strong>WhatsApp API Hub's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" class="font-semibold underline text-amber-950 hover:text-black">Google API Services User Data Policy</a>, including the Limited Use requirements.</strong>
+                    <strong>WhatsGateway's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" class="font-semibold underline text-amber-950 hover:text-black">Google API Services User Data Policy</a>, including the Limited Use requirements.</strong>
                 </p>
                 <ul class="list-disc pl-5 space-y-1.5 text-xs md:text-sm text-amber-900/90">
                     <li><strong>No Sale of Google Data:</strong> We never sell, lease, rent, or trade your Google data, contacts, or personal details to any third parties, data brokers, or advertising networks under any circumstances.</li>
@@ -152,7 +152,7 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
                 <ul class="list-disc pl-5 space-y-2 text-slate-600">
                     <li><strong>Delete Contacts:</strong> You can delete any individual contact or flush your contact list at any moment directly from the Contacts Manager.</li>
                     <li><strong>Unlink WhatsApp:</strong> Clicking "Disconnect" or "Reset Session" immediately wipes your active WhatsApp cryptographic session files from our servers.</li>
-                    <li><strong>Revoke Google Access:</strong> You can revoke WhatsApp API Hub's access to your Google Account at any time via your Google Security Settings at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" class="text-brand-wa_med hover:underline font-semibold">Google Account Permissions</a>.</li>
+                    <li><strong>Revoke Google Access:</strong> You can revoke WhatsGateway's access to your Google Account at any time via your Google Security Settings at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" class="text-brand-wa_med hover:underline font-semibold">Google Account Permissions</a>.</li>
                     <li><strong>Account Deletion Requests:</strong> To permanently delete your entire account, API keys, database records, and logs, email us at <a href="mailto:info.assistgroupofficial@gmail.com" class="text-brand-wa_med hover:underline font-semibold">info.assistgroupofficial@gmail.com</a>. We will process your deletion request within 48 business hours.</li>
                 </ul>
             </section>
@@ -160,7 +160,7 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
             <section class="space-y-3">
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">7. Third-Party Disclaimers</h2>
                 <p>
-                    WhatsApp API Hub is an independent open-source tool. We are not endorsed, affiliated, associated, authorized, or connected in any way with Meta Platforms, Inc., WhatsApp Inc., or Google LLC. WhatsApp and Google are registered trademarks of their respective owners.
+                    WhatsGateway is an independent open-source tool. We are not endorsed, affiliated, associated, authorized, or connected in any way with Meta Platforms, Inc., WhatsApp Inc., or Google LLC. WhatsApp and Google are registered trademarks of their respective owners.
                 </p>
             </section>
 
@@ -187,7 +187,7 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
             <a href="<?= e(base_url('terms')) ?>" class="hover:text-slate-900 transition-colors">Terms of Service</a>
             <a href="mailto:info.assistgroupofficial@gmail.com" class="hover:text-slate-900 transition-colors">Support Contact</a>
         </div>
-        <p class="text-slate-400 text-[11px]">&copy; 2026 WhatsApp API Hub &bull; Maintained by Navneet Kumar Yadav &bull; Open Source under MIT License</p>
+        <p class="text-slate-400 text-[11px]">&copy; <?= date('Y') ?> WhatsGateway &bull; Maintained by Navneet Kumar Yadav &bull; Open Source under MIT License</p>
     </footer>
 
 </body>

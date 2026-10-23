@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
 /**
- * WhatsApp API Hub — Java Quickstart
+ * WhatsGateway — Java Quickstart
  * Compatible with Java 8, 11, 17, and 21+ using standard HttpURLConnection.
  * Zero external JAR dependencies required.
  *

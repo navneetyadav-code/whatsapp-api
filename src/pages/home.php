@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 $user = current_user();
-$seoTitle = 'WhatsApp API Hub — Open-Source Developer Messaging Gateway & Automation';
+$seoTitle = 'WhatsGateway — Open-Source Developer WhatsApp API Gateway & Automation';
 $seoDesc = 'Production-grade self-hosted WhatsApp API gateway powered by Baileys & PHP 8.2. Dual REST API format, Meta Cloud API compatibility, queue engine, chatbot rules, HMAC webhooks, and Google Contacts sync.';
 ?>
 <!DOCTYPE html>
@@ -28,7 +28,7 @@ $seoDesc = 'Production-grade self-hosted WhatsApp API gateway powered by Baileys
     <meta property="og:title" content="<?= e($seoTitle) ?>">
     <meta property="og:description" content="<?= e($seoDesc) ?>">
     <meta property="og:image" content="<?= e(public_url('assets/favicon.png')) ?>">
-    <meta property="og:site_name" content="WhatsApp API Hub">
+    <meta property="og:site_name" content="WhatsGateway">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="<?= e($seoTitle) ?>">
     <meta name="twitter:description" content="<?= e($seoDesc) ?>">
@@ -116,12 +116,12 @@ $seoDesc = 'Production-grade self-hosted WhatsApp API gateway powered by Baileys
             <!-- Brand Logo & Badge -->
             <a href="<?= e(base_url('')) ?>" class="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-xl p-1 transition-all">
                 <div class="relative flex-shrink-0">
-                    <img src="<?= e(base_url('assets/favicon.png')) ?>" alt="WhatsApp API Hub Logo" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-soft-xs border border-slate-200 group-hover:scale-105 transition-transform duration-200">
+                    <img src="<?= e(base_url('assets/favicon.png')) ?>" alt="WhatsGateway Logo" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover shadow-soft-xs border border-slate-200 group-hover:scale-105 transition-transform duration-200">
                     <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse" title="Gateway Ready"></span>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <span class="font-bold text-slate-900 text-base sm:text-lg tracking-tight group-hover:text-brand-600 transition-colors">WhatsApp API Hub</span>
+                        <span class="font-bold text-slate-900 text-base sm:text-lg tracking-tight group-hover:text-brand-600 transition-colors">WhatsGateway</span>
                         <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">v1.0</span>
                     </div>
                     <span class="text-[11px] text-slate-500 font-medium hidden sm:block">Open-Source Developer Gateway</span>
@@ -742,7 +742,7 @@ curl -X POST "<?= e(public_url('api/send.php')) ?>" \
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
                                 <span>
-                                    <strong class="text-slate-900">Strict Limited Use Compliance:</strong> WhatsApp API Hub’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" class="text-emerald-700 font-semibold underline hover:text-emerald-800">Google API Services User Data Policy</a>, including the Limited Use requirements.
+                                    <strong class="text-slate-900">Strict Limited Use Compliance:</strong> WhatsGateway’s use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" class="text-emerald-700 font-semibold underline hover:text-emerald-800">Google API Services User Data Policy</a>, including the Limited Use requirements.
                                 </span>
                             </div>
 
@@ -800,7 +800,7 @@ curl -X POST "<?= e(public_url('api/send.php')) ?>" \
                         <thead class="bg-slate-100/70 border-b border-slate-200 text-slate-700 font-mono">
                             <tr>
                                 <th class="p-4 sm:p-5 font-semibold">Capability / Metric</th>
-                                <th class="p-4 sm:p-5 font-bold text-emerald-900 bg-emerald-50/70 border-x border-emerald-200">WhatsApp API Hub (Self-Hosted)</th>
+                                <th class="p-4 sm:p-5 font-bold text-emerald-900 bg-emerald-50/70 border-x border-emerald-200">WhatsGateway (Self-Hosted)</th>
                                 <th class="p-4 sm:p-5 font-semibold text-slate-600">Meta WhatsApp Cloud API</th>
                                 <th class="p-4 sm:p-5 font-semibold text-slate-600">Commercial SaaS Brokers</th>
                             </tr>
@@ -897,7 +897,7 @@ curl -X POST "<?= e(public_url('api/send.php')) ?>" \
                             </span>
                         </summary>
                         <div class="mt-4 text-sm text-slate-600 leading-relaxed border-t border-slate-200 pt-4">
-                            WhatsApp flags numbers when high volumes of unsolicited messages are blasted simultaneously. WhatsApp API Hub implements several anti-ban protections:
+                            WhatsApp flags numbers when high volumes of unsolicited messages are blasted simultaneously. WhatsGateway implements several anti-ban protections:
                             <ul class="list-disc pl-5 mt-2 space-y-1 text-slate-600">
                                 <li>Configurable queue pacing delays (<code class="bg-white px-1 py-0.5 rounded text-emerald-800 border border-slate-200 font-mono text-xs">SEND_DELAY_MS</code>, defaulting to 2500ms between messages).</li>
                                 <li>Automatic human typing presence updates (<code class="bg-white px-1 py-0.5 rounded text-emerald-800 border border-slate-200 font-mono text-xs">sendPresenceUpdate('composing')</code>).</li>
@@ -981,8 +981,8 @@ curl -X POST "<?= e(public_url('api/send.php')) ?>" \
                 <!-- Col 1: Brand Info -->
                 <div class="md:col-span-1 space-y-4">
                     <div class="flex items-center gap-3">
-                        <img src="<?= e(base_url('assets/favicon.png')) ?>" alt="WhatsApp API Hub Logo" class="w-8 h-8 rounded-lg object-cover shadow-soft-xs border border-slate-200">
-                        <span class="font-bold text-slate-900 text-base">WhatsApp API Hub</span>
+                        <img src="<?= e(base_url('assets/favicon.png')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-cover shadow-soft-xs border border-slate-200">
+                        <span class="font-bold text-slate-900 text-base">WhatsGateway</span>
                     </div>
                     <p class="text-xs text-slate-600 leading-relaxed">
                         Open-source, self-hosted WhatsApp messaging gateway and automation engine for modern developers.
@@ -1033,7 +1033,7 @@ curl -X POST "<?= e(public_url('api/send.php')) ?>" \
 
             <!-- Disclaimers & Copyright -->
             <div class="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-                <p>&copy; <?= date('Y') ?> WhatsApp API Hub &bull; Maintained by Navneet Kumar Yadav. Open-source under MIT License.</p>
+                <p>&copy; <?= date('Y') ?> WhatsGateway &bull; Maintained by Navneet Kumar Yadav. Open-source under MIT License.</p>
                 <p class="text-center sm:text-right">
                     Not affiliated with, sponsored by, or endorsed by Meta Platforms, Inc., WhatsApp Inc., or Google LLC.
                 </p>

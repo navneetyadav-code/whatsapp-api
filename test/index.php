@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * WhatsApp API Hub — Developer Interactive API Tester
+ * WhatsGateway — Developer Interactive API Tester
  *
  * Standalone utility to test message delivery, headers, and media payloads
- * against local, staging, or production WhatsApp API Hub endpoints.
+ * against local, staging, or production WhatsGateway endpoints.
  */
 
 $defaultApiUrl = 'http://localhost/wa/public/api/send.php';
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <div class="card">
         <h2>WhatsApp API Tester</h2>
-        <p style="font-size: 14px; color: #64748b; margin-bottom: 1.5rem;">Interactive test console for sending WhatsApp messages and media through WhatsApp API Hub.</p>
+        <p style="font-size: 14px; color: #64748b; margin-bottom: 1.5rem;">Interactive test console for sending WhatsApp messages and media through WhatsGateway.</p>
         
         <form method="POST" autocomplete="off" data-form-type="other">
             <div class="form-group">

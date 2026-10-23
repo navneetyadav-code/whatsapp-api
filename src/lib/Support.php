@@ -234,11 +234,11 @@ function seo_meta(?string $page): array {
             $defaults['description'] = 'Manage WhatsApp linked devices, view live queue depth, monitor delivery statistics, and generate secure REST API keys.';
             break;
         case 'login':
-            $defaults['title'] = 'Login | Free WhatsApp API Hub';
+            $defaults['title'] = 'Login | WhatsGateway';
             $defaults['description'] = 'Sign in to your self-hosted WhatsApp API Dashboard to manage messaging campaigns, webhooks, and API keys.';
             break;
         case 'register':
-            $defaults['title'] = 'Create Free Account | WhatsApp API Hub';
+            $defaults['title'] = 'Create Free Account | WhatsGateway';
             $defaults['description'] = 'Get started with self-hosted WhatsApp Web automation, multi-tenant message queues, and REST API endpoints.';
             break;
         case 'docs':
@@ -246,7 +246,7 @@ function seo_meta(?string $page): array {
             $defaults['description'] = 'Complete REST API documentation for cURL, Python, Node.js, PHP, and Go. Send WhatsApp messages, manage delivery queues, and configure webhooks.';
             break;
         case 'message':
-            $defaults['title'] = 'Send WhatsApp Message | Free WhatsApp API Hub';
+            $defaults['title'] = 'Send WhatsApp Message | WhatsGateway';
             break;
         case 'queue':
             $defaults['title'] = 'Live Message Queue & Delivery Logs | WhatsApp API';

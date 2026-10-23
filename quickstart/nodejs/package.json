@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-quickstart-nodejs",
   "version": "1.0.0",
-  "description": "WhatsApp API Hub Node.js Quickstart Client",
+  "description": "WhatsGateway Node.js Quickstart Client",
   "main": "send.js",
   "scripts": {
     "start": "node send.js"

@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
         $workerToken = bin2hex(random_bytes(16));
         $envContent = <<<ENV
 APP_ENV=local
-APP_NAME="WhatsApp API Hub"
+APP_NAME="WhatsGateway"
 APP_PUBLIC_URL="http://localhost/whatsapp-api/public"
 APP_BASE_PATH="/whatsapp-api/public"
 

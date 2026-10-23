@@ -1,4 +1,4 @@
-# 🚀 WhatsApp API Hub (Self-Hosted, Open-Source WhatsApp REST API Gateway)
+# 🚀 WhatsGateway (Self-Hosted, Open-Source WhatsApp REST API Gateway)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI Quality Check](https://img.shields.io/badge/CI-Passing-brightgreen.svg)](.github/workflows/ci.yml)
@@ -41,7 +41,7 @@
 
 Commercial WhatsApp Business API providers (such as Twilio, MessageBird, or Meta Cloud API directly) enforce pay-per-conversation billing (\$0.05 – \$0.15+ per dialogue), require business registration paperwork, mandate pre-approved message templates, and demand credit card verifications.
 
-**WhatsApp API Hub** is an open-source, developer-centric alternative for individuals, startups, and software engineering teams who require a reliable WhatsApp notification gateway without external per-message costs:
+**WhatsGateway** is an open-source, developer-centric alternative for individuals, startups, and software engineering teams who require a reliable WhatsApp notification gateway without external per-message costs:
 
 - **100% Free & Open Source:** Licensed under MIT with no hidden subscription fees.
 - **Any Regular or Business WhatsApp Number:** Connect your existing phone number in seconds by scanning a QR code via WhatsApp Web multi-device.
@@ -50,7 +50,7 @@ Commercial WhatsApp Business API providers (such as Twilio, MessageBird, or Meta
 
 ### Comparison Table
 
-| Dimension | WhatsApp API Hub | Meta Cloud API | Twilio WhatsApp | Traditional Cloud Gateways |
+| Dimension | WhatsGateway | Meta Cloud API | Twilio WhatsApp | Traditional Cloud Gateways |
 | :--- | :---: | :---: | :---: | :---: |
 | **Pricing** | **100% Free ($0)** | Pay-per-conversation | Pay-per-message + markup | $49 – $299 / month |
 | **Credit Card Required** | ❌ **No** | ✅ Yes | ✅ Yes | ✅ Yes |
@@ -258,7 +258,7 @@ whatsap_api/
    Set your local parameters in `.env`:
    ```ini
    APP_ENV=local
-   APP_NAME="WhatsApp API Hub"
+   APP_NAME="WhatsGateway"
    APP_PUBLIC_URL=http://localhost/wa/public
    APP_BASE_PATH=/wa/public
 
@@ -344,10 +344,10 @@ All application configurations are managed in `.env` at the root directory and l
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
 | `APP_ENV` | `local` | Environment mode (`local` or `production`). Production enforces non-default tokens. |
-| `APP_NAME` | `WhatsApp API Hub` | Application display name. |
+| `APP_NAME` | `WhatsGateway` | Application display name. |
 | `APP_PUBLIC_URL` | `http://localhost/wa/public` | Canonical public URL used for redirects, webhooks, and sitemaps. |
 | `APP_BASE_PATH` | `/wa/public` | Subfolder base path (leave blank when using root domain in production). |
-| `APP_SESSION_NAME` | `wa_api_hub` | PHP session cookie name. |
+| `APP_SESSION_NAME` | `whatsgateway_session` | PHP session cookie name. |
 | `APP_SECURE_COOKIES` | `false` (auto in prod) | Force HTTPS-only cookie attributes (`Secure; HttpOnly; SameSite=Lax`). |
 | `ENABLE_REGISTRATION` | `true` | Set to `false` in production to prevent unauthorized public registrations. |
 | `ENABLE_TEST_PAGE` | `true` (dev only) | Enables developer interactive tester at `/test-page.php`. |
@@ -376,7 +376,7 @@ All application configurations are managed in `.env` at the root directory and l
 | `SMTP_USER` | `""` | SMTP username / email address. |
 | `SMTP_PASS` | `""` | SMTP password or App Password. |
 | `SMTP_FROM` | `noreply@localhost` | Outgoing email sender address. |
-| `SMTP_FROM_NAME` | `WhatsApp API Hub` | Outgoing email sender name. |
+| `SMTP_FROM_NAME` | `WhatsGateway` | Outgoing email sender name. |
 | `GOOGLE_CLIENT_ID` | `""` | Google OAuth2 Client ID (for login and Google Contacts sync). |
 | `GOOGLE_CLIENT_SECRET` | `""` | Google OAuth2 Client Secret. |
 
@@ -608,7 +608,7 @@ curl -X POST "http://localhost/wa/public/api/send.php" \
   -H "X-API-Key: wa_live_YOUR_API_KEY_HERE" \
   -d '{
     "to": "919876543210",
-    "message": "Hello from WhatsApp API Hub! 🚀\nYour order *#84920* has been shipped.",
+    "message": "Hello from WhatsGateway! 🚀\nYour order *#84920* has been shipped.",
     "humanize": true
   }'
 ```

@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Top Logo -->
         <div class="relative z-10 flex items-center gap-2.5">
             <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/20">
-            <span class="font-semibold text-white tracking-wide text-sm">WhatsApp API Hub</span>
+            <span class="font-semibold text-white tracking-wide text-sm">WhatsGateway</span>
         </div>
 
         <!-- Middle Content -->

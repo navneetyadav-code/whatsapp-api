@@ -64,7 +64,7 @@ Creating an official GitHub release creates permanent versioned URLs (`/releases
    ```
 5. **Release Description:**
    ```markdown
-   ## 🚀 WhatsApp API Hub v1.0.0 Release
+   ## 🚀 WhatsGateway v1.0.0 Release
 
    Initial release of the 100% Free, Open-Source WhatsApp API Gateway and Dashboard!
 

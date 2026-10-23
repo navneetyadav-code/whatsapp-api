@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve WhatsApp API Hub.
+Thanks for helping improve WhatsGateway.
 
 ## Development Setup
 

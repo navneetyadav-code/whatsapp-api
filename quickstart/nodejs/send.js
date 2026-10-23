@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * WhatsApp API Hub — Node.js Quickstart
+ * WhatsGateway — Node.js Quickstart
  * Production-ready JavaScript/Node.js client supporting both Standard and Meta formats.
  *
  * Requirements: Node.js 18+ (Uses native fetch, 0 external dependencies)
@@ -129,7 +129,7 @@ async function main() {
   const args = parseArgs();
 
   if (args.help || args.h) {
-    console.log(`WhatsApp API Hub — Node.js Quickstart
+    console.log(`WhatsGateway — Node.js Quickstart
 Usage:
   node send.js [options]
 

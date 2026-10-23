@@ -32,7 +32,7 @@ if ($userForLayout) {
     <meta property="og:url" content="<?= e($seo['canonical']) ?>">
     <meta property="og:title" content="<?= e($seo['title']) ?>">
     <meta property="og:description" content="<?= e($seo['description']) ?>">
-    <meta property="og:site_name" content="WhatsApp API Hub">
+    <meta property="og:site_name" content="WhatsGateway">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
@@ -44,7 +44,7 @@ if ($userForLayout) {
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "Free WhatsApp API Hub",
+      "name": "WhatsGateway",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, Windows, macOS, Docker",
       "offers": {

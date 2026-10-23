@@ -211,7 +211,7 @@ $showTestPage = current_user() && app_config('app.enable_test_page') && is_local
   -H "X-API-Key: YOUR_API_KEY_HERE" \
   -d '{
     "to": "919876543210",
-    "message": "Hello from WhatsApp API Hub! 🚀",
+    "message": "Hello from WhatsGateway! 🚀",
     "humanize": true
   }'</code></pre>
             </div>

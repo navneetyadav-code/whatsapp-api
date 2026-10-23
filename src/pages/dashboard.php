@@ -1167,7 +1167,7 @@ function page_header(string $title, string $subtitle): void
         <form class="campaign-form" method="post" action="<?= e(base_url('index.php?page=campaign-create')) ?>">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <input name="name" placeholder="Campaign name" value="Opt-in announcement" required>
-            <textarea name="message_template" class="wa-editor w-full border border-slate-200 rounded p-2 text-sm" data-presets='["{name}", "{phone}"]' placeholder="Hi {name}, this is a message from WhatsApp API Hub." required></textarea>
+            <textarea name="message_template" class="wa-editor w-full border border-slate-200 rounded p-2 text-sm" data-presets='["{name}", "{phone}"]' placeholder="Hi {name}, this is a message from WhatsGateway." required></textarea>
             <button type="submit">Queue Campaign</button>
         </form>
         <div class="table-wrap">

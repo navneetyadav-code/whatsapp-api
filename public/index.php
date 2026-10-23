@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * WhatsApp API Hub — Web Front Controller & Application Entry Point
+ * WhatsGateway — Web Front Controller & Application Entry Point
  *
  * Routes incoming web traffic to public landing pages, authentication flows,
  * or authenticated dashboard views. Handles clean URL rewrites and CSRF-protected

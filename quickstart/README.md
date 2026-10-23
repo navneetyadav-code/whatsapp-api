@@ -1,4 +1,4 @@
-# 🚀 WhatsApp API Hub — Developer Quickstart Directory
+# 🚀 WhatsGateway — Developer Quickstart Directory
 
 Complete, production-ready, zero-dependency source code programs in **5 major programming languages** to connect to your WhatsApp API Gateway in seconds.
 

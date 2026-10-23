@@ -15,7 +15,7 @@ import (
 
 const defaultURL = "https://whatsapp-api-xepo.onrender.com/api/send.php"
 
-// Client handles requests to the WhatsApp API Hub
+// Client handles requests to the WhatsGateway
 type Client struct {
 	APIKey     string
 	Endpoint   string

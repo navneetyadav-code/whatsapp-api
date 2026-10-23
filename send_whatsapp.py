@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Interactive WhatsApp Message Sender CLI
-Send WhatsApp messages through your WhatsApp API Hub (Local or Cloud).
+Send WhatsApp messages through your WhatsGateway (Local or Cloud).
 
 Author: Navneet Kumar Yadav
 """
@@ -138,7 +138,7 @@ def send_message(api_url: str, api_key: str, recipient: str, message: str) -> tu
 
 def main():
     print("=" * 60)
-    print("   [+] WhatsApp API Hub - Interactive Message Sender CLI")
+    print("   [+] WhatsGateway - Interactive Message Sender CLI")
     print("   Author: Navneet Kumar Yadav")
     print("=" * 60)
 
@@ -233,7 +233,7 @@ def main():
         # Loop prompt
         again = input("\nDo you want to send another message? (y/n) [y]: ").strip().lower()
         if again in ["n", "no", "q", "exit"]:
-            print("\nExiting. Thank you for using WhatsApp API Hub CLI! Goodbye.\n")
+            print("\nExiting. Thank you for using WhatsGateway CLI! Goodbye.\n")
             break
 
 
