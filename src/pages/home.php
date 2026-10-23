@@ -122,18 +122,15 @@ $seoDesc = 'Production-grade self-hosted WhatsApp API gateway powered by Baileys
                 <div>
                     <div class="flex items-center gap-2">
                         <span class="font-bold text-slate-900 text-base sm:text-lg tracking-tight group-hover:text-brand-600 transition-colors">WhatsGateway</span>
-                        <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">v1.0</span>
                     </div>
                     <span class="text-[11px] text-slate-500 font-medium hidden sm:block">Open-Source Developer Gateway</span>
                 </div>
             </a>
 
-            <!-- Desktop Navigation Links (Clean 5-Link Hierarchy) -->
+            <!-- Desktop Navigation Links (Clean Focused Hierarchy) -->
             <nav class="hidden lg:flex items-center gap-7 text-sm font-semibold text-slate-600">
                 <a href="#architecture" class="hover:text-slate-900 transition-colors">Architecture</a>
                 <a href="#features" class="hover:text-slate-900 transition-colors">Features</a>
-                <a href="#code-playground" class="hover:text-slate-900 transition-colors">Playground</a>
-                <a href="#google-sync" class="hover:text-slate-900 transition-colors">Google Sync</a>
                 <a href="#comparison" class="hover:text-slate-900 transition-colors">Comparison</a>
                 <a href="#faq" class="hover:text-slate-900 transition-colors">FAQ</a>
                 <a href="<?= e(base_url('docs')) ?>" class="text-brand-600 hover:text-brand-700 font-semibold transition-colors flex items-center gap-1">
@@ -150,15 +147,12 @@ $seoDesc = 'Production-grade self-hosted WhatsApp API gateway powered by Baileys
                 </a>
 
                 <?php if ($user): ?>
-                    <a href="<?= e(base_url('dashboard')) ?>" class="hidden sm:inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 px-4 py-2 sm:py-2.5 rounded-xl transition-all shadow-soft-sm">
+                    <a href="<?= e(base_url('dashboard')) ?>" class="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 px-4 py-2 sm:py-2.5 rounded-xl transition-all shadow-soft-sm">
                         <span>Dashboard</span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                     </a>
                 <?php else: ?>
-                    <a href="<?= e(base_url('login')) ?>" class="hidden sm:inline-flex text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 transition-colors">
-                        Sign In
-                    </a>
-                    <a href="<?= e(base_url('register')) ?>" class="hidden sm:inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 px-4 py-2 sm:py-2.5 rounded-xl transition-all shadow-soft-sm">
+                    <a href="<?= e(base_url('register')) ?>" class="inline-flex items-center gap-2 text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 px-4 py-2 sm:py-2.5 rounded-xl transition-all shadow-soft-sm hover:shadow-soft-md">
                         <span>Get Started Free</span>
                         <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                     </a>
@@ -177,8 +171,6 @@ $seoDesc = 'Production-grade self-hosted WhatsApp API gateway powered by Baileys
             <div class="grid grid-cols-2 gap-2 text-sm font-medium">
                 <a href="#architecture" class="mobile-nav-link px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100">Architecture</a>
                 <a href="#features" class="mobile-nav-link px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100">Features</a>
-                <a href="#code-playground" class="mobile-nav-link px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100">Playground</a>
-                <a href="#google-sync" class="mobile-nav-link px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100">Google Sync</a>
                 <a href="#comparison" class="mobile-nav-link px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100">Comparison</a>
                 <a href="#faq" class="mobile-nav-link px-3 py-2.5 rounded-xl text-slate-700 hover:text-slate-900 hover:bg-slate-100">FAQ</a>
             </div>
@@ -187,12 +179,11 @@ $seoDesc = 'Production-grade self-hosted WhatsApp API gateway powered by Baileys
                     <span>Developer Documentation</span>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </a>
-                <div class="flex items-center gap-2 pt-1">
+                <div class="pt-1">
                     <?php if (!$user): ?>
-                        <a href="<?= e(base_url('login')) ?>" class="flex-1 text-center py-2.5 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200">Sign In</a>
-                        <a href="<?= e(base_url('register')) ?>" class="flex-1 text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800">Get Started</a>
+                        <a href="<?= e(base_url('register')) ?>" class="w-full block text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-soft-sm">Get Started Free</a>
                     <?php else: ?>
-                        <a href="<?= e(base_url('dashboard')) ?>" class="w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800">Open Dashboard</a>
+                        <a href="<?= e(base_url('dashboard')) ?>" class="w-full block text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-soft-sm">Open Dashboard</a>
                     <?php endif; ?>
                 </div>
             </div>

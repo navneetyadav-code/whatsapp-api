@@ -183,7 +183,7 @@ if ($userForLayout) {
         <div class="public-doc-topbar">
             <a class="auth-brand" href="<?= e(base_url('index.php?page=login')) ?>">
                 <span class="auth-logo">WA</span>
-                <span>WhatsApp <b>API Hub</b></span>
+                <span>Whats<b>Gateway</b></span>
             </a>
             <a class="ghost small" href="<?= e(base_url('index.php?page=login')) ?>">Log in</a>
         </div>
