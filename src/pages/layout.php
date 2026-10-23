@@ -22,7 +22,10 @@ if ($userForLayout) {
     <meta name="author" content="Navneet Kumar Yadav">
     <meta name="robots" content="<?= e($seo['robots']) ?>">
     <link rel="canonical" href="<?= e($seo['canonical']) ?>">
-    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= e(base_url('assets/apple-touch-icon.png')) ?>">
+    <link rel="shortcut icon" href="<?= e(base_url('favicon.ico')) ?>">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">

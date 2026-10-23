@@ -13,7 +13,10 @@ $seoTitle = 'Privacy Policy | WhatsApp API Hub';
     <title><?= e($seoTitle) ?></title>
     <meta name="description" content="Public Privacy Policy for WhatsApp API Hub. Explains how data, Google OAuth accounts, and contacts are collected, protected, and used in accordance with Google API User Data Policies.">
     <link rel="canonical" href="<?= e(public_url('privacy')) ?>">
-    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= e(base_url('assets/apple-touch-icon.png')) ?>">
+    <link rel="shortcut icon" href="<?= e(base_url('favicon.ico')) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">

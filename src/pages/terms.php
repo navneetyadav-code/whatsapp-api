@@ -13,7 +13,10 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
     <title><?= e($seoTitle) ?></title>
     <meta name="description" content="Terms of Service for WhatsApp API Hub. Read our acceptable use policy, anti-spam guidelines, Google integration rules, API limits, and user agreement.">
     <link rel="canonical" href="<?= e(public_url('terms')) ?>">
-    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= e(base_url('assets/apple-touch-icon.png')) ?>">
+    <link rel="shortcut icon" href="<?= e(base_url('favicon.ico')) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
