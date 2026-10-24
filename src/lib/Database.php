@@ -25,14 +25,15 @@ final class Database
         ];
         $isSsl = !empty(self::$config['ssl']) || str_contains((string) (self::$config['dsn'] ?? ''), 'tidbcloud.com');
         if ($isSsl) {
-            $caCandidates = [
+            $configuredCa = (string) (self::$config['ssl_ca'] ?? '');
+            $caCandidates = array_filter([$configuredCa,
                 '/etc/ssl/certs/ca-certificates.crt',
                 dirname(__DIR__, 2) . '/prod/isrgrootx1.pem',
                 dirname(__DIR__, 2) . '/produ/isrgrootx1.pem',
-            ];
+            ]);
             $caFound = null;
             foreach ($caCandidates as $ca) {
-                if (file_exists($ca)) {
+                if (is_file($ca) && is_readable($ca)) {
                     $caFound = $ca;
                     break;
                 }
@@ -40,10 +41,8 @@ final class Database
 
             if ($caFound) {
                 $options[PDO::MYSQL_ATTR_SSL_CA] = $caFound;
-            } else {
-                $options[PDO::MYSQL_ATTR_SSL_CA] = true;
             }
-            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
         }
 
         self::$pdo = new PDO(

@@ -92,17 +92,7 @@ function register_user(string $name, string $email, string $phone, string $passw
     $pdo->beginTransaction();
 
     try {
-        $stmt = $pdo->prepare('INSERT INTO users (name, email, phone, password_hash) VALUES (?, ?, ?, ?)');
-        $stmt->execute([
-            trim($name),
-            mb_strtolower(trim($email)),
-            trim($phone),
-            password_hash($password, PASSWORD_DEFAULT),
-        ]);
-
-        $userId = (int) $pdo->lastInsertId();
-        $pdo->prepare('INSERT INTO whatsapp_sessions (user_id) VALUES (?)')->execute([$userId]);
-        $pdo->prepare('INSERT INTO webhooks (user_id) VALUES (?)')->execute([$userId]);
+        $userId = create_user_records($pdo, $name, $email, $phone, $password);
         $pdo->commit();
 
         session_regenerate_id(true);
@@ -112,6 +102,67 @@ function register_user(string $name, string $email, string $phone, string $passw
     } catch (Throwable $exception) {
         $pdo->rollBack();
         throw $exception;
+    }
+}
+
+function create_user_records(PDO $pdo, string $name, string $email, string $phone, string $password): int
+{
+    $stmt = $pdo->prepare('INSERT INTO users (name, email, phone, password_hash) VALUES (?, ?, ?, ?)');
+    $stmt->execute([
+        trim($name),
+        function_exists('mb_strtolower') ? mb_strtolower(trim($email)) : strtolower(trim($email)),
+        trim($phone),
+        password_hash($password, PASSWORD_DEFAULT),
+    ]);
+
+    $userId = (int) $pdo->lastInsertId();
+    $pdo->prepare('INSERT INTO whatsapp_sessions (user_id) VALUES (?)')->execute([$userId]);
+    $pdo->prepare('INSERT INTO webhooks (user_id) VALUES (?)')->execute([$userId]);
+    return $userId;
+}
+
+function create_initial_admin_account(PDO $pdo, string $name, string $email, string $password): string
+{
+    $name = trim($name);
+    $email = function_exists('mb_strtolower') ? mb_strtolower(trim($email)) : strtolower(trim($email));
+
+    if ($name === '' || strlen($name) > 120 || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) {
+        throw new InvalidArgumentException('Provide a valid administrator name and email address.');
+    }
+    if (strlen($password) < 12) {
+        throw new InvalidArgumentException('The initial administrator password must contain at least 12 characters.');
+    }
+
+    // TiDB supports MySQL-compatible advisory locks. This serializes concurrent
+    // bootstrap invocations without changing the application schema.
+    $lock = $pdo->prepare('SELECT GET_LOCK(?, ?)');
+    $lock->execute(['whatsapp_api_initial_admin_setup', 10]);
+    if ((int) $lock->fetchColumn() !== 1) {
+        throw new RuntimeException('Could not acquire the initial account setup lock. Retry later.');
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $rows = $pdo->query('SELECT id, email FROM users ORDER BY id ASC LIMIT 2 FOR UPDATE')->fetchAll(PDO::FETCH_ASSOC);
+        if ($rows !== []) {
+            $pdo->rollBack();
+            if (count($rows) === 1 && strtolower((string) $rows[0]['email']) === $email) {
+                return 'already_exists';
+            }
+            throw new RuntimeException('Initial account setup refused because the instance already contains user accounts.');
+        }
+
+        create_user_records($pdo, $name, $email, '', $password);
+        $pdo->commit();
+        return 'created';
+    } catch (Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $exception;
+    } finally {
+        $release = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+        $release->execute(['whatsapp_api_initial_admin_setup']);
     }
 }
 
