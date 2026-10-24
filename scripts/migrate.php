@@ -20,8 +20,8 @@ function migrationRun(): void
 {
     $pdo = Database::pdo();
     $database = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
-    if ($database !== 'whatsapp_api') {
-        throw new RuntimeException('Database initialization refused: selected database must be whatsapp_api.');
+    if ($database === '') {
+        throw new RuntimeException('Database initialization refused: no database selected.');
     }
 
     $pdo->exec(
@@ -71,7 +71,7 @@ function migrationRun(): void
 
     $record = $pdo->prepare('INSERT IGNORE INTO schema_migrations (version) VALUES (?)');
     $record->execute(['001_initial_schema']);
-    fwrite(STDOUT, 'Database schema is ready: ' . count($requiredTables) . ' application tables in whatsapp_api.' . PHP_EOL);
+    fwrite(STDOUT, 'Database schema is ready: ' . count($requiredTables) . ' application tables in ' . $database . '.' . PHP_EOL);
 }
 
 function migrationEnsureIndexes(PDO $pdo, string $table, string $definition): void

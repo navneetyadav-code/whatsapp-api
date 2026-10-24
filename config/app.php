@@ -62,20 +62,13 @@ if ($appEnv === 'production' && (strlen($workerToken) < 32 || $workerToken === '
 $dbHost = config_env('DB_HOST', '127.0.0.1');
 $dbPort = config_env('DB_PORT', '3306');
 $dbName = config_env('DB_NAME', 'whatsapp_api');
-if ($dbName !== 'whatsapp_api') {
-    throw new RuntimeException('DB_NAME must be whatsapp_api for this deployment.');
-}
 $defaultDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
 $dbDsn = config_env('DB_DSN', $defaultDsn);
-$dsnDatabase = [];
-preg_match('/(?:^|;)dbname=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $dbDsn), $dsnDatabase);
-if (empty($dsnDatabase[1])
-    || $dsnDatabase[1] !== 'whatsapp_api') {
-    throw new RuntimeException('DB_DSN must point to the whatsapp_api database.');
-}
+
 if (!ctype_digit((string) $dbPort) || (int) $dbPort < 1 || (int) $dbPort > 65535) {
     throw new RuntimeException('DB_PORT must be a valid TCP port number.');
 }
+
 $dsnHost = $dbHost;
 $dsnPort = (string) $dbPort;
 $dsnHostMatch = [];
@@ -99,15 +92,15 @@ return [
     ],
     'app' => [
         'env' => $appEnv,
-        'name' => config_env('APP_NAME', 'WhatsApp API Hub'),
+        'name' => config_env('APP_NAME', 'WhatsGateway'),
         'public_url' => rtrim((string) config_env('APP_PUBLIC_URL', $appEnv === 'production' ? '' : 'http://localhost/whatsapp-api/public'), '/'),
         'base_path' => config_env('APP_BASE_PATH', $appEnv === 'production' ? '' : '/whatsapp-api/public'),
-        'session_name' => config_env('APP_SESSION_NAME', 'wa_api_hub'),
+        'session_name' => config_env('APP_SESSION_NAME', 'whatsgateway_session'),
         'secure_cookies' => config_bool('APP_SECURE_COOKIES', $appEnv === 'production'),
         'enable_test_page' => config_bool('ENABLE_TEST_PAGE', $appEnv !== 'production'),
-        'enable_registration' => config_bool('ENABLE_REGISTRATION', true),
-        'default_country_code' => config_env('DEFAULT_COUNTRY_CODE', 'in'),
         'enable_registration' => config_bool('ENABLE_REGISTRATION', false),
+        'default_country_code' => config_env('DEFAULT_COUNTRY_CODE', 'in'),
+
         'allow_new_devices' => config_bool('ALLOW_NEW_DEVICES', false),
         'admin_email' => config_env('ADMIN_EMAIL', 'navneetyadav982008@gmail.com,unknownkumar1113@gmail.com'),
         'restricted_notice' => 'This is not allowed in current architecture. Contact info.assistgroupofficial@gmail.com',
@@ -137,7 +130,7 @@ return [
         'user' => config_env('SMTP_USER', ''),
         'pass' => config_env('SMTP_PASS', ''),
         'from' => config_env('SMTP_FROM', 'noreply@localhost'),
-        'from_name' => config_env('SMTP_FROM_NAME', 'WhatsApp API Hub'),
+        'from_name' => config_env('SMTP_FROM_NAME', 'WhatsGateway'),
     ],
     'google' => [
         'client_id' => config_env('GOOGLE_CLIENT_ID', ''),

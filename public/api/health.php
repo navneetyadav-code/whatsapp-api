@@ -21,7 +21,7 @@ try {
     $pdo = Database::pdo();
     $databaseConnected = true;
     $databaseName = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
-    if ($databaseName === 'whatsapp_api') {
+    if ($databaseName !== '') {
         $statement = $pdo->query(
             'SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()'
         );

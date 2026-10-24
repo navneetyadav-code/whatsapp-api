@@ -99,7 +99,7 @@ function databaseOptions() {
       else if (!['charset', 'unix_socket'].includes(key.trim())) throw new Error('DB_DSN contains an unsupported connection option.');
     }
   }
-  if (options.database !== 'whatsapp_api') throw new Error('DB_NAME/DB_DSN must select whatsapp_api.');
+  if (!options.database) throw new Error('DB_NAME or DB_DSN must specify a database name.');
   if (!options.host || !Number.isInteger(options.port) || options.port < 1 || options.port > 65535) {
     throw new Error('DB_HOST and DB_PORT must identify a valid database endpoint.');
   }
