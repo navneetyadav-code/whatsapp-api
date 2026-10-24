@@ -7,8 +7,8 @@ $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
     <!-- Sidebar Header (Logo) -->
     <div class="h-14 flex items-center px-5 shrink-0">
         <div class="flex items-center gap-2.5 text-slate-900">
-            <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="Logo" class="w-6 h-6 rounded object-cover shadow-sm border border-slate-200/50">
-            <span class="font-semibold tracking-tight text-[15px]">API Hub</span>
+            <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-6 h-6 rounded-lg object-cover shadow-sm border border-slate-200/50">
+            <span class="font-bold tracking-tight text-[15px] text-slate-900">WhatsGateway</span>
         </div>
         
         <button id="closeSidebar" class="md:hidden ml-auto text-slate-400 hover:text-slate-900 p-1">
