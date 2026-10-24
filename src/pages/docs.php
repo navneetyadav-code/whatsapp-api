@@ -82,6 +82,28 @@ $healthEndpoint = public_url('api/health.php');
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .doc-section { scroll-margin-top: 6rem; }
+        .doc-sidebar-scroll::-webkit-scrollbar,
+        .doc-toc-scroll::-webkit-scrollbar { width: 4px; }
+        .doc-sidebar-scroll::-webkit-scrollbar-track,
+        .doc-toc-scroll::-webkit-scrollbar-track { background: transparent; }
+        .doc-sidebar-scroll::-webkit-scrollbar-thumb,
+        .doc-toc-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 9999px; }
+        .doc-sidebar-scroll::-webkit-scrollbar-thumb:hover,
+        .doc-toc-scroll::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+        .doc-link.active {
+            background-color: #ecfdf5;
+            color: #065f46;
+            font-weight: 600;
+            border-left: 2px solid #059669;
+            padding-left: 0.625rem;
+        }
+        .toc-link.active {
+            color: #047857;
+            font-weight: 600;
+            border-left: 2px solid #10b981;
+            padding-left: 0.5rem;
+            transform: translateX(2px);
+        }
     </style>
 </head>
 <body class="min-h-full flex flex-col font-sans bg-white text-slate-800 antialiased selection:bg-brand-500/20 selection:text-brand-900">
@@ -139,13 +161,13 @@ $healthEndpoint = public_url('api/health.php');
     </header>
 
     <!-- Main Docs Shell (Sidebar + Main Content + Right TOC) -->
-    <div class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 flex">
+    <div class="flex-1 max-w-[88rem] w-full mx-auto px-4 sm:px-6 lg:px-8 flex items-start">
         
         <!-- Mobile Sidebar Backdrop Overlay -->
         <div id="doc-sidebar-overlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 hidden lg:hidden"></div>
 
         <!-- Left Navigation Sidebar -->
-        <aside id="doc-sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transform -translate-x-full lg:translate-x-0 lg:static lg:w-64 xl:w-72 lg:shrink-0 lg:border-r lg:border-slate-200 transition-transform duration-200 ease-in-out overflow-y-auto pt-6 pb-12 px-4 sm:px-6 text-sm">
+        <aside id="doc-sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transform -translate-x-full lg:translate-x-0 lg:sticky lg:top-16 sm:lg:top-20 lg:w-64 xl:w-72 lg:shrink-0 lg:border-r lg:border-slate-200 transition-transform duration-200 ease-in-out lg:h-[calc(100vh-4rem)] sm:lg:h-[calc(100vh-5rem)] overflow-y-auto doc-sidebar-scroll pt-6 pb-16 px-4 sm:px-6 text-sm">
             
             <div class="flex items-center justify-between pb-4 border-b border-slate-200 lg:hidden mb-4">
                 <span class="font-bold text-slate-900">Documentation Menu</span>
@@ -154,10 +176,12 @@ $healthEndpoint = public_url('api/health.php');
                 </button>
             </div>
 
-            <!-- Quick Filter Input -->
-            <div class="relative mb-5">
+            <!-- Quick Filter Input (Pinned at Top of Sidebar) -->
+            <div class="sticky top-0 bg-white pt-1 pb-3 z-10 mb-4 border-b border-slate-100">
+                <div class="relative">
                 <input id="doc-search" type="text" placeholder="Quick filter docs..." class="w-full text-xs px-3 py-2 pl-8 rounded-lg bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 placeholder-slate-400">
                 <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
             </div>
 
             <!-- Navigation Categories Tree -->
@@ -976,7 +1000,7 @@ func main() {
         </main>
 
         <!-- Right "On this page" TOC (Desktop Only) -->
-        <aside class="hidden xl:block w-56 shrink-0 py-12 pl-6 sticky top-20 self-start text-xs border-l border-slate-100">
+        <aside id="doc-toc" class="hidden xl:block w-60 shrink-0 py-8 pl-6 sticky top-16 sm:top-20 self-start text-xs border-l border-slate-200 h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] overflow-y-auto doc-toc-scroll">
             <h5 class="font-bold text-slate-900 uppercase tracking-wider text-[11px] font-mono mb-3">On This Page</h5>
             <ul class="space-y-2 text-slate-500">
                 <li><a href="#overview" class="toc-link hover:text-slate-900 transition-colors block">1. Overview</a></li>
@@ -1083,6 +1107,51 @@ func main() {
                     });
                 });
             });
+
+            // 5. ScrollSpy - Dynamic Active Link Highlighting in Split View
+            const sections = document.querySelectorAll('.doc-section');
+            const navDocLinks = document.querySelectorAll('.doc-link');
+            const navTocLinks = document.querySelectorAll('.toc-link');
+
+            function updateScrollSpy() {
+                let activeId = '';
+                const scrollPosition = window.scrollY + 130;
+
+                sections.forEach(section => {
+                    const top = section.offsetTop;
+                    const height = section.offsetHeight;
+                    if (scrollPosition >= top && scrollPosition < top + height) {
+                        activeId = section.getAttribute('id');
+                    }
+                });
+
+                if (!activeId && sections.length > 0 && window.scrollY < 200) {
+                    activeId = sections[0].getAttribute('id');
+                }
+
+                if (activeId) {
+                    navDocLinks.forEach(link => {
+                        const href = link.getAttribute('href');
+                        if (href === '#' + activeId) {
+                            link.classList.add('active');
+                        } else {
+                            link.classList.remove('active');
+                        }
+                    });
+
+                    navTocLinks.forEach(link => {
+                        const href = link.getAttribute('href');
+                        if (href === '#' + activeId) {
+                            link.classList.add('active');
+                        } else {
+                            link.classList.remove('active');
+                        }
+                    });
+                }
+            }
+
+            window.addEventListener('scroll', updateScrollSpy, { passive: true });
+            updateScrollSpy();
 
             // 4. Quick Filter for Sidebar Navigation Links
             const searchInput = document.getElementById('doc-search');
