@@ -169,6 +169,14 @@ app.use((req, res, next) => {
   next();
 });
 
+app.param('userId', (req, res, next, userId) => {
+  if (!/^\d+$/.test(String(userId))) {
+    res.status(400).json({ ok: false, error: 'Invalid user ID. Must be a positive integer.' });
+    return;
+  }
+  next();
+});
+
 function emptySession(userId) {
   return {
     userId,
@@ -453,7 +461,14 @@ async function startSession(userId, force = false, waitForReady = true) {
   session.sleeping = false;
   session.error = null;
 
-  const authDir = join(SESSION_DIR, `user_${userId}`);
+  const cleanUserId = String(parseInt(String(userId), 10));
+  if (!/^\d+$/.test(cleanUserId)) {
+    throw new Error('Invalid user ID.');
+  }
+  const authDir = resolve(SESSION_DIR, `user_${cleanUserId}`);
+  if (!authDir.startsWith(SESSION_DIR)) {
+    throw new Error('Session directory path traversal detected.');
+  }
   if (force) {
     try {
       const credsFile = join(authDir, 'creds.json');
@@ -959,7 +974,13 @@ async function sendWebhook(userId, payload) {
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const response = await fetch(webhook.target_url, { method: 'POST', headers, body, signal: AbortSignal.timeout(8000) });
+      const response = await fetch(webhook.target_url, {
+        method: 'POST',
+        headers,
+        body,
+        redirect: 'error',
+        signal: AbortSignal.timeout(8000)
+      });
       await recordWebhookDelivery(webhook, payload, response.status, response.ok ? null : `HTTP ${response.status}`, attempt);
       if (response.ok) {
         return;
@@ -995,8 +1016,12 @@ async function markMessageSent(message, result, normalizedTo) {
   });
 
   // Ephemeral media cleanup to conserve disk space
+  await cleanupEphemeralMedia(message);
+}
+
+async function cleanupEphemeralMedia(message) {
   try {
-    const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+    const payload = message?.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
     if (payload?.attachment?.is_temp && payload.attachment.path) {
       const resolvedPath = resolve(String(payload.attachment.path));
       const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
@@ -1004,7 +1029,9 @@ async function markMessageSent(message, result, normalizedTo) {
         await rm(resolvedPath, { force: true });
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    logger.warn({ err }, 'Could not clean up ephemeral media file');
+  }
 }
 
 async function markMessageFailed(message, error, normalizedTo = null) {
@@ -1034,16 +1061,7 @@ async function markMessageFailed(message, error, normalizedTo = null) {
     });
 
     // Cleanup temporary media if final attempt failed
-    try {
-      const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
-      if (payload?.attachment?.is_temp && payload.attachment.path) {
-        const resolvedPath = resolve(String(payload.attachment.path));
-        const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
-        if (resolvedPath.startsWith(allowedUploadsDir) && existsSync(resolvedPath)) {
-          await rm(resolvedPath, { force: true });
-        }
-      }
-    } catch (_) {}
+    await cleanupEphemeralMedia(message);
   }
 }
 
@@ -1157,7 +1175,12 @@ app.post('/sessions/:userId/start', async (req, res) => {
 
 app.post('/sessions/:userId/logout', async (req, res) => {
   const session = getSession(req.params.userId);
-  const authDir = join(SESSION_DIR, `user_${req.params.userId}`);
+  const cleanUserId = String(parseInt(String(req.params.userId), 10));
+  const authDir = resolve(SESSION_DIR, `user_${cleanUserId}`);
+  if (!authDir.startsWith(SESSION_DIR)) {
+    res.status(400).json({ ok: false, error: 'Invalid session path.' });
+    return;
+  }
 
   try {
     if (session.sock) {

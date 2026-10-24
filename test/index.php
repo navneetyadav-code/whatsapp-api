@@ -9,7 +9,14 @@ declare(strict_types=1);
  * against local, staging, or production WhatsGateway endpoints.
  */
 
-$defaultApiUrl = 'http://localhost/wa/public/api/send.php';
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+
+if (!app_config('app.enable_test_page')) {
+    http_response_code(404);
+    exit('Not Found');
+}
+
+$defaultApiUrl = public_url('api/send.php');
 $apiUrl = !empty($_POST['api_url']) ? trim((string) $_POST['api_url']) : $defaultApiUrl;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -19,37 +26,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mediaUrl = trim((string) ($_POST['media_url'] ?? ''));
     $humanize = !empty($_POST['humanize']);
 
-    $bodyData = [
-        'to' => $to,
-        'message' => $message,
-        'humanize' => $humanize,
-    ];
+    // SSRF Protection: Validate target API URL and media URL
+    $targetHost = strtolower((string) (parse_url($apiUrl, PHP_URL_HOST) ?? ''));
+    $targetScheme = strtolower((string) (parse_url($apiUrl, PHP_URL_SCHEME) ?? ''));
+    $isLocal = is_local_request();
 
-    if ($mediaUrl !== '') {
-        $bodyData['media_url'] = $mediaUrl;
+    $isDisallowed = !filter_var($apiUrl, FILTER_VALIDATE_URL)
+        || !in_array($targetScheme, ['http', 'https'], true)
+        || $targetHost === ''
+        || str_starts_with($targetHost, '169.254.')
+        || $targetHost === 'metadata.google.internal'
+        || (!$isLocal && (in_array($targetHost, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true) || is_private_ip(gethostbyname($targetHost))));
+
+    if ($isDisallowed) {
+        $result = [
+            'code' => 400,
+            'response' => ['ok' => false, 'error' => 'API endpoint URL is invalid or targets a restricted host.'],
+        ];
+    } else {
+        if ($mediaUrl !== '') {
+            try {
+                assert_safe_media_url($mediaUrl);
+            } catch (Throwable $e) {
+                $result = [
+                    'code' => 400,
+                    'response' => ['ok' => false, 'error' => 'Media URL validation failed: ' . $e->getMessage()],
+                ];
+            }
+        }
+
+        if (!isset($result)) {
+            $bodyData = [
+                'to' => $to,
+                'message' => $message,
+                'humanize' => $humanize,
+            ];
+
+            if ($mediaUrl !== '') {
+                $bodyData['media_url'] = $mediaUrl;
+            }
+
+            $payload = json_encode($bodyData, JSON_UNESCAPED_SLASHES);
+
+            $ch = curl_init($apiUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $apiKey,
+                'X-Api-Key: ' . $apiKey,
+                'ngrok-skip-browser-warning: true',
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            $result = [
+                'code' => $httpCode ?: 500,
+                'response' => json_decode((string) $response, true) ?: ($curlError ?: $response),
+            ];
+        }
     }
-
-    $payload = json_encode($bodyData, JSON_UNESCAPED_SLASHES);
-
-    $ch = curl_init($apiUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $apiKey,
-        'X-Api-Key: ' . $apiKey,
-        'ngrok-skip-browser-warning: true',
-    ]);
-
-    $response = curl_exec($ch);
-    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    $result = [
-        'code' => $httpCode,
-        'response' => json_decode((string) $response, true) ?: $response,
-    ];
 }
 ?>
 <!DOCTYPE html>

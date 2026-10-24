@@ -122,40 +122,16 @@ if ($page === 'message-send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_to('index.php?page=message');
     }
 
-    // Media upload logic
+    // Secure media upload handling (validated against allowed MIME types, extension whitelisting, and temporary cleanup)
     $payload = [];
-    if (isset($_FILES['attachment'])) {
-        if ($_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = dirname(__DIR__) . '/public/uploads/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-            
-            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
-            $fileName = uniqid('media_') . '.' . $ext;
-            $target = $uploadDir . $fileName;
-            
-            if (move_uploaded_file($_FILES['attachment']['tmp_name'], $target)) {
-                $payload['attachment'] = [
-                    'path' => $target,
-                    'name' => $_FILES['attachment']['name'],
-                    'type' => in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']) ? 'image' : (in_array($ext, ['mp4', 'mov']) ? 'video' : 'document'),
-                    'mime' => $_FILES['attachment']['type']
-                ];
-            } else {
-                if ($isAjax) { json_response(['ok' => false, 'error' => 'Failed to save uploaded file to disk.'], 500); }
-                flash('error', 'Failed to save uploaded file.');
-                redirect_to('index.php?page=message');
+    if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
+        try {
+            $payload['attachment'] = save_uploaded_media($_FILES['attachment']);
+        } catch (Throwable $e) {
+            $errMsg = $e->getMessage();
+            if ($isAjax) {
+                json_response(['ok' => false, 'error' => $errMsg], 422);
             }
-        } elseif ($_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
-            $uploadErrors = [
-                UPLOAD_ERR_INI_SIZE => 'The uploaded file exceeds the upload_max_filesize directive in php.ini (Default is usually 2MB).',
-                UPLOAD_ERR_FORM_SIZE => 'The uploaded file exceeds the MAX_FILE_SIZE directive in the HTML form.',
-                UPLOAD_ERR_PARTIAL => 'The uploaded file was only partially uploaded.',
-                UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder.',
-                UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk.',
-                UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload.'
-            ];
-            $errMsg = $uploadErrors[$_FILES['attachment']['error']] ?? 'Unknown upload error.';
-            if ($isAjax) { json_response(['ok' => false, 'error' => $errMsg], 400); }
             flash('error', $errMsg);
             redirect_to('index.php?page=message');
         }
