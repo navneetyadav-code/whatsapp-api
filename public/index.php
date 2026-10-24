@@ -429,6 +429,11 @@ if ($page === 'terms' || $page === 'terms-of-service' || $page === 'tos') {
     exit;
 }
 
+if ($page === 'docs' || $page === 'documentation' || $page === 'api-docs') {
+    require dirname(__DIR__) . '/src/pages/docs.php';
+    exit;
+}
+
 if ($page === 'home') {
     require dirname(__DIR__) . '/src/pages/home.php';
     exit;

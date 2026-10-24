@@ -68,10 +68,10 @@ return [
     ],
     'app' => [
         'env' => $appEnv,
-        'name' => config_env('APP_NAME', 'WhatsApp API Hub'),
+        'name' => config_env('APP_NAME', 'WhatsGateway'),
         'public_url' => rtrim((string) config_env('APP_PUBLIC_URL', $appEnv === 'production' ? '' : 'http://localhost/whatsapp-api/public'), '/'),
         'base_path' => config_env('APP_BASE_PATH', $appEnv === 'production' ? '' : '/whatsapp-api/public'),
-        'session_name' => config_env('APP_SESSION_NAME', 'wa_api_hub'),
+        'session_name' => config_env('APP_SESSION_NAME', 'whatsgateway_session'),
         'secure_cookies' => config_bool('APP_SECURE_COOKIES', $appEnv === 'production'),
         'enable_test_page' => config_bool('ENABLE_TEST_PAGE', $appEnv !== 'production'),
         'enable_registration' => config_bool('ENABLE_REGISTRATION', true),
@@ -99,7 +99,7 @@ return [
         'user' => config_env('SMTP_USER', ''),
         'pass' => config_env('SMTP_PASS', ''),
         'from' => config_env('SMTP_FROM', 'noreply@localhost'),
-        'from_name' => config_env('SMTP_FROM_NAME', 'WhatsApp API Hub'),
+        'from_name' => config_env('SMTP_FROM_NAME', 'WhatsGateway'),
     ],
     'google' => [
         'client_id' => config_env('GOOGLE_CLIENT_ID', ''),

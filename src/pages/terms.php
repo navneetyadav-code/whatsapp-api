@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 $user = current_user();
-$seoTitle = 'Terms of Service | WhatsApp API Hub';
+$seoTitle = 'Terms of Service | WhatsGateway';
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full bg-slate-50">
@@ -11,9 +11,12 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($seoTitle) ?></title>
-    <meta name="description" content="Terms of Service for WhatsApp API Hub. Read our acceptable use policy, anti-spam guidelines, Google integration rules, API limits, and user agreement.">
+    <meta name="description" content="Terms of Service for WhatsGateway. Read our acceptable use policy, anti-spam guidelines, Google integration rules, API limits, and user agreement.">
     <link rel="canonical" href="<?= e(public_url('terms')) ?>">
-    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= e(base_url('assets/apple-touch-icon.png')) ?>">
+    <link rel="shortcut icon" href="<?= e(base_url('favicon.ico')) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -37,9 +40,9 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
     <header class="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200/80">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <a href="<?= e(base_url('')) ?>" class="flex items-center gap-2.5 text-slate-900 group">
-                <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WA API Hub Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-slate-200/50">
+                <img src="<?= e(base_url('assets/favicon.png')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-slate-200/50">
                 <div class="leading-tight">
-                    <span class="font-bold text-slate-900 text-[15px] tracking-tight block">WhatsApp API Hub</span>
+                    <span class="font-bold text-slate-900 text-[15px] tracking-tight block">WhatsGateway</span>
                     <span class="text-[10px] text-slate-400 font-medium block">Self-Hosted Developer Platform</span>
                 </div>
             </a>
@@ -78,17 +81,17 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
             <section class="space-y-3">
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">1. Acceptance of Terms</h2>
                 <p>
-                    By registering for an account, accessing, or using <strong>WhatsApp API Hub</strong> ("the Service", "the Software", "we", "us", or "our"), hosted at <a href="<?= e(public_url('')) ?>" class="text-brand-wa_med font-semibold hover:underline"><?= e(parse_url(public_url(''), PHP_URL_HOST)) ?></a> or self-hosted, you ("User", "Developer", or "Customer") agree to be bound by these Terms of Service ("Terms") and our <a href="<?= e(base_url('privacy')) ?>" class="text-brand-wa_med font-semibold hover:underline">Privacy Policy</a>.
+                    By registering for an account, accessing, or using <strong>WhatsGateway</strong> ("the Service", "the Software", "we", "us", or "our"), hosted at <a href="<?= e(public_url('')) ?>" class="text-brand-wa_med font-semibold hover:underline"><?= e(parse_url(public_url(''), PHP_URL_HOST)) ?></a> or self-hosted, you ("User", "Developer", or "Customer") agree to be bound by these Terms of Service ("Terms") and our <a href="<?= e(base_url('privacy')) ?>" class="text-brand-wa_med font-semibold hover:underline">Privacy Policy</a>.
                 </p>
                 <p>
-                    If you do not agree to these Terms in their entirety, you must not access or use WhatsApp API Hub.
+                    If you do not agree to these Terms in their entirety, you must not access or use WhatsGateway.
                 </p>
             </section>
 
             <section class="space-y-3">
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">2. Description of the Service</h2>
                 <p>
-                    WhatsApp API Hub is a developer-centric automation and messaging gateway software. The platform enables authenticated users to:
+                    WhatsGateway is a developer-centric automation and messaging gateway software. The platform enables authenticated users to:
                 </p>
                 <ul class="list-disc pl-5 space-y-1.5 text-slate-600">
                     <li>Pair and manage WhatsApp Web client sessions via the open-source Baileys library.</li>
@@ -119,7 +122,7 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
                     <span>4. Acceptable Use Policy & Anti-Spam Requirements</span>
                 </div>
                 <p class="text-amber-950 text-sm leading-relaxed">
-                    WhatsApp API Hub is intended strictly for authorized, transactional, customer service, and consented business communication. We maintain a zero-tolerance policy against unsolicited bulk messaging (spam).
+                    WhatsGateway is intended strictly for authorized, transactional, customer service, and consented business communication. We maintain a zero-tolerance policy against unsolicited bulk messaging (spam).
                 </p>
                 <div class="space-y-2 text-xs sm:text-sm text-amber-900">
                     <p><strong>You explicitly warrant and agree that:</strong></p>
@@ -140,7 +143,7 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
                     <span>5. Google OAuth & People API Integration Terms</span>
                 </div>
                 <p class="text-sky-950 text-sm leading-relaxed">
-                    WhatsApp API Hub offers optional Google Sign-In and Google Contacts synchronization powered by Google OAuth 2.0. By authenticating your Google account with our application:
+                    WhatsGateway offers optional Google Sign-In and Google Contacts synchronization powered by Google OAuth 2.0. By authenticating your Google account with our application:
                 </p>
                 <div class="space-y-2 text-xs sm:text-sm text-sky-900">
                     <ul class="list-disc pl-5 space-y-1.5">
@@ -167,10 +170,10 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
             <section class="space-y-3">
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">7. Intellectual Property & Trademarks</h2>
                 <p>
-                    WhatsApp API Hub is open-source software licensed under the MIT License. You retain full ownership of your proprietary code, customer lists, and outbound message copy.
+                    WhatsGateway is open-source software licensed under the MIT License. You retain full ownership of your proprietary code, customer lists, and outbound message copy.
                 </p>
                 <p class="text-slate-600">
-                    <strong>Notice Regarding Third-Party Trademarks:</strong> "WhatsApp" is a registered trademark of Meta Platforms, Inc. "Google" and the Google logo are trademarks of Google LLC. WhatsApp API Hub is an independent software tool and is <strong>not affiliated, endorsed, sponsored, or certified by Meta Platforms, Inc. or Google LLC</strong>.
+                    <strong>Notice Regarding Third-Party Trademarks:</strong> "WhatsApp" is a registered trademark of Meta Platforms, Inc. "Google" and the Google logo are trademarks of Google LLC. WhatsGateway is an independent software tool and is <strong>not affiliated, endorsed, sponsored, or certified by Meta Platforms, Inc. or Google LLC</strong>.
                 </p>
             </section>
 
@@ -188,7 +191,7 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">9. Disclaimer of Warranties</h2>
                 <p class="text-slate-600 uppercase text-xs tracking-wider font-semibold">Provided "AS IS"</p>
                 <p class="text-slate-600">
-                    TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WHATSAPP API HUB AND ALL ACCOMPANYING CODE, SERVICES, AND APIS ARE PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WITHOUT LIMITATION WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT UNINTERRUPTED AVAILABILITY, INSTANTANEOUS DELIVERY, OR ERROR-FREE COMMUNICATION OVER THIRD-PARTY CARRIERS OR WHATSAPP NETWORKS.
+                    TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, WHATSGATEWAY AND ALL ACCOMPANYING CODE, SERVICES, AND APIS ARE PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WITHOUT LIMITATION WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT UNINTERRUPTED AVAILABILITY, INSTANTANEOUS DELIVERY, OR ERROR-FREE COMMUNICATION OVER THIRD-PARTY CARRIERS OR WHATSAPP NETWORKS.
                 </p>
             </section>
 
@@ -202,7 +205,7 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
             <section class="space-y-3">
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">11. Modifications to Terms</h2>
                 <p>
-                    We reserve the right to revise or update these Terms of Service periodically to reflect changes in regulatory standards, Google API policies, or platform functionality. Updated terms will be posted directly to this URL with an updated "Effective Date". Your continued use of WhatsApp API Hub after changes are published constitutes your acceptance of the revised Terms.
+                    We reserve the right to revise or update these Terms of Service periodically to reflect changes in regulatory standards, Google API policies, or platform functionality. Updated terms will be posted directly to this URL with an updated "Effective Date". Your continued use of WhatsGateway after changes are published constitutes your acceptance of the revised Terms.
                 </p>
             </section>
 
@@ -230,7 +233,7 @@ $seoTitle = 'Terms of Service | WhatsApp API Hub';
             <a href="<?= e(base_url('terms')) ?>" class="text-slate-900 font-bold hover:underline">Terms of Service</a>
             <a href="mailto:info.assistgroupofficial@gmail.com" class="hover:text-slate-900 transition-colors">Support Contact</a>
         </div>
-        <p class="text-slate-400 text-[11px]">&copy; 2026 WhatsApp API Hub &bull; Maintained by Navneet Kumar Yadav &bull; Open Source under MIT License</p>
+        <p class="text-slate-400 text-[11px]">&copy; <?= date('Y') ?> WhatsGateway &bull; Maintained by Navneet Kumar Yadav &bull; Open Source under MIT License</p>
     </footer>
 
 </body>

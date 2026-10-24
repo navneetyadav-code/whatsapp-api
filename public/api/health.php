@@ -16,7 +16,7 @@ echo json_encode([
     'ok' => $workerOk,
     'status' => $workerOk ? 'healthy' : 'degraded',
     'timestamp' => date('c'),
-    'service' => 'whatsapp-api-hub',
+    'service' => 'whatsgateway',
     'worker' => [
         'ok' => $workerOk,
         'status_code' => $worker['status_code'] ?? $worker['status'] ?? null,

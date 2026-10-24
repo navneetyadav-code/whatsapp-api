@@ -52,8 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Business API - Register</title>
-    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
+    <title>WhatsGateway - Register</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= e(base_url('assets/apple-touch-icon.png')) ?>">
+    <link rel="shortcut icon" href="<?= e(base_url('favicon.ico')) ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -130,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Top Logo -->
         <div class="relative z-10 flex items-center gap-2.5">
             <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/20">
-            <span class="font-semibold text-white tracking-wide text-sm">WhatsApp API Hub</span>
+            <span class="font-semibold text-white tracking-wide text-sm">WhatsGateway</span>
         </div>
 
         <!-- Middle Content -->

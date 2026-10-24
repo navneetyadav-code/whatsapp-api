@@ -26,7 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Business API - Login</title>
-    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= e(base_url('assets/apple-touch-icon.png')) ?>">
+    <link rel="shortcut icon" href="<?= e(base_url('favicon.ico')) ?>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -102,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Top Logo -->
         <div class="relative z-10 flex items-center gap-2.5">
             <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/20">
-            <span class="font-semibold text-white tracking-wide text-sm">WhatsApp API Hub</span>
+            <span class="font-semibold text-white tracking-wide text-sm">WhatsGateway</span>
         </div>
 
         <!-- Middle Content -->
@@ -240,11 +243,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Sign in with Google
             </a>
 
+            <?php if (app_config('app.enable_registration')): ?>
             <!-- Footer -->
             <p class="mt-8 text-center text-sm font-medium text-gray-500">
                 Don't have an account? 
                 <a href="<?= e(base_url('register')) ?>" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Sign up</a>
-            </p>
+            <?php endif; ?>
             </div>
 
         </div>

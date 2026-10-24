@@ -22,14 +22,17 @@ if ($userForLayout) {
     <meta name="author" content="Navneet Kumar Yadav">
     <meta name="robots" content="<?= e($seo['robots']) ?>">
     <link rel="canonical" href="<?= e($seo['canonical']) ?>">
-    <link rel="icon" type="image/jpeg" href="<?= e(base_url('assets/logo.jpg')) ?>">
+    <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
+    <link rel="icon" type="image/png" sizes="512x512" href="<?= e(base_url('assets/favicon.png')) ?>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= e(base_url('assets/apple-touch-icon.png')) ?>">
+    <link rel="shortcut icon" href="<?= e(base_url('favicon.ico')) ?>">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="<?= e($seo['canonical']) ?>">
     <meta property="og:title" content="<?= e($seo['title']) ?>">
     <meta property="og:description" content="<?= e($seo['description']) ?>">
-    <meta property="og:site_name" content="WhatsApp API Hub">
+    <meta property="og:site_name" content="WhatsGateway">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
@@ -41,7 +44,7 @@ if ($userForLayout) {
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "Free WhatsApp API Hub",
+      "name": "WhatsGateway",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "Linux, Windows, macOS, Docker",
       "offers": {
@@ -180,7 +183,7 @@ if ($userForLayout) {
         <div class="public-doc-topbar">
             <a class="auth-brand" href="<?= e(base_url('index.php?page=login')) ?>">
                 <span class="auth-logo">WA</span>
-                <span>WhatsApp <b>API Hub</b></span>
+                <span>Whats<b>Gateway</b></span>
             </a>
             <a class="ghost small" href="<?= e(base_url('index.php?page=login')) ?>">Log in</a>
         </div>
