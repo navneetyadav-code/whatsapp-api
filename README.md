@@ -248,7 +248,7 @@ whatsap_api/
    ```sql
    CREATE DATABASE whatsapp_api CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
-   Import the [`database.sql`](database.sql) schema file into `whatsapp_api`.
+   For a brand-new local database, run `php scripts/migrate.php`. The legacy `database.sql` is a dump with destructive `DROP TABLE` statements; do not import it into a database that has existing data.
 
 3. **Configure Environment:**
    Copy `.env.example` to `.env`:
@@ -330,7 +330,7 @@ whatsap_api/
 
 If you are deploying on a fresh environment, navigate to `http://localhost/wa/setup.php`. The wizard will:
 1. Test your database server connection.
-2. Create the database and import `database.sql`.
+2. Create the database and import `database.sql` (legacy wizard path for a fresh install only; it is destructive and must not be used with existing data). For deployments with an existing database, run `php scripts/migrate.php` instead.
 3. Create an initial administrator account.
 4. Generate the `.env` configuration file with a secure random `WORKER_TOKEN`.
 5. Execute `npm install` inside the `worker/` directory automatically.
@@ -357,11 +357,12 @@ All application configurations are managed in `.env` at the root directory and l
 | `DB_NAME` | `whatsapp_api` | Database name. |
 | `DB_USER` | `root` | Database username. |
 | `DB_PASSWORD` | `""` | Database password. |
-| `DB_SSL` | `false` | Enable TLS/SSL connection to MySQL (auto-enabled for TiDB Cloud). |
-| `DB_DSN` | *(computed)* | Optional raw PDO DSN string override. |
-| `WORKER_URL` | `http://127.0.0.1:3107` | HTTP endpoint where the Node.js Baileys worker listens. |
-| `WORKER_PORT` | `3107` | Port for the background worker microservice. |
-| `WORKER_TOKEN` | *(required in prod)* | Shared secret token passed in `X-Worker-Token` to authorize worker RPC calls. |
+| `DB_SSL` | `false` | Enable TLS/SSL. It is always enabled for TiDB Cloud hostnames or port 4000, with certificate verification. |
+| `DB_SSL_CA` | system CA bundle | Optional filesystem path to a trusted CA bundle; never disables certificate verification. |
+| `DB_DSN` | *(computed)* | Optional MySQL PDO DSN override; its database must remain `whatsapp_api`. |
+| `WORKER_URL` | `http://127.0.0.1:<WORKER_PORT>` (default port `3107`) | Internal HTTP endpoint used by PHP to call the Node worker. The Render Docker entrypoint forces this to the co-located worker loopback URL. |
+| `WORKER_PORT` | `3107` | Port for the background worker microservice. PHP derives its default `WORKER_URL` from this value. |
+| `WORKER_TOKEN` | *(required in prod)* | Random shared secret of at least 32 characters passed in `X-Worker-Token`; generate it and set it in Render Environment Variables. |
 | `WA_SESSION_DIR` | *(platform default)* | Directory where Baileys multi-file authentication keys are stored. |
 | `SEND_DELAY_MS` | `2500` | Base delay between message dispatches in milliseconds. |
 | `QUEUE_POLL_MS` | `3000` | Polling frequency for claiming queued messages from the database. |
@@ -384,7 +385,9 @@ All application configurations are managed in `.env` at the root directory and l
 
 ## 8. Database Setup, Migrations & Initialization
 
-The database schema is defined in [`database.sql`](database.sql).
+The current application schema is defined by the non-destructive, repeatable [`001_initial_schema.sql`](migrations/001_initial_schema.sql) migration. It is based on the actual table definitions in [`database.sql`](database.sql), but contains no `DROP`, `TRUNCATE`, or seed-data statements. The application uses 13 tables: `users`, `api_keys`, `api_request_logs`, `campaigns`, `chatbot_rules`, `contacts`, `login_attempts`, `message_logs`, `message_queue`, `password_resets`, `webhooks`, `webhook_deliveries`, and `whatsapp_sessions`. The migration repairs missing indexes and foreign keys, validates existing columns, and records `001_initial_schema` in `schema_migrations`. It never deletes or resets existing rows. Existing tables with incompatible columns or conflicting data stop initialization and require a reviewed follow-up migration.
+
+Run the initializer manually with `php scripts/migrate.php`. Docker startup runs the same command before Supervisor starts Apache or the queue worker. If it fails, the container exits with a sanitized error and the worker does not start. Health checks require both a live database connection and all 13 application tables.
 
 ### Key Tables Overview
 
@@ -861,13 +864,22 @@ node --check worker/server.mjs
 
 ### Deploying to Render / Railway / PaaS with TiDB Cloud
 
-The repository includes a production [`Dockerfile`](Dockerfile) configured with Supervisor:
+The repository includes a production [`Dockerfile`](Dockerfile) configured with Supervisor. Its entrypoint applies `php scripts/migrate.php` before any service starts:
 1. Connect your GitHub repository to Render / Railway.
 2. Set Environment Variables:
-   - `DB_HOST`, `DB_PORT=4000`, `DB_NAME=whatsapp_api`, `DB_USER`, `DB_PASSWORD`, `DB_SSL=true`
+   - `DB_HOST`, `DB_PORT=4000`, `DB_NAME=whatsapp_api`, `DB_USER`, `DB_PASSWORD`, `DB_SSL=true` (TLS certificate verification stays enabled; provide `DB_SSL_CA` only if a trusted CA file is required)
    - `APP_ENV=production`, `APP_PUBLIC_URL=https://your-service.onrender.com`, `APP_BASE_PATH=`
-   - `WORKER_TOKEN=your-random-token`, `ENABLE_REGISTRATION=false`
-3. The container's [`entrypoint.sh`](docker/entrypoint.sh) exports environment variables into Apache and launches Supervisor to manage both Apache and `worker/server.mjs`.
+   - `WORKER_TOKEN` generated with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, `ENABLE_REGISTRATION=false`. Paste the generated value directly into Render Environment Variables; do not commit it or send it in chat.
+3. Deploy. Startup applies the migration before the queue worker. For a manual run on a compatible Render service shell, execute `php /var/www/html/scripts/migrate.php`; Render also documents one-off jobs for tasks such as database migrations. Do not use `database.sql`, `clean_tidb_import.sql`, or `schema_export.sql` against the existing database because they contain destructive dump statements.
+4. The container forces `WORKER_URL` to `http://127.0.0.1:${WORKER_PORT}` because Apache and the Node worker run in the same container; `WORKER_PORT` defaults to `3107`. Loopback cURL requests explicitly bypass inherited HTTP proxy settings. The worker's `GET /health` route is unauthenticated but reports ready only after it connects to the `whatsapp_api` database and confirms all 13 required tables; a not-ready result is HTTP 503 JSON with `error.code=database_not_ready`. Other worker routes require `X-Worker-Token`; PHP includes it without logging or returning it. Verify `https://<service-host>/api/health.php` returns HTTP 200 with `database.ok`, `database.schema_ready`, and `worker.ok` all `true`. On a failed worker probe, the PHP error log records only the sanitized target, peer IP, HTTP status, content type, a redacted response excerpt, and a short failure category. Then check Render logs for `Database schema is ready: 13 application tables in whatsapp_api.` and confirm queue processing no longer logs `ER_NO_SUCH_TABLE`.
+
+### First private dashboard account
+
+Public registration should remain disabled with `ENABLE_REGISTRATION=false`. To provision the first account without a public administrator endpoint, set `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` as temporary Render environment variables, then deploy. Use a unique valid email and a password of at least 12 characters; optionally set `INITIAL_ADMIN_NAME` (defaults to `Administrator`). The Docker entrypoint runs `scripts/create-initial-admin.php` after the existing non-destructive schema initializer and before Apache or the worker starts. The password is read from the process environment, hashed with PHP `password_hash`, and never included in logs or command arguments. After logs report that the account was created, remove all `INITIAL_ADMIN_*` variables and deploy again. The command is safe to rerun for the same sole account: it reports that the account already exists without changing its password. It refuses if other user accounts exist or if it cannot acquire TiDB's advisory setup lock; it never upgrades, downgrades, or replaces an existing account.
+
+The current schema has no `is_admin` column or separate administrator role: the first account is the initial dashboard owner, and authenticated accounts use the same user-scoped dashboard permissions. This setup creates only that first login account and its normal WhatsApp session and webhook records; it makes no schema changes. Sign in at `/login`; the authenticated root route (`/`) opens the dashboard. Open `/device`, select **Connect**, and scan the QR displayed by the existing session UI. The connect action is a CSRF-protected request to `public/session.php?action=start`; this source confirms the QR pairing flow, but a successful WhatsApp connection still depends on the deployed worker and WhatsApp session.
+
+For local test runs, include `php tests/initial-admin.test.php`.
 
 ---
 
