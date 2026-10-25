@@ -1,6 +1,14 @@
 /.env
 *.env
 *.env.local
+
+# Third-party Provider & SMTP Secrets
+*brevo*
+*resend*
+!*brevo*.php
+!*brevo*.md
+!*resend*.php
+!*resend*.md
 worker/node_modules/
 worker/sessions/
 worker/*.log
