@@ -121,7 +121,7 @@ return [
         'port' => (int) $workerPort,
     ],
     'otp' => [
-        'via_email' => config_bool('OTP_VIA_EMAIL', true),
+        'via_email' => config_bool('OTP_VIA_EMAIL', false),
         'via_phone' => config_bool('OTP_VIA_PHONE', true),
     ],
     'system_api' => [

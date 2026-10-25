@@ -122,13 +122,25 @@ It expires in 15 minutes.";
         }
 
         if (empty($sentVia)) {
+            $err = $viaEmail 
+                ? 'Unable to send OTP. Email delivery failed, and no WhatsApp session is currently connected.'
+                : ($phone === '' 
+                    ? 'No phone number is registered on this account. Please update your account phone number to receive OTP via WhatsApp.' 
+                    : 'Unable to send OTP: No active WhatsApp session is currently connected. Please connect a WhatsApp session in the dashboard.');
             json_response([
                 'ok' => false,
-                'error' => 'Unable to send OTP. Email delivery failed (check SMTP credentials in Render), and no WhatsApp session is currently connected.'
+                'error' => $err
             ], 500);
         }
 
-        json_response(['ok' => true, 'sent_via' => $sentVia]);
+        $maskedPhone = '';
+        if ($phone !== '') {
+            $cleanPhone = preg_replace('/[^\d+]/', '', $phone);
+            $len = strlen($cleanPhone);
+            $maskedPhone = $len > 4 ? substr($cleanPhone, 0, 3) . str_repeat('*', max(2, $len - 5)) . substr($cleanPhone, -2) : $cleanPhone;
+        }
+
+        json_response(['ok' => true, 'sent_via' => $sentVia, 'phone' => $maskedPhone]);
     } elseif ($action === 'verify_otp') {
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $otp = trim((string) ($data['otp'] ?? ''));
@@ -322,7 +334,7 @@ It expires in 15 minutes.";
                 </a>
                 
                 <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Forgot Password</h2>
-                <p class="text-sm text-gray-500 mt-1.5 font-medium leading-relaxed">Enter the email address associated with your account, and we'll send you a link to reset your password.</p>
+                <p class="text-sm text-gray-500 mt-1.5 font-medium leading-relaxed">Enter your registered email address, and we'll send a 6-digit OTP to your linked phone via WhatsApp.</p>
             </div>
 
             <!-- Forgot Password Form -->
@@ -331,7 +343,7 @@ It expires in 15 minutes.";
                 
                 <!-- Email Field -->
                 <div>
-                    <label for="email" class="block text-sm font-semibold text-gray-700 mb-1.5">Work Email</label>
+                    <label for="email" class="block text-sm font-semibold text-gray-700 mb-1.5">Registered Email</label>
                     <input type="email" id="email" 
                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
                            placeholder="name@company.com" 
@@ -340,7 +352,7 @@ It expires in 15 minutes.";
                 
                 <!-- Submit Button -->
                 <button type="submit" id="submitBtn" class="w-full bg-brand-wa_light hover:bg-[#1DA851] text-white font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 shadow-sm shadow-brand-wa_light/20 active:scale-[0.98] flex justify-center items-center gap-2 mt-2">
-                    Send Reset Link
+                    Send Reset OTP
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
             </form>
@@ -350,8 +362,8 @@ It expires in 15 minutes.";
                 <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
                     <svg class="w-6 h-6 text-brand-wa_light" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <h3 id="successHeading" class="text-lg font-bold text-gray-900 mb-2">Check your inbox</h3>
-                <p class="text-sm text-gray-500 mb-6">We've sent a 6-digit OTP to <span id="displayEmail" class="font-medium text-gray-700"></span>.</p>
+                <h3 id="successHeading" class="text-lg font-bold text-gray-900 mb-2">Check your WhatsApp</h3>
+                <p id="successSubtext" class="text-sm text-gray-500 mb-6">We've sent a 6-digit OTP to your linked phone via WhatsApp.</p>
                 
                 <form id="otpForm" onsubmit="handleVerifyOTP(event)" class="space-y-4 text-left">
                     <div id="otpErrorAlert" class="hidden p-3 text-sm rounded-xl bg-red-50 text-red-700"></div>
@@ -441,6 +453,9 @@ It expires in 15 minutes.";
                     if (data.sent_via && data.sent_via.length > 0) {
                         const methods = data.sent_via.join(' and ');
                         document.getElementById('successHeading').textContent = 'Check your ' + methods;
+                        if (data.phone) {
+                            document.getElementById('successSubtext').textContent = "We've sent a 6-digit OTP to your WhatsApp: " + data.phone;
+                        }
                     }
                     
                     form.classList.add('hidden');
