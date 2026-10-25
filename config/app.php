@@ -29,7 +29,10 @@ if (!function_exists('config_env')) {
     function config_env(string $key, ?string $default = null): ?string
     {
         $value = getenv($key);
-        return $value === false ? $default : $value;
+        if ($value === false || trim((string) $value) === '') {
+            return $default;
+        }
+        return $value;
     }
 }
 
