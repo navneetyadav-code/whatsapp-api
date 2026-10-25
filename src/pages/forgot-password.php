@@ -88,7 +88,7 @@ It expires in 15 minutes.";
             }
 
             if (!$userId) {
-                $adminEmails = array_filter(array_map('trim', explode(',', (string) app_config('admin_email', ''))));
+                $adminEmails = array_filter(array_map('trim', explode(',', (string) (app_config('app.admin_email') ?? app_config('admin_email') ?? ''))));
                 if (!empty($adminEmails)) {
                     $inPlaceholders = implode(',', array_fill(0, count($adminEmails), '?'));
                     $stmtAdmin = Database::pdo()->prepare(
