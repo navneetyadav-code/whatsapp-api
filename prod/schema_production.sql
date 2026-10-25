@@ -18,8 +18,6 @@ CREATE TABLE `users` (
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `users` (`id`, `name`, `email`, `phone`, `password_hash`, `api_key_hash`, `api_key_prefix`, `api_secret_hash`, `created_at`, `updated_at`) VALUES ('1', 'Navneet Kumar Yadav', 'navneetyadav982008@gmail.com', '9507286092', '$2y$10$YFw8Dduqg72lMevXa2t2Nu/15VrBXHTBV9IH4EoYBIWkYqxN2.Z4O', '58901c3bfb7c80d3923f6a2f9705de7a80b751a4e63513ea060eb2768f91163d', 'wa_live_f89b0312c06de1', '$2y$10$9m3OyoMuxsOOnWLNgx9aMuYPtUOppNmHHNSI.G9IO9BIsBT3W1xGK', '2026-06-02 12:46:18', '2026-09-29 23:22:41');
-INSERT INTO `users` (`id`, `name`, `email`, `phone`, `password_hash`, `api_key_hash`, `api_key_prefix`, `api_secret_hash`, `created_at`, `updated_at`) VALUES ('9', 'Unknown Kumar', 'unknownkumar1113@gmail.com', '', '$2y$10$jlcGR.5IU6sOQIA82aaapuKuL/B0n3Fn6H6EtDfghIctY6p9W8cXy', NULL, NULL, NULL, '2026-10-13 14:27:12', '2026-10-13 14:27:12');
 
 DROP TABLE IF EXISTS `api_keys`;
 CREATE TABLE `api_keys` (
@@ -44,9 +42,6 @@ CREATE TABLE `api_keys` (
   CONSTRAINT `fk_api_keys_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `api_keys` (`id`, `user_id`, `name`, `key_hash`, `key_prefix`, `secret_hash`, `status`, `ip_allowlist`, `rate_per_minute`, `rate_per_hour`, `rate_per_day`, `allow_humanize`, `last_used_at`, `created_at`, `updated_at`) VALUES ('16', '1', 'key', '96fab6d2a873b79d5ce60db0ef49bae4d19dec4ca99faefee49fd399fa926e96', 'wa_live_24f504ef8a7990', '$2y$10$DV/ZfFQo73M/FY/pURHgT.xJ7DJ/d8DXCHu.EXBD.btabXYTH169K', 'active', NULL, '20', '300', '1000', '1', '2026-09-29 23:22:12', '2026-09-29 23:18:21', '2026-09-30 11:38:20');
-INSERT INTO `api_keys` (`id`, `user_id`, `name`, `key_hash`, `key_prefix`, `secret_hash`, `status`, `ip_allowlist`, `rate_per_minute`, `rate_per_hour`, `rate_per_day`, `allow_humanize`, `last_used_at`, `created_at`, `updated_at`) VALUES ('17', '1', 'N-Key', 'f1e0049a73dbc09bd6772ab2b2ff1bc093791b671d7169e1594c8f856bfa7558', 'wa_live_cb78eb11b575d9', '$2y$10$xMcb9RcLhMMNAdWgOaHPZet/a5qGoZ6Yqr8wv0QohTJFZVHhOpJjW', 'active', '185.27.134.37', '20', '300', '1000', '1', '2026-09-30 17:12:43', '2026-09-30 12:23:52', '2026-09-30 17:12:43');
-INSERT INTO `api_keys` (`id`, `user_id`, `name`, `key_hash`, `key_prefix`, `secret_hash`, `status`, `ip_allowlist`, `rate_per_minute`, `rate_per_hour`, `rate_per_day`, `allow_humanize`, `last_used_at`, `created_at`, `updated_at`) VALUES ('18', '9', 'Test Key User 9', 'e6f0d8f46862498d07d98f2deb579632ac15d27069a3c7b37815b48c40771ede', 'wa_live_671e8845f7b671', '$2y$10$ny4BkZsdbCSUsuM3hiYv7.Nm/q0NCUqsvAG6zsjY0vDOfjyEznXNG', 'active', NULL, '20', '300', '1000', '0', '2026-10-13 15:24:24', '2026-10-13 15:17:41', '2026-10-13 15:24:24');
 
 DROP TABLE IF EXISTS `api_request_logs`;
 CREATE TABLE `api_request_logs` (
@@ -249,7 +244,5 @@ CREATE TABLE `whatsapp_sessions` (
   CONSTRAINT `fk_whatsapp_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `whatsapp_sessions` (`id`, `user_id`, `status`, `sleeping`, `phone`, `push_name`, `qr_updated_at`, `connected_at`, `disconnected_at`, `last_error`, `created_at`, `updated_at`) VALUES ('1', '1', 'disconnected', '0', NULL, NULL, '2026-10-13 11:14:52', NULL, '2026-10-13 14:51:02', 'QR refs attempts ended', '2026-06-02 12:46:18', '2026-10-13 14:51:02');
-INSERT INTO `whatsapp_sessions` (`id`, `user_id`, `status`, `sleeping`, `phone`, `push_name`, `qr_updated_at`, `connected_at`, `disconnected_at`, `last_error`, `created_at`, `updated_at`) VALUES ('8', '9', 'connected', '0', '917491954139', 'Assist Group', NULL, '2026-10-13 12:41:58', NULL, NULL, '2026-10-13 14:27:12', '2026-10-13 16:11:58');
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -20,7 +20,7 @@ $apiUrl = 'http://localhost/wa/public/api/send.php';
 // $apiUrl = 'https://whatsapp-api-xepo.onrender.com/api/send.php';
 
 // Your API Key from Dashboard -> API Keys
-$apiKey = 'wa_live_671e8845f7b671e32922c05079c8d423298fd0aa79b9dfc6';
+$apiKey = 'wa_live_YOUR_ACTUAL_API_KEY_HERE';
 
 // Recipient phone number with country code (e.g., 919876543210 for India)
 $recipientPhone = '919876543210';
