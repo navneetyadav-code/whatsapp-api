@@ -151,24 +151,34 @@ function api_key_ip_allowed(array $apiKey, string $ip): bool
 
 function client_ip(): string
 {
-    $headers = [
-        'HTTP_X_FORWARDED_FOR',
-        'HTTP_CLIENT_IP',
-        'HTTP_X_REAL_IP',
-        'REMOTE_ADDR'
-    ];
+    $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
 
-    foreach ($headers as $header) {
-        if (!empty($_SERVER[$header])) {
-            // X-Forwarded-For can contain a comma-separated list of IPs. The first one is the client.
-            $ips = explode(',', $_SERVER[$header]);
-            $ip = trim($ips[0]);
-            
-            if (filter_var($ip, FILTER_VALIDATE_IP)) {
-                return $ip;
+    // Only inspect reverse-proxy headers if the direct connecting socket is a trusted proxy or loopback
+    $isProxy = in_array($remote, ['127.0.0.1', '::1'], true)
+        || str_starts_with($remote, '10.')
+        || str_starts_with($remote, '172.')
+        || str_starts_with($remote, '192.168.');
+
+    if ($isProxy) {
+        $headers = [
+            'HTTP_CF_CONNECTING_IP',
+            'HTTP_X_REAL_IP',
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_CLIENT_IP',
+        ];
+
+        foreach ($headers as $header) {
+            if (!empty($_SERVER[$header])) {
+                // X-Forwarded-For can contain a comma-separated list of IPs. The first one is the client.
+                $ips = explode(',', (string) $_SERVER[$header]);
+                $ip = trim($ips[0]);
+
+                if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip;
+                }
             }
         }
     }
 
-    return (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+    return $remote;
 }
