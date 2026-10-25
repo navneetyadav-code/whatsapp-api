@@ -125,16 +125,95 @@ function cancel_message(int $userId, int $messageId): void
     $stmt->execute([$messageId, $userId]);
 }
 
+function is_recipient_suppressed(int $userId, string $phone): bool
+{
+    $clean = preg_replace('/\D/', '', $phone);
+    if ($clean === '' || $userId <= 0) {
+        return false;
+    }
+    $pdo = Database::pdo();
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT 1 FROM recipient_suppressions 
+             WHERE user_id = ? AND (normalized_phone = ? OR phone = ?)
+             LIMIT 1'
+        );
+        $stmt->execute([$userId, $clean, $phone]);
+        return (bool) $stmt->fetchColumn();
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+function suppress_recipient(int $userId, string $phone, string $reason = 'opt_out', string $source = 'keyword'): bool
+{
+    $clean = preg_replace('/\D/', '', $phone);
+    if ($clean === '' || $userId <= 0) {
+        return false;
+    }
+    $pdo = Database::pdo();
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO recipient_suppressions (user_id, phone, normalized_phone, reason, source)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE reason = VALUES(reason), source = VALUES(source)'
+        );
+        $stmt->execute([$userId, $phone, $clean, $reason, $source]);
+
+        // Also update contacts table if present
+        $updateContact = $pdo->prepare('UPDATE contacts SET opt_in = 0 WHERE user_id = ? AND (phone = ? OR normalized_phone = ?)');
+        $updateContact->execute([$userId, $phone, $clean]);
+
+        // Cancel any pending queued messages to this recipient
+        $cancelQueue = $pdo->prepare(
+            "UPDATE message_queue
+             SET status = 'cancelled', error_message = 'Recipient opted out / suppressed'
+             WHERE user_id = ? AND status = 'queued' AND (recipient = ? OR normalized_recipient = ?)"
+        );
+        $cancelQueue->execute([$userId, $phone, $clean]);
+
+        return true;
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+function unsuppress_recipient(int $userId, string $phone): bool
+{
+    $clean = preg_replace('/\D/', '', $phone);
+    if ($clean === '' || $userId <= 0) {
+        return false;
+    }
+    $pdo = Database::pdo();
+    try {
+        $stmt = $pdo->prepare('DELETE FROM recipient_suppressions WHERE user_id = ? AND (normalized_phone = ? OR phone = ?)');
+        $stmt->execute([$userId, $clean, $phone]);
+
+        $updateContact = $pdo->prepare('UPDATE contacts SET opt_in = 1 WHERE user_id = ? AND (phone = ? OR normalized_phone = ?)');
+        $updateContact->execute([$userId, $phone, $clean]);
+
+        return true;
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
 function create_campaign(int $userId, string $name, string $template): int
 {
-    $pdo = Database::pdo();
     $contacts = opted_in_contacts($userId);
-
     return create_campaign_for_contacts($userId, $name, $template, $contacts);
 }
 
 function create_campaign_for_contacts(int $userId, string $name, string $template, array $contacts): int
 {
+    if ($userId <= 0) {
+        throw new InvalidArgumentException('Invalid user ID.');
+    }
+    $template = trim($template);
+    if ($template === '') {
+        throw new InvalidArgumentException('Campaign template cannot be empty.');
+    }
+
     $pdo = Database::pdo();
     $pdo->beginTransaction();
     try {
@@ -145,42 +224,81 @@ function create_campaign_for_contacts(int $userId, string $name, string $templat
         $campaignId = (int) $pdo->lastInsertId();
 
         $queued = 0;
-        foreach ($contacts as $contact) {
-            $body = apply_contact_template($template, $contact);
-            $queue = $pdo->prepare(
-                'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
-                 VALUES (?, NULL, ?, "text", ?, ?, 1)'
-            );
-            $queue->execute([
-                $userId,
-                $contact['phone'],
-                $body,
-                json_encode([
-                    'source' => 'campaign',
-                    'campaign_id' => $campaignId,
-                    'contact_id' => (int) $contact['id'],
-                    'type' => 'text',
-                ], JSON_UNESCAPED_SLASHES),
-            ]);
-            $queued++;
+        $batchSize = 250;
+        $chunks = array_chunk($contacts, $batchSize);
+
+        foreach ($chunks as $chunk) {
+            foreach ($chunk as $contact) {
+                $recipientPhone = (string) ($contact['phone'] ?? '');
+                if ($recipientPhone === '') {
+                    continue;
+                }
+
+                // Check suppression at campaign creation boundary
+                if (is_recipient_suppressed($userId, $recipientPhone)) {
+                    continue;
+                }
+
+                $body = apply_contact_template($template, $contact);
+                $queue = $pdo->prepare(
+                    'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
+                     VALUES (?, NULL, ?, "text", ?, ?, 1)'
+                );
+                $queue->execute([
+                    $userId,
+                    $recipientPhone,
+                    $body,
+                    json_encode([
+                        'source' => 'campaign',
+                        'campaign_id' => $campaignId,
+                        'contact_id' => (int) ($contact['id'] ?? 0),
+                        'type' => 'text',
+                    ], JSON_UNESCAPED_SLASHES),
+                ]);
+                $queued++;
+            }
         }
 
         $pdo->prepare('UPDATE campaigns SET queued_count = ?, status = ? WHERE id = ?')
             ->execute([$queued, $queued > 0 ? 'queued' : 'completed', $campaignId]);
         $pdo->commit();
 
+        try {
+            worker_request('POST', 'queue/notify', ['user_id' => $userId], 1);
+        } catch (\Throwable $e) {
+        }
+
         return $campaignId;
-    } catch (Throwable $exception) {
-        $pdo->rollBack();
+    } catch (\Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         throw $exception;
     }
 }
 
 function opted_in_contacts(int $userId): array
 {
-    $stmt = Database::pdo()->prepare('SELECT * FROM contacts WHERE user_id = ? AND opt_in = 1 ORDER BY id ASC');
-    $stmt->execute([$userId]);
-    return $stmt->fetchAll();
+    $pdo = Database::pdo();
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT c.* FROM contacts c
+             WHERE c.user_id = ? AND c.opt_in = 1
+               AND NOT EXISTS (
+                   SELECT 1 FROM recipient_suppressions s
+                   WHERE s.user_id = c.user_id
+                     AND (s.normalized_phone = c.normalized_phone OR s.phone = c.phone)
+               )
+             ORDER BY c.id ASC'
+        );
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll();
+    } catch (\Throwable $e) {
+        // Fallback if migration 003 is pending
+        $fallback = $pdo->prepare('SELECT * FROM contacts WHERE user_id = ? AND opt_in = 1 ORDER BY id ASC');
+        $fallback->execute([$userId]);
+        return $fallback->fetchAll();
+    }
 }
 
 function apply_contact_template(string $template, array $contact): string
@@ -229,7 +347,7 @@ function cancel_campaign(int $userId, int $campaignId): void
     try {
         $stmt = $pdo->prepare(
             "UPDATE message_queue
-             SET status = 'cancelled'
+             SET status = 'cancelled', error_message = 'Campaign cancelled by user'
              WHERE user_id = ?
                AND status = 'queued'
                AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.source')) = 'campaign'
@@ -237,15 +355,30 @@ function cancel_campaign(int $userId, int $campaignId): void
         );
         $stmt->execute([$userId, $campaignId]);
 
-        $status = $stmt->rowCount() > 0 ? 'cancelled' : 'completed';
         $pdo->prepare('UPDATE campaigns SET status = ? WHERE id = ? AND user_id = ?')
-            ->execute([$status, $campaignId, $userId]);
+            ->execute(['cancelled', $campaignId, $userId]);
 
         $pdo->commit();
-    } catch (Throwable $exception) {
-        $pdo->rollBack();
+    } catch (\Throwable $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         throw $exception;
     }
+}
+
+function pause_campaign(int $userId, int $campaignId): void
+{
+    $pdo = Database::pdo();
+    $pdo->prepare("UPDATE campaigns SET status = 'paused' WHERE id = ? AND user_id = ? AND status = 'queued'")
+        ->execute([$campaignId, $userId]);
+}
+
+function resume_campaign(int $userId, int $campaignId): void
+{
+    $pdo = Database::pdo();
+    $pdo->prepare("UPDATE campaigns SET status = 'queued' WHERE id = ? AND user_id = ? AND status = 'paused'")
+        ->execute([$campaignId, $userId]);
 }
 
 function campaign_contacts(int $userId, int $campaignId): array
@@ -310,6 +443,11 @@ function sync_campaign_statuses(int $userId): void
         $activeMessages = (int) ($row['active_messages'] ?? 0);
         $cancelledMessages = (int) ($row['cancelled_messages'] ?? 0);
         $currentStatus = (string) ($row['campaign_status'] ?? 'queued');
+
+        // Do not alter paused or cancelled states if explicitly set
+        if ($currentStatus === 'paused' || $currentStatus === 'cancelled') {
+            continue;
+        }
 
         if ($activeMessages > 0) {
             $nextStatus = 'queued';

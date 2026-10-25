@@ -79,6 +79,145 @@ if (APP_ENV === 'production' && (WORKER_TOKEN.length < 32 || WORKER_TOKEN === 'c
 
 mkdirSync(SESSION_DIR, { recursive: true });
 
+function createMemoryCache(maxEntries = 2000, ttlMs = 15 * 60 * 1000) {
+  const store = new Map();
+  return {
+    get(key) {
+      const item = store.get(key);
+      if (!item) return undefined;
+      if (Date.now() > item.expiresAt) {
+        store.delete(key);
+        return undefined;
+      }
+      return item.value;
+    },
+    set(key, value) {
+      if (store.size >= maxEntries) {
+        const oldestKey = store.keys().next().value;
+        store.delete(oldestKey);
+      }
+      store.set(key, { value, expiresAt: Date.now() + ttlMs });
+    },
+    del(key) {
+      store.delete(key);
+    },
+    flushAll() {
+      store.clear();
+    }
+  };
+}
+
+const msgRetryCounterCache = createMemoryCache(2000, 15 * 60 * 1000);
+const memoryMessageStore = new Map();
+const MAX_MEMORY_MESSAGE_STORE = 2000;
+const recipientLookupCache = new Map();
+const recipientLookupInFlight = new Map();
+const MAX_LOOKUP_CACHE_SIZE = 5000;
+const chatbotReplyTracker = new Map();
+
+async function storeBaileysMessage(userId, remoteJid, messageId, fromMe, participant, messageProto) {
+  if (!messageId || !messageProto) return;
+  try {
+    if (memoryMessageStore.size >= MAX_MEMORY_MESSAGE_STORE) {
+      const oldestKey = memoryMessageStore.keys().next().value;
+      memoryMessageStore.delete(oldestKey);
+    }
+    memoryMessageStore.set(messageId, messageProto);
+
+    const dataStr = JSON.stringify(messageProto);
+    await db.execute(
+      `INSERT INTO baileys_message_store (user_id, remote_jid, message_id, from_me, participant, message_data)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE message_data = VALUES(message_data)`,
+      [userId, remoteJid, messageId, fromMe ? 1 : 0, participant || null, dataStr]
+    );
+  } catch (err) {
+    logger.warn({ err: err.message, messageId }, 'Could not persist message to baileys_message_store');
+  }
+}
+
+async function getBaileysMessage(key) {
+  if (!key?.id) return undefined;
+  if (memoryMessageStore.has(key.id)) {
+    return memoryMessageStore.get(key.id);
+  }
+
+  try {
+    const [rows] = await db.execute(
+      'SELECT message_data FROM baileys_message_store WHERE message_id = ? AND remote_jid = ? LIMIT 1',
+      [key.id, key.remoteJid || '']
+    );
+    if (rows && rows[0]?.message_data) {
+      return typeof rows[0].message_data === 'string' ? JSON.parse(rows[0].message_data) : rows[0].message_data;
+    }
+
+    const [queueRows] = await db.execute(
+      'SELECT body FROM message_queue WHERE provider_message_id = ? LIMIT 1',
+      [key.id]
+    );
+    if (queueRows && queueRows[0]?.body) {
+      return { conversation: String(queueRows[0].body) };
+    }
+  } catch (err) {
+    logger.warn({ err: err.message, keyId: key.id }, 'Error retrieving message in getMessage');
+  }
+  return undefined;
+}
+
+async function verifyRecipientLookup(sock, recipientJid, cleanPhone) {
+  const cacheKey = cleanPhone || recipientJid;
+  const cached = recipientLookupCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached;
+  }
+
+  if (recipientLookupInFlight.has(cacheKey)) {
+    return await recipientLookupInFlight.get(cacheKey);
+  }
+
+  const lookupPromise = (async () => {
+    try {
+      const matches = await sock.onWhatsApp(recipientJid);
+      const match = Array.isArray(matches) ? matches.find((m) => m.exists) : null;
+      const result = {
+        exists: Boolean(match),
+        jid: match?.jid || recipientJid,
+        transientError: false,
+        expiresAt: Date.now() + (match ? 24 * 3600 * 1000 : 15 * 60 * 1000)
+      };
+
+      if (recipientLookupCache.size >= MAX_LOOKUP_CACHE_SIZE) {
+        const oldest = recipientLookupCache.keys().next().value;
+        recipientLookupCache.delete(oldest);
+      }
+      recipientLookupCache.set(cacheKey, result);
+      return result;
+    } catch (err) {
+      logger.warn({ err: err.message, recipientJid }, 'onWhatsApp upstream query error; treating as transient');
+      return { exists: true, jid: recipientJid, transientError: true, expiresAt: Date.now() + 60000 };
+    } finally {
+      recipientLookupInFlight.delete(cacheKey);
+    }
+  })();
+
+  recipientLookupInFlight.set(cacheKey, lookupPromise);
+  return await lookupPromise;
+}
+
+async function isRecipientSuppressedInDb(userId, normalizedRecipient) {
+  if (!normalizedRecipient) return false;
+  try {
+    const [rows] = await db.execute(
+      'SELECT 1 FROM recipient_suppressions WHERE user_id = ? AND (normalized_phone = ? OR phone = ?) LIMIT 1',
+      [userId, normalizedRecipient, normalizedRecipient]
+    );
+    return Boolean(rows && rows.length > 0);
+  } catch (err) {
+    logger.warn({ err: err.message, userId, normalizedRecipient }, 'Failed to check recipient suppression');
+    return false;
+  }
+}
+
 function databaseOptions() {
   const options = {
     host: process.env.DB_HOST || '127.0.0.1',
@@ -541,7 +680,8 @@ async function startSession(userId, force = false, waitForReady = true) {
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
-      getMessage: async () => undefined,
+      getMessage: async (key) => await getBaileysMessage(key),
+      msgRetryCounterCache,
       ...(version ? { version } : {})
     });
 
@@ -940,9 +1080,80 @@ function normalizeInboundMessage(userId, msg, session = {}) {
             message: norm.payload
           }, norm.messageId);
 
-          // 4. Chatbot rule processing for text messages
+          // 4. Persist message representation for Signal retry handling
+          if (msg.key?.id && msg.message) {
+            await storeBaileysMessage(userId, msg.key.remoteJid, msg.key.id, Boolean(msg.key.fromMe), msg.key.participant, msg.message);
+          }
+
+          // 5. Inbound Consent / Opt-Out & Opt-In keyword processing
+          const rawText = (norm.body || '').trim().toLowerCase();
+          const OPT_OUT_KEYWORDS = ['stop', 'unsubscribe', 'opt out', 'optout', 'cancel', 'quit', 'arretez', 'alto'];
+          const OPT_IN_KEYWORDS = ['start', 'unstop', 'subscribe', 'commencer'];
+
+          if (OPT_OUT_KEYWORDS.includes(rawText)) {
+            const senderDigits = norm.remoteJid ? norm.remoteJid.split('@')[0].replace(/\D/g, '') : '';
+            if (senderDigits) {
+              try {
+                await db.execute(
+                  `INSERT INTO recipient_suppressions (user_id, phone, normalized_phone, reason, source)
+                   VALUES (?, ?, ?, 'opt_out', 'inbound_stop')
+                   ON DUPLICATE KEY UPDATE reason = VALUES(reason), source = VALUES(source)`,
+                  [userId, senderDigits, senderDigits]
+                );
+                await db.execute(
+                  'UPDATE contacts SET opt_in = 0 WHERE user_id = ? AND (phone = ? OR normalized_phone = ?)',
+                  [userId, senderDigits, senderDigits]
+                );
+                await db.execute(
+                  `UPDATE message_queue
+                   SET status = 'cancelled', error_message = 'Recipient opted out via inbound keyword'
+                   WHERE user_id = ? AND status = 'queued' AND (recipient = ? OR normalized_recipient = ?)`,
+                  [userId, senderDigits, senderDigits]
+                );
+                logger.info({ userId, phone: senderDigits }, 'Processed inbound opt-out command');
+              } catch (err) {
+                logger.error({ err: err.message, userId }, 'Failed to record inbound opt-out');
+              }
+            }
+            continue; // Do NOT evaluate chatbot rules on opt-out commands
+          }
+
+          if (OPT_IN_KEYWORDS.includes(rawText)) {
+            const senderDigits = norm.remoteJid ? norm.remoteJid.split('@')[0].replace(/\D/g, '') : '';
+            if (senderDigits) {
+              try {
+                await db.execute(
+                  'DELETE FROM recipient_suppressions WHERE user_id = ? AND (normalized_phone = ? OR phone = ?)',
+                  [userId, senderDigits, senderDigits]
+                );
+                await db.execute(
+                  'UPDATE contacts SET opt_in = 1 WHERE user_id = ? AND (phone = ? OR normalized_phone = ?)',
+                  [userId, senderDigits, senderDigits]
+                );
+                logger.info({ userId, phone: senderDigits }, 'Processed inbound opt-in command');
+              } catch (err) {
+                logger.error({ err: err.message, userId }, 'Failed to record inbound opt-in');
+              }
+            }
+            continue;
+          }
+
+          // 6. Chatbot rule processing for text messages with loop protection
           const text = norm.body || '';
           if (!text.trim()) continue;
+
+          // Chatbot loop protection: maximum 3 auto-replies per 5-minute window
+          const chatbotCooldownKey = `${userId}:${msg.key.remoteJid}`;
+          const nowTs = Date.now();
+          const tracker = chatbotReplyTracker.get(chatbotCooldownKey) || { count: 0, resetAt: nowTs + 300000 };
+          if (nowTs > tracker.resetAt) {
+            tracker.count = 0;
+            tracker.resetAt = nowTs + 300000;
+          }
+          if (tracker.count >= 3) {
+            logger.warn({ userId, remoteJid: msg.key.remoteJid }, 'Chatbot reply rate limit exceeded; skipping to prevent loops');
+            continue;
+          }
 
           const [rules] = await db.execute('SELECT * FROM chatbot_rules WHERE user_id = ? AND status = "active"', [userId]);
           if (!rules || rules.length === 0) continue;
@@ -963,6 +1174,9 @@ function normalizeInboundMessage(userId, msg, session = {}) {
           }
 
           if (matchedRule) {
+            tracker.count += 1;
+            chatbotReplyTracker.set(chatbotCooldownKey, tracker);
+
             const payload = JSON.stringify({ source: 'chatbot', rule_id: matchedRule.id, type: 'text' });
             await db.execute(
               `INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority) VALUES (?, NULL, ?, 'text', ?, ?, 5)`,
@@ -1263,7 +1477,29 @@ async function sendQueuedMessage(message) {
     session.wasSleeping = true;
   }
 
-  await new Promise((resolve) => setTimeout(resolve, SEND_DELAY_MS));
+  // 1. Guard against cancelled jobs
+  const [currentQueueStatus] = await db.execute('SELECT status FROM message_queue WHERE id = ? LIMIT 1', [message.id]);
+  if (currentQueueStatus && currentQueueStatus[0]?.status === 'cancelled') {
+    logger.info({ messageId: message.id }, 'Message was cancelled while awaiting dispatch; aborting send.');
+    return;
+  }
+
+  // 2. Guard against cancelled or paused campaigns
+  if (payload?.campaign_id) {
+    const [campRows] = await db.execute('SELECT status FROM campaigns WHERE id = ? LIMIT 1', [payload.campaign_id]);
+    if (campRows && campRows[0]) {
+      if (campRows[0].status === 'cancelled') {
+        logger.info({ messageId: message.id, campaignId: payload.campaign_id }, 'Campaign was cancelled; aborting message send.');
+        await db.execute('UPDATE message_queue SET status = "cancelled", error_message = "Campaign was cancelled" WHERE id = ?', [message.id]);
+        return;
+      }
+      if (campRows[0].status === 'paused') {
+        logger.info({ messageId: message.id, campaignId: payload.campaign_id }, 'Campaign is paused; deferring message send.');
+        await db.execute('UPDATE message_queue SET status = "queued", locked_at = NULL, locked_by = NULL, available_at = DATE_ADD(NOW(), INTERVAL 30 SECOND) WHERE id = ?', [message.id]);
+        return;
+      }
+    }
+  }
 
   const recipient = normalizeRecipient(message.recipient);
   if (!recipient.jid) {
@@ -1271,15 +1507,24 @@ async function sendQueuedMessage(message) {
     return;
   }
 
+  // 3. Final dispatch boundary consent / suppression check
+  const isSuppressed = await isRecipientSuppressedInDb(message.user_id, recipient.normalizedTo);
+  if (isSuppressed) {
+    logger.warn({ userId: message.user_id, recipient: recipient.normalizedTo }, 'Recipient is suppressed or opted out; cancelling message.');
+    await markMessageFailed(message, 'Recipient opted out or suppressed.', recipient.normalizedTo);
+    return;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, SEND_DELAY_MS));
+
   if (!recipient.isGroup && !recipient.isLid && typeof session.sock.onWhatsApp === 'function') {
-    const matches = await session.sock.onWhatsApp(recipient.jid);
-    const match = Array.isArray(matches) ? matches.find((m) => m.exists) : null;
-    if (!match) {
+    const verified = await verifyRecipientLookup(session.sock, recipient.jid, recipient.normalizedTo);
+    if (!verified.exists && !verified.transientError) {
       await markMessageFailed(message, `The number ${recipient.normalizedTo} is not registered on WhatsApp.`, recipient.normalizedTo);
       return;
     }
-    if (match.jid) {
-      recipient.jid = match.jid;
+    if (verified.jid) {
+      recipient.jid = verified.jid;
     }
 
     // "Humanized Delivery" Presence & Delay
@@ -1350,6 +1595,9 @@ async function sendQueuedMessage(message) {
     let result;
     try {
       result = await session.sock.sendMessage(recipient.jid, outgoingMessage);
+      if (result?.key?.id && result?.message) {
+        await storeBaileysMessage(message.user_id, recipient.jid, result.key.id, true, null, result.message);
+      }
     } finally {
       session.activeOperations = Math.max(0, (session.activeOperations || 1) - 1);
       session.lastActivityAt = Date.now();
@@ -1871,12 +2119,22 @@ app.post('/sessions/:userId/send', async (req, res) => {
     return;
   }
 
+  // 1. Consent and suppression boundary check
+  const isSuppressed = await isRecipientSuppressedInDb(req.params.userId, recipient.normalizedTo);
+  if (isSuppressed) {
+    res.status(403).json({
+      ok: false,
+      error: `The recipient ${recipient.normalizedTo} is suppressed or opted out.`,
+      normalizedTo: recipient.normalizedTo
+    });
+    return;
+  }
+
   try {
     if (!recipient.isGroup && !recipient.isLid && typeof session.sock.onWhatsApp === 'function') {
-      const matches = await session.sock.onWhatsApp(recipient.jid);
-      const match = Array.isArray(matches) ? matches.find((m) => m.exists) : null;
+      const verified = await verifyRecipientLookup(session.sock, recipient.jid, recipient.normalizedTo);
 
-      if (!match) {
+      if (!verified.exists && !verified.transientError) {
         res.status(404).json({
           ok: false,
           error: `The number ${recipient.normalizedTo} is not registered on WhatsApp.`,
@@ -1884,13 +2142,48 @@ app.post('/sessions/:userId/send', async (req, res) => {
         });
         return;
       }
-      if (match.jid) {
-        recipient.jid = match.jid;
+      if (verified.jid) {
+        recipient.jid = verified.jid;
       }
     }
 
-    const result = await session.sock.sendMessage(recipient.jid, { text: message });
-    res.json({ ok: true, messageId: result?.key?.id || null, normalizedTo: recipient.normalizedTo });
+    // 2. Centralized dispatch pipeline integration: record job in message_queue with priority 10
+    const payload = JSON.stringify({ source: 'direct_send', type: 'text' });
+    const [insertResult] = await db.execute(
+      `INSERT INTO message_queue (user_id, api_key_id, recipient, normalized_recipient, message_type, body, payload, priority, status)
+       VALUES (?, NULL, ?, ?, 'text', ?, ?, 10, 'processing')`,
+      [req.params.userId, recipient.jid, recipient.normalizedTo, message, payload]
+    );
+    const queueId = insertResult.insertId;
+
+    session.activeOperations = (session.activeOperations || 0) + 1;
+    session.lastActivityAt = Date.now();
+    let result;
+    try {
+      result = await session.sock.sendMessage(recipient.jid, { text: message });
+      if (result?.key?.id && result?.message) {
+        await storeBaileysMessage(req.params.userId, recipient.jid, result.key.id, true, null, result.message);
+      }
+    } finally {
+      session.activeOperations = Math.max(0, (session.activeOperations || 1) - 1);
+      session.lastActivityAt = Date.now();
+    }
+
+    const providerMessageId = result?.key?.id || null;
+    await db.execute(
+      `UPDATE message_queue
+       SET status = 'sent', provider_message_id = ?, sent_at = NOW(), locked_at = NULL, locked_by = NULL
+       WHERE id = ?`,
+      [providerMessageId, queueId]
+    );
+
+    await db.execute(
+      `INSERT INTO message_logs (user_id, recipient, message_preview, status, provider_response)
+       VALUES (?, ?, ?, 'sent', ?)`,
+      [req.params.userId, recipient.normalizedTo, String(message).slice(0, 255), JSON.stringify({ ok: true, messageId: providerMessageId })]
+    );
+
+    res.json({ ok: true, messageId: providerMessageId, queueId, normalizedTo: recipient.normalizedTo });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message, normalizedTo: recipient.normalizedTo });
   }
