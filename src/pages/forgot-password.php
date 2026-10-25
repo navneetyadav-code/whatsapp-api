@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $waitLeft = max(1, (int) $activeCooldown['rem_sec'] - (14 * 60));
             json_response([
                 'ok' => false, 
-                'error' => "Please wait ${waitLeft} seconds before requesting a new OTP.",
+                'error' => "Please wait {$waitLeft} seconds before requesting a new OTP.",
                 'cooldown' => $waitLeft
             ], 429);
         }
@@ -221,7 +221,7 @@ It expires in 15 minutes.";
             }
 
             $remaining = max(1, 5 - $failedCount);
-            json_response(['ok' => false, 'error' => "Invalid or expired OTP. ${remaining} attempts remaining."], 400);
+            json_response(['ok' => false, 'error' => "Invalid or expired OTP. {$remaining} attempts remaining."], 400);
         }
 
         $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE email = ?");
