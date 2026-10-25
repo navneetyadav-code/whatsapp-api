@@ -133,8 +133,10 @@ return [
         'port' => (int) config_env('SMTP_PORT', '587'),
         'user' => config_env('SMTP_USER', ''),
         'pass' => config_env('SMTP_PASS', ''),
-        'from' => config_env('SMTP_FROM', 'noreply@localhost'),
+        'from' => config_env('SMTP_FROM', config_env('BREVO_SENDER_EMAIL', config_env('SMTP_USER', 'noreply@localhost'))),
         'from_name' => config_env('SMTP_FROM_NAME', 'WhatsGateway'),
+        'brevo_api_key' => config_env('BREVO_API_KEY', ''),
+        'resend_api_key' => config_env('RESEND_API_KEY', ''),
     ],
     'google' => [
         'client_id' => config_env('GOOGLE_CLIENT_ID', ''),

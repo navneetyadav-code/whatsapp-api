@@ -335,13 +335,97 @@ function seo_meta(?string $page): array {
     return $defaults;
 }
 
+function send_brevo_api_email(string $apiKey, string $from, string $fromName, string $to, string $subject, string $body): bool
+{
+    $payload = [
+        'sender' => ['name' => $fromName, 'email' => $from],
+        'to' => [['email' => $to]],
+        'subject' => $subject,
+        'textContent' => $body,
+    ];
+
+    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER => [
+            'api-key: ' . $apiKey,
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    if ($error || $httpCode < 200 || $httpCode >= 300) {
+        error_log("Brevo API Email Failed: HTTP {$httpCode} - {$response} ({$error})");
+        return false;
+    }
+
+    return true;
+}
+
+function send_resend_api_email(string $apiKey, string $from, string $to, string $subject, string $body): bool
+{
+    $payload = [
+        'from' => $from,
+        'to' => [$to],
+        'subject' => $subject,
+        'text' => $body,
+    ];
+
+    $ch = curl_init('https://api.resend.com/emails');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $apiKey,
+            'Content-Type: application/json',
+        ],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 10,
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    if ($error || $httpCode < 200 || $httpCode >= 300) {
+        error_log("Resend API Email Failed: HTTP {$httpCode} - {$response} ({$error})");
+        return false;
+    }
+
+    return true;
+}
+
 function send_smtp_email(string $to, string $subject, string $body): bool {
+    $resendKey = trim((string) (app_config('smtp.resend_api_key') ?: getenv('RESEND_API_KEY') ?: ''));
+    $brevoKey = trim((string) (app_config('smtp.brevo_api_key') ?: getenv('BREVO_API_KEY') ?: ''));
+    $user = trim((string) app_config('smtp.user'));
+    $from = trim((string) (app_config('smtp.from') ?: ''));
+    if ($from === '' || str_ends_with($from, '@localhost')) {
+        $from = ($user !== '' && filter_var($user, FILTER_VALIDATE_EMAIL)) ? $user : 'info.assistgroupofficial@gmail.com';
+    }
+    $fromName = trim((string) (app_config('smtp.from_name') ?: 'WhatsGateway'));
+
+    if ($resendKey !== '') {
+        $resendFrom = (str_contains($from, '@resend.dev') || !str_ends_with($from, '@gmail.com')) ? "{$fromName} <{$from}>" : "WhatsGateway <onboarding@resend.dev>";
+        return send_resend_api_email($resendKey, $resendFrom, $to, $subject, $body);
+    }
+
+    if ($brevoKey !== '') {
+        return send_brevo_api_email($brevoKey, $from, $fromName, $to, $subject, $body);
+    }
+
     $host = app_config('smtp.host');
     $port = (int) (app_config('smtp.port') ?: 587);
-    $user = trim((string) app_config('smtp.user'));
     $pass = str_replace([' ', '-', "\t", "\r", "\n"], '', trim((string) app_config('smtp.pass')));
-    $from = trim((string) (app_config('smtp.from') ?: $user));
-    $fromName = trim((string) (app_config('smtp.from_name') ?: 'WhatsGateway'));
 
     if (!$host) {
         error_log("SMTP Error: No SMTP host configured.");
