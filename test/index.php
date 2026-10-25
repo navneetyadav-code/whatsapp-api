@@ -28,15 +28,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // SSRF Protection: Validate target API URL and media URL
     $targetHost = strtolower((string) (parse_url($apiUrl, PHP_URL_HOST) ?? ''));
+    $cleanTargetHost = trim($targetHost, '[]');
     $targetScheme = strtolower((string) (parse_url($apiUrl, PHP_URL_SCHEME) ?? ''));
     $isLocal = is_local_request();
 
     $isDisallowed = !filter_var($apiUrl, FILTER_VALIDATE_URL)
         || !in_array($targetScheme, ['http', 'https'], true)
-        || $targetHost === ''
-        || str_starts_with($targetHost, '169.254.')
-        || $targetHost === 'metadata.google.internal'
-        || (!$isLocal && (in_array($targetHost, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true) || is_private_ip(gethostbyname($targetHost))));
+        || $cleanTargetHost === ''
+        || str_starts_with($cleanTargetHost, '169.254.')
+        || $cleanTargetHost === 'metadata.google.internal'
+        || (!$isLocal && (in_array($cleanTargetHost, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true) || is_private_ip(gethostbyname($cleanTargetHost))));
 
     if ($isDisallowed) {
         $result = [
@@ -84,13 +85,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $response = curl_exec($ch);
             $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $primaryIp = (string) curl_getinfo($ch, CURLINFO_PRIMARY_IP);
             $curlError = curl_error($ch);
             curl_close($ch);
 
-            $result = [
+            if (!$isLocal && $primaryIp !== '' && is_private_ip($primaryIp)) {
+                $result = [
+                    'code' => 400,
+                    'response' => ['ok' => false, 'error' => 'API endpoint resolved to a restricted IP address.'],
+                ];
+            } else {
+                $result = [
                 'code' => $httpCode ?: 500,
                 'response' => json_decode((string) $response, true) ?: ($curlError ?: $response),
             ];
+            }
         }
     }
 }

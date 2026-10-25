@@ -8,7 +8,7 @@ import dns from 'dns/promises';
 import net from 'net';
 import { existsSync, mkdirSync, readFileSync, statSync } from 'fs';
 import { rm } from 'fs/promises';
-import { dirname, join, resolve } from 'path';
+import { basename, dirname, join, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import makeWASocket, {
   Browsers,
@@ -355,30 +355,62 @@ function normalizeRecipient(value) {
 }
 
 function isPrivateIp(ip) {
-  if (!net.isIP(ip)) {
+  let cleanIp = String(ip || '').trim().toLowerCase();
+  if (cleanIp.startsWith('[') && cleanIp.endsWith(']')) {
+    cleanIp = cleanIp.slice(1, -1);
+  }
+
+  if (!net.isIP(cleanIp)) {
     return true;
   }
 
-  if (ip === '127.0.0.1' || ip === '::1' || ip === '0.0.0.0') {
-    return true;
-  }
-
-  if (ip.startsWith('10.') || ip.startsWith('192.168.')) {
-    return true;
-  }
-
-  const parts = ip.split('.').map((part) => Number(part));
-  if (parts.length === 4) {
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
-      return true;
-    }
-    if (parts[0] === 169 && parts[1] === 254) {
-      return true;
+  // Handle IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1)
+  if (cleanIp.startsWith('::ffff:')) {
+    const v4 = cleanIp.slice(7);
+    if (net.isIPv4(v4)) {
+      return isPrivateIp(v4);
     }
   }
 
-  const normalized = ip.toLowerCase();
-  return normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe80:');
+  if (cleanIp === '::1' || cleanIp === '::' || cleanIp === '0.0.0.0') {
+    return true;
+  }
+
+  if (net.isIPv4(cleanIp)) {
+    const parts = cleanIp.split('.').map(Number);
+    if (parts.length !== 4 || parts.some((n) => isNaN(n) || n < 0 || n > 255)) {
+      return true;
+    }
+    // 0.0.0.0/8 (Broadcast/source)
+    if (parts[0] === 0) return true;
+    // 10.0.0.0/8 (Private)
+    if (parts[0] === 10) return true;
+    // 100.64.0.0/10 (Carrier-grade NAT / Shared)
+    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
+    // 127.0.0.0/8 (Loopback)
+    if (parts[0] === 127) return true;
+    // 169.254.0.0/16 (Link-local / Cloud metadata)
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    // 172.16.0.0/12 (Private)
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    // 192.168.0.0/16 (Private)
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    // 192.0.0.0/24 (IETF Protocol Assignments)
+    if (parts[0] === 192 && parts[1] === 0 && parts[2] === 0) return true;
+    // 198.18.0.0/15 (Benchmarking)
+    if (parts[0] === 198 && (parts[1] === 18 || parts[1] === 19)) return true;
+    // 224.0.0.0/4 (Multicast) & 240.0.0.0/4 (Reserved)
+    if (parts[0] >= 224) return true;
+
+    return false;
+  }
+
+  // IPv6 unique local (fc00::/7)
+  if (cleanIp.startsWith('fc') || cleanIp.startsWith('fd')) return true;
+  // IPv6 link-local (fe80::/10)
+  if (cleanIp.startsWith('fe8') || cleanIp.startsWith('fe9') || cleanIp.startsWith('fea') || cleanIp.startsWith('feb')) return true;
+
+  return false;
 }
 
 async function assertSafeWebhookUrl(targetUrl) {
@@ -466,7 +498,7 @@ async function startSession(userId, force = false, waitForReady = true) {
     throw new Error('Invalid user ID.');
   }
   const authDir = resolve(SESSION_DIR, `user_${cleanUserId}`);
-  if (!authDir.startsWith(SESSION_DIR)) {
+  if (authDir !== SESSION_DIR && !authDir.startsWith(SESSION_DIR + sep)) {
     throw new Error('Session directory path traversal detected.');
   }
   if (force) {
@@ -896,8 +928,7 @@ async function sendQueuedMessage(message) {
     const rawPath = String(attachment.path);
     const resolvedPath = resolve(rawPath);
     const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
-
-    if (!resolvedPath.startsWith(allowedUploadsDir)) {
+    if (resolvedPath !== allowedUploadsDir && !resolvedPath.startsWith(allowedUploadsDir + sep)) {
       logger.warn({ path: rawPath, resolvedPath }, 'Security alert: Attachment path is outside allowed uploads directory.');
       await markMessageFailed(message, 'Attachment path is invalid or restricted.', recipient.normalizedTo);
       return;
@@ -1025,7 +1056,9 @@ async function cleanupEphemeralMedia(message) {
     if (payload?.attachment?.is_temp && payload.attachment.path) {
       const resolvedPath = resolve(String(payload.attachment.path));
       const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
-      if (resolvedPath.startsWith(allowedUploadsDir) && existsSync(resolvedPath)) {
+      const isWithinUploads = resolvedPath === allowedUploadsDir || resolvedPath.startsWith(allowedUploadsDir + sep);
+      const fileBase = basename(resolvedPath);
+      if (isWithinUploads && fileBase !== '.htaccess' && !fileBase.startsWith('.') && existsSync(resolvedPath)) {
         await rm(resolvedPath, { force: true });
       }
     }
@@ -1177,7 +1210,7 @@ app.post('/sessions/:userId/logout', async (req, res) => {
   const session = getSession(req.params.userId);
   const cleanUserId = String(parseInt(String(req.params.userId), 10));
   const authDir = resolve(SESSION_DIR, `user_${cleanUserId}`);
-  if (!authDir.startsWith(SESSION_DIR)) {
+  if (authDir !== SESSION_DIR && !authDir.startsWith(SESSION_DIR + sep)) {
     res.status(400).json({ ok: false, error: 'Invalid session path.' });
     return;
   }

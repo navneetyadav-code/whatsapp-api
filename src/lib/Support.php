@@ -155,17 +155,73 @@ function request_json(): array
 
 function is_local_request(): bool
 {
-    $ip = client_ip();
-    return in_array($ip, ['127.0.0.1', '::1'], true) || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.');
+    $remoteAddr = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    $isDirectLoopback = in_array($remoteAddr, ['127.0.0.1', '::1'], true);
+
+    // If forwarded via reverse proxy, verify the originating client was also genuinely local
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $forwardedIps = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']);
+        $clientIp = trim($forwardedIps[0]);
+        if (!in_array($clientIp, ['127.0.0.1', '::1'], true) && !str_starts_with($clientIp, '192.168.') && !str_starts_with($clientIp, '10.')) {
+            return false;
+        }
+    }
+
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        $cfIp = trim((string) $_SERVER['HTTP_CF_CONNECTING_IP']);
+        if (!in_array($cfIp, ['127.0.0.1', '::1'], true) && !str_starts_with($cfIp, '192.168.') && !str_starts_with($cfIp, '10.')) {
+            return false;
+        }
+    }
+
+    return $isDirectLoopback || str_starts_with($remoteAddr, '192.168.') || str_starts_with($remoteAddr, '10.');
 }
 
 function is_private_ip(string $ip): bool
 {
+    $ip = trim($ip, '[]');
+
     if (!filter_var($ip, FILTER_VALIDATE_IP)) {
         return true;
     }
 
-    return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+    // Handle IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1)
+    if (str_starts_with(strtolower($ip), '::ffff:')) {
+        $v4 = substr($ip, 7);
+        if (filter_var($v4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return is_private_ip($v4);
+        }
+    }
+
+    if (in_array($ip, ['127.0.0.1', '::1', '0.0.0.0', '::'], true)) {
+        return true;
+    }
+
+    // Check standard private / reserved ranges
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+        return true;
+    }
+
+    // Additional check for CGNAT (100.64.0.0/10) and benchmarking (198.18.0.0/15)
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        $long = ip2long($ip);
+        if ($long !== false) {
+            // 100.64.0.0/10 (Carrier-Grade NAT / Shared Address Space)
+            if (($long & 0xFFC00000) === 0x64400000) {
+                return true;
+            }
+            // 198.18.0.0/15 (Benchmarking)
+            if (($long & 0xFFFE0000) === 0xC6120000) {
+                return true;
+            }
+            // 0.0.0.0/8
+            if (($long & 0xFF000000) === 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 function validate_webhook_url(?string $url): ?string
@@ -373,15 +429,16 @@ function assert_safe_media_url(string $url): string
         throw new InvalidArgumentException('Media URL must use HTTP or HTTPS.');
     }
 
-    if ($host === '' || in_array($host, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true) || str_ends_with($host, '.local')) {
+    $cleanHost = trim($host, '[]');
+    if ($cleanHost === '' || in_array($cleanHost, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true) || str_ends_with($cleanHost, '.local')) {
         throw new InvalidArgumentException('Media URL cannot point to localhost or loopback.');
     }
 
     $addresses = [];
-    if (filter_var($host, FILTER_VALIDATE_IP)) {
-        $addresses[] = $host;
+    if (filter_var($cleanHost, FILTER_VALIDATE_IP)) {
+        $addresses[] = $cleanHost;
     } else {
-        $records = dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
+        $records = dns_get_record($cleanHost, DNS_A | DNS_AAAA) ?: [];
         foreach ($records as $r) {
             $addr = $r['ip'] ?? $r['ipv6'] ?? null;
             if ($addr) {
@@ -450,8 +507,16 @@ function download_remote_media(string $url, int $maxBytes = 20971520): array
         $redirectUrl = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL);
         $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
         $curlError = curl_error($ch);
+        $primaryIp = (string) curl_getinfo($ch, CURLINFO_PRIMARY_IP);
         curl_close($ch);
         fclose($fp);
+
+        if ($primaryIp !== '' && is_private_ip($primaryIp)) {
+            if (file_exists($tmpPath)) {
+                unlink($tmpPath);
+            }
+            throw new RuntimeException('Media URL resolved to a private or reserved network IP address during connection.');
+        }
 
         if (in_array($httpCode, [301, 302, 303, 307, 308], true)) {
             if (file_exists($tmpPath)) {
