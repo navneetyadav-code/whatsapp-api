@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans antialiased min-h-screen flex overflow-x-hidden">
+<body class="bg-gray-50 text-gray-900 font-sans antialiased min-h-screen lg:h-screen lg:overflow-hidden flex flex-col lg:flex-row overflow-x-hidden">
 
     <!-- Left Promotional Panel (Hidden on mobile, 38% width on desktop) -->
     <div class="hidden lg:flex lg:w-[38%] bg-gradient-to-br from-brand-dark via-brand-wa_dark to-brand-wa_med p-10 flex-col justify-between relative overflow-hidden shadow-2xl z-10">
@@ -137,14 +137,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <!-- Middle Content -->
-        <div class="relative z-10 mb-12 mt-16">
-            <h1 class="text-4xl font-bold text-white leading-tight mb-5 tracking-tight">Connect.<br>Automate.<br>Grow.</h1>
-            <p class="text-white/80 text-sm leading-relaxed max-w-sm mb-10">
+        <div class="relative z-10 my-auto py-4">
+            <h1 class="text-3xl xl:text-4xl font-bold text-white leading-tight mb-3 xl:mb-4 tracking-tight">Connect.<br>Automate.<br>Grow.</h1>
+            <p class="text-white/80 text-xs xl:text-sm leading-relaxed max-w-sm mb-6 xl:mb-8">
                 Independent open-source WhatsApp automation gateway powered by Baileys. Self-hosted, lightweight, and customizable.
             </p>
             
             <!-- Compact Feature Highlights -->
-            <ul class="space-y-4">
+            <ul class="space-y-3">
                 <li class="flex items-center gap-3 text-sm font-medium text-white/90">
                     <div class="w-5 h-5 rounded-full bg-brand-wa_light/20 flex items-center justify-center text-brand-wa_light border border-brand-wa_light/30">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
@@ -168,86 +168,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Bottom Footer -->
         <div class="relative z-10 text-xs text-white/70 font-medium space-y-1">
-            <div>Made by <a href="https://github.com/navneetyadav-code" target="_blank" rel="noopener noreferrer" class="text-white hover:underline font-semibold">Navneet Kumar Yadav</a></div>
+            <div>Made by <a href="https://github.com/navneetyadav-code/whatsapp-api" target="_blank" rel="noopener noreferrer" class="text-white hover:underline font-semibold">Navneet Kumar Yadav</a></div>
             <div class="text-[11px] text-white/60">Takedown / Removal request: <a href="mailto:info.assistgroupofficial@gmail.com" class="text-white/80 hover:underline">info.assistgroupofficial@gmail.com</a></div>
             <div class="text-[10px] text-white/40 pt-1">Independent open-source project. Not affiliated with or endorsed by Meta or WhatsApp Inc.</div>
         </div>
     </div>
 
     <!-- Right Login Form Panel (62% width on desktop, 100% on mobile) -->
-    <div class="w-full lg:w-[62%] flex items-center justify-center p-6 sm:p-8 lg:p-12 relative">
+    <div class="w-full lg:w-[62%] h-full flex items-center justify-center p-4 sm:p-6 lg:p-4 xl:p-6 relative overflow-y-auto lg:overflow-hidden">
         
         <!-- Decorative subtle background on right side -->
         <div class="absolute inset-0 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:20px_20px] opacity-50 z-0"></div>
 
-        <div class="w-full max-w-[400px] bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-8 sm:p-10 z-10 relative">
+        <div class="w-full max-w-[400px] bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-6 sm:p-8 lg:py-5 lg:px-7 z-10 relative my-auto">
             
-            <!-- Logo inside form (for visual balance on desktop and main branding on mobile) -->
-            <div class="flex items-center gap-2 mb-8">
-                <svg class="w-6 h-6 text-brand-wa_light" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
-                </svg>
-                <span class="font-bold text-gray-900 tracking-tight lg:hidden">API Hub</span>
+            <!-- Logo inside form (mobile branding) -->
+            <div class="flex items-center gap-2 mb-4 lg:hidden">
+                <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-cover shadow-sm border border-gray-100">
+                <span class="font-bold text-gray-900 tracking-tight text-base">WhatsGateway</span>
             </div>
 
             <!-- Header -->
-            <div class="mb-7">
-                <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Create an Account</h2>
-                <p class="text-sm text-gray-500 mt-1.5 font-medium">Start building your WhatsApp API integration.</p>
+            <div class="mb-3">
+                <h2 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Create an Account</h2>
+                <p class="text-xs text-gray-500 mt-0.5 font-medium">Start building your WhatsApp API integration.</p>
             </div>
 
             <!-- Register Form -->
-            <form method="post" onsubmit="handleRegister(event)" class="space-y-4">
+            <form method="post" onsubmit="handleRegister(event)" class="space-y-2.5">
                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <?php foreach (flashes() as $flash): ?>
-                    <div class="p-3 text-sm rounded-xl <?= $flash['type'] === 'error' || $flash['type'] === 'danger' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700' ?>">
+                    <div class="p-2.5 text-xs rounded-xl <?= $flash['type'] === 'error' || $flash['type'] === 'danger' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700' ?>">
                         <?= e($flash['message']) ?>
                     </div>
                 <?php endforeach; ?>
                 <?php if ($error): ?>
-                    <div class="p-3 text-sm rounded-xl bg-red-50 text-red-700">
+                    <div class="p-2.5 text-xs rounded-xl bg-red-50 text-red-700">
                         <?= e($error) ?>
                     </div>
                 <?php endif; ?>
                 
                 <!-- Full Name Field -->
                 <div>
-                    <label for="fullName" class="block text-sm font-semibold text-gray-700 mb-1.5">Full Name</label>
+                    <label for="fullName" class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
                     <input type="text" id="fullName" name="name" 
-                           class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
+                           class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
                            placeholder="Navneet Yadav" 
                            required>
                 </div>
 
                 <!-- Email Field -->
                 <div>
-                    <label for="email" class="block text-sm font-semibold text-gray-700 mb-1.5">Work Email</label>
+                    <label for="email" class="block text-xs font-semibold text-gray-700 mb-1">Work Email</label>
                     <input type="email" id="email" name="email" 
-                           class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
+                           class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
                            placeholder="name@company.com" 
                            required>
                 </div>
 
                 <!-- Phone Field -->
                 <div>
-                    <label for="phone" class="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
+                    <label for="phone" class="block text-xs font-semibold text-gray-700 mb-1">Phone Number</label>
                     <input type="tel" id="phone" name="phone" 
-                           class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
+                           class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
                            placeholder="9876543210" 
                            required>
                 </div>
                 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <!-- Password Field -->
                     <div>
-                        <label for="password" class="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
+                        <label for="password" class="block text-xs font-semibold text-gray-700 mb-1">Password</label>
                         <div class="relative flex items-center">
                             <input type="password" id="password" name="password" 
-                                   class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 pr-10" 
+                                   class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 pr-9" 
                                    placeholder="Password" 
                                    required>
                             <!-- Toggle Password Button -->
-                            <button type="button" onclick="togglePassword('password', 'eye-icon')" class="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none flex items-center justify-center p-1" aria-label="Toggle password visibility">
+                            <button type="button" onclick="togglePassword('password', 'eye-icon')" class="absolute right-2.5 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none flex items-center justify-center p-1" aria-label="Toggle password visibility">
                                 <svg id="eye-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -258,10 +256,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <!-- Confirm Password Field -->
                     <div>
-                        <label for="confirmPassword" class="block text-sm font-semibold text-gray-700 mb-1.5">Confirm Password</label>
+                        <label for="confirmPassword" class="block text-xs font-semibold text-gray-700 mb-1">Confirm Password</label>
                         <div class="relative flex items-center">
                             <input type="password" id="confirmPassword" name="confirmPassword" 
-                                   class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 pr-10" 
+                                   class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 pr-10" 
                                    placeholder="confirm password" 
                                    required>
                             <!-- Toggle Confirm Password Button -->
@@ -276,31 +274,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <!-- Terms and Conditions -->
-                <div class="pt-2 pb-2">
+                <div class="pt-1 pb-0.5">
                     <label class="flex items-start gap-2 cursor-pointer group">
-                        <input type="checkbox" required class="mt-0.5 w-4 h-4 rounded border-gray-300 text-brand-wa_light focus:ring-brand-wa_light focus:ring-offset-0 transition-colors cursor-pointer">
-                        <span class="text-xs font-medium text-gray-600 group-hover:text-gray-800 transition-colors leading-tight">
+                        <input type="checkbox" required class="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-brand-wa_light focus:ring-brand-wa_light focus:ring-offset-0 transition-colors cursor-pointer">
+                        <span class="text-[11px] font-medium text-gray-600 group-hover:text-gray-800 transition-colors leading-tight">
                             I agree to the <a href="#" class="text-brand-wa_med hover:text-brand-wa_dark transition-colors">Terms of Service</a> and <a href="#" class="text-brand-wa_med hover:text-brand-wa_dark transition-colors">Privacy Policy</a>.
                         </span>
                     </label>
                 </div>
 
                 <!-- Submit Button -->
-                <button type="submit" class="w-full bg-brand-wa_light hover:bg-[#1DA851] text-white font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 shadow-sm shadow-brand-wa_light/20 active:scale-[0.98] flex justify-center items-center gap-2 mt-2">
+                <button type="submit" class="w-full bg-brand-wa_light hover:bg-[#1DA851] text-white font-semibold text-sm py-2 rounded-xl transition-all duration-200 shadow-sm shadow-brand-wa_light/20 active:scale-[0.98] flex justify-center items-center gap-2">
                     Create Account
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
             </form>
 
             <!-- OR Divider -->
-            <div class="my-5 flex items-center">
+            <div class="my-3 flex items-center">
                 <div class="flex-grow border-t border-gray-100"></div>
                 <span class="mx-4 text-xs font-semibold text-gray-400 uppercase tracking-widest">Or</span>
                 <div class="flex-grow border-t border-gray-100"></div>
             </div>
 
             <!-- Google Signup Button -->
-            <a href="<?= e(base_url('google-auth')) ?>" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 active:scale-[0.98]">
+            <a href="<?= e(base_url('google-auth')) ?>" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 font-semibold text-sm py-2 rounded-xl transition-all duration-200 active:scale-[0.98]">
                 <svg class="w-4 h-4" viewBox="0 0 24 24">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -311,7 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </a>
 
             <!-- Footer -->
-            <p class="mt-6 text-center text-sm font-medium text-gray-500">
+            <p class="mt-3 text-center text-xs font-medium text-gray-500">
                 Already have an account? 
                 <a href="<?= e(base_url('login')) ?>" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Log in</a>
             </p>

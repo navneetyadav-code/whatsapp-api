@@ -1036,4 +1036,4 @@ This project is licensed under the [MIT License](LICENSE).
 This project is an independent open-source library and is **not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with Meta Platforms, Inc. or WhatsApp LLC.** WhatsApp is a registered trademark of WhatsApp LLC.
 
 **Inquiries & Support:** `info.assistgroupofficial@gmail.com`  
-**Maintainer:** [Navneet Kumar Yadav](https://github.com/navneetyadav-code)
+**Maintainer:** [Navneet Kumar Yadav](https://github.com/navneetyadav-code/whatsapp-api)

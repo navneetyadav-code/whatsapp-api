@@ -59,7 +59,7 @@ GitHub Releases create permanent versioned URLs (`/releases/tag/vX.X.X`) that Go
 To boost your GitHub repository ranking from 3 stars into hundreds of stars:
 
 1. **Pin on Your Profile:**
-   - Go to [github.com/navneetyadav-code](https://github.com/navneetyadav-code) &rarr; **Customize your pins** &rarr; Pin `whatsapp-api` to the #1 spot.
+   - Go to [github.com/navneetyadav-code](https://github.com/navneetyadav-code/whatsapp-api) &rarr; **Customize your pins** &rarr; Pin `whatsapp-api` to the #1 spot.
 2. **Post on Developer Communities (High Organic Traffic):**
    - **Reddit:**
      - `r/selfhosted`: *"I built a 100% free, self-hosted WhatsApp REST API Gateway with PHP & Baileys (zero Twilio fees)"*

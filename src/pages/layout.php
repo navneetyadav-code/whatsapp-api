@@ -55,7 +55,7 @@ if ($userForLayout) {
       "author": {
         "@type": "Person",
         "name": "Navneet Kumar Yadav",
-        "url": "https://github.com/navneetyadav-code"
+        "url": "https://github.com/navneetyadav-code/whatsapp-api"
       },
       "description": "Free open-source WhatsApp API Gateway and Dashboard powered by Baileys, PHP, Node.js, and MySQL."
     }
