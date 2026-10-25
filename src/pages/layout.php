@@ -62,7 +62,7 @@ if ($userForLayout) {
     </script>
     
     <!-- Old CSS for backward compatibility of non-dashboard pages -->
-    <link rel="stylesheet" href="<?= e(base_url('assets/app.css')) ?>">
+    <link rel="stylesheet" href="<?= e(base_url('assets/app.css')) ?>?v=<?= time() ?>">
     
     <?php if ($isAuthed): ?>
     <!-- New Tailwind CSS -->

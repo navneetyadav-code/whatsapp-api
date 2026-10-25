@@ -165,10 +165,14 @@ function renderStatus(data) {
         if (session.qr && qrImage && qrPlaceholder) {
             qrImage.src = session.qr;
             qrImage.classList.remove('hidden');
+            qrImage.style.display = 'block';
             qrPlaceholder.classList.add('hidden');
+            qrPlaceholder.style.setProperty('display', 'none', 'important');
         } else if (qrImage && qrPlaceholder) {
             qrImage.classList.add('hidden');
+            qrImage.style.setProperty('display', 'none', 'important');
             qrPlaceholder.classList.remove('hidden');
+            qrPlaceholder.style.removeProperty('display');
             const span = qrPlaceholder.querySelector('span');
             if (span) {
                 if (session.error) {

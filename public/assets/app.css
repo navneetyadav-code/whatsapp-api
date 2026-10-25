@@ -1809,6 +1809,7 @@ button.ghost,
     width: min(270px, 78vw);
 }
 
+#qrPlaceholder.hidden, #qrPlaceholder[hidden] { display: none !important; }
 #qrPlaceholder {
     color: var(--muted);
     display: flex;
