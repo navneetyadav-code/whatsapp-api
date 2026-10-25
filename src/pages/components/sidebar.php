@@ -174,7 +174,7 @@ $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
                 <span>&bull;</span>
                 <a href="<?= e(base_url('docs')) ?>" class="hover:text-slate-800 hover:underline">Docs</a>
             </div>
-            <div>Made by <a href="https://github.com/navneetyadav-code" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:underline">Navneet Kumar Yadav</a></div>
+            <div>Made by <a href="https://github.com/navneetyadav-code/whatsapp-api" target="_blank" rel="noopener noreferrer" class="font-semibold text-slate-700 hover:underline">Navneet Kumar Yadav</a></div>
             <div>Takedown: <a href="mailto:info.assistgroupofficial@gmail.com" class="hover:underline text-slate-500">info.assistgroupofficial@gmail.com</a></div>
             <div class="text-[9px] text-slate-400">Independent project &bull; Not affiliated with Meta</div>
         </div>

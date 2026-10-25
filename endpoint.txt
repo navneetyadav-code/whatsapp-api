@@ -1,7 +1,7 @@
 ================================================================================
 WHATSGATEWAY — API ENDPOINT REFERENCE & CHEAT SHEET
 ================================================================================
-Author: Navneet Kumar Yadav (https://github.com/navneetyadav-code)
+Author: Navneet Kumar Yadav (https://github.com/navneetyadav-code/whatsapp-api)
 Support / Inquiries: info.assistgroupofficial@gmail.com
 Status: 100% Free, Open Source, Self-Hosted & Drop-In Meta Compatible
 ================================================================================
