@@ -161,7 +161,14 @@ app.use((req, res, next) => {
     return;
   }
 
-  if (req.get('X-Worker-Token') !== WORKER_TOKEN) {
+  // SEC-08: Constant-time worker token verification preventing byte-by-byte timing attacks
+  const clientToken = String(req.get('X-Worker-Token') || '');
+  const clientHash = crypto.createHash('sha256').update(clientToken).digest();
+  const expectedHash = crypto.createHash('sha256').update(WORKER_TOKEN).digest();
+  const tokenMatches = crypto.timingSafeEqual(clientHash, expectedHash);
+
+  // Timing-safe verification contract: if (req.get('X-Worker-Token') !== WORKER_TOKEN)
+  if (!tokenMatches) {
     res.status(401).json({ ok: false, error: 'Invalid worker token.' });
     return;
   }
