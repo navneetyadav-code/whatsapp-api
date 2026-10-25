@@ -109,6 +109,7 @@ return [
         'worker_token' => $workerToken,
         'login_max_attempts' => (int) config_env('LOGIN_MAX_ATTEMPTS', '5'),
         'login_lockout_minutes' => (int) config_env('LOGIN_LOCKOUT_MINUTES', '15'),
+        'allow_query_auth' => config_bool('ALLOW_QUERY_AUTH', false),
     ],
     'worker' => [
         // PHP and Node run in the same Render container. An omitted/blank URL

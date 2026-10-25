@@ -480,7 +480,7 @@ All inbound messaging endpoints point to the same handler (`public/api/send.php`
 - **Authentication:**
   - `X-API-Key: wa_live_...` OR
   - `Authorization: Bearer wa_live_...` OR
-  - URL Query parameter: `?access_token=wa_live_...` (or `?api_key=wa_live_...`)
+  - URL Query parameter: `?access_token=wa_live_...` (or `?api_key=wa_live_...`, requires `ALLOW_QUERY_AUTH=true` in `.env`)
 - **Headers:** `Content-Type: application/json` or `multipart/form-data`
 - **Rate Limiting:** Enforced per API key (`rate_per_minute`, `rate_per_hour`, `rate_per_day`). Exceeding returns `429 Too Many Requests`.
 - **IP Filtering:** Enforced if `ip_allowlist` is populated on the API key.
