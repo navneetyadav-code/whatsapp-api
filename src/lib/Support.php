@@ -155,8 +155,26 @@ function request_json(): array
 
 function is_local_request(): bool
 {
-    $ip = client_ip();
-    return in_array($ip, ['127.0.0.1', '::1'], true) || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.');
+    $remoteAddr = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    $isDirectLoopback = in_array($remoteAddr, ['127.0.0.1', '::1'], true);
+
+    // If forwarded via reverse proxy, verify the originating client was also genuinely local
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $forwardedIps = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']);
+        $clientIp = trim($forwardedIps[0]);
+        if (!in_array($clientIp, ['127.0.0.1', '::1'], true) && !str_starts_with($clientIp, '192.168.') && !str_starts_with($clientIp, '10.')) {
+            return false;
+        }
+    }
+
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        $cfIp = trim((string) $_SERVER['HTTP_CF_CONNECTING_IP']);
+        if (!in_array($cfIp, ['127.0.0.1', '::1'], true) && !str_starts_with($cfIp, '192.168.') && !str_starts_with($cfIp, '10.')) {
+            return false;
+        }
+    }
+
+    return $isDirectLoopback || str_starts_with($remoteAddr, '192.168.') || str_starts_with($remoteAddr, '10.');
 }
 
 function is_private_ip(string $ip): bool
