@@ -338,10 +338,10 @@ function seo_meta(?string $page): array {
 function send_smtp_email(string $to, string $subject, string $body): bool {
     $host = app_config('smtp.host');
     $port = (int) (app_config('smtp.port') ?: 587);
-    $user = app_config('smtp.user');
-    $pass = app_config('smtp.pass');
-    $from = app_config('smtp.from');
-    $fromName = app_config('smtp.from_name');
+    $user = trim((string) app_config('smtp.user'));
+    $pass = str_replace([' ', '-', "\t", "\r", "\n"], '', trim((string) app_config('smtp.pass')));
+    $from = trim((string) (app_config('smtp.from') ?: $user));
+    $fromName = trim((string) (app_config('smtp.from_name') ?: 'WhatsGateway'));
 
     if (!$host) {
         error_log("SMTP Error: No SMTP host configured.");
