@@ -102,9 +102,21 @@ function authenticate_api_request(): ?array
         }
     }
 
-    // Fallback: check query params or POST body for single-key authentication (supports Meta access_token)
+    // Fallback: check POST body or guarded query params for single-key authentication
     if (!$key) {
-        $key = $_GET['api_key'] ?? $_GET['key'] ?? $_GET['access_token'] ?? $_POST['api_key'] ?? $_POST['key'] ?? $_POST['access_token'] ?? '';
+        // Priority 1: Request POST body payload (safe from access logs)
+        $key = $_POST['api_key'] ?? $_POST['key'] ?? $_POST['access_token'] ?? '';
+
+        // Priority 2: JSON payload if POST body was json
+        if (!$key && !empty($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json')) {
+            $jsonData = request_json();
+            $key = $jsonData['api_key'] ?? $jsonData['key'] ?? $jsonData['access_token'] ?? '';
+        }
+
+        // Priority 3: GET query parameter (SEC-07: Guarded to prevent log leakage; requires ALLOW_QUERY_AUTH=true)
+        if (!$key && (bool) app_config('security.allow_query_auth', false)) {
+            $key = $_GET['api_key'] ?? $_GET['key'] ?? $_GET['access_token'] ?? '';
+        }
     }
 
     if (!is_string($key) || $key === '') {
