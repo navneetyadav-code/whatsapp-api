@@ -131,6 +131,19 @@ $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
             <?php endif; ?>
             Message Queue
         </a>
+
+        <!-- Section: Security -->
+        <div class="px-3 mt-6 mb-2 text-[11px] font-semibold text-slate-400 tracking-wider">SECURITY</div>
+        
+        <a href="<?= e(base_url('index.php?page=security')) ?>" class="flex items-center gap-3 px-3 py-2 rounded-lg <?= $currentPage === 'security' ? 'bg-white shadow-saas text-brand-wa_dark mb-1 relative border border-slate-200/50' : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors mb-1 group' ?>">
+            <?php if ($currentPage === 'security'): ?>
+                <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-4 bg-brand-wa_light rounded-r-full"></div>
+                <svg class="w-[18px] h-[18px] text-brand-wa_med" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            <?php else: ?>
+                <svg class="w-[18px] h-[18px] text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            <?php endif; ?>
+            Security
+        </a>
     </div>
 
     <!-- Sidebar Footer -->

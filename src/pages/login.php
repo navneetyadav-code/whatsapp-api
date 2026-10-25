@@ -4,22 +4,52 @@ if (current_user()) {
     redirect_to('index.php?page=dashboard');
 }
 
+if (isset($_GET['action']) && $_GET['action'] === 'cancel_2fa') {
+    unset($_SESSION['2fa_pending_user_id']);
+    redirect_to('index.php?page=login');
+}
+
+$pending2faUserId = $_SESSION['2fa_pending_user_id'] ?? null;
 $error = null;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    $email = trim((string) ($_POST['email'] ?? ''));
-    $password = (string) ($_POST['password'] ?? '');
 
-    if ((bool) app_config('app.disable_password_login')) {
-        $error = 'Password login is disabled on this instance. Please sign in with Google.';
-    } else {
-        $lockedFor = login_lockout_seconds($email);
-        if ($lockedFor > 0) {
-            $error = 'Too many login attempts. Try again in about ' . (int) ceil($lockedFor / 60) . ' minutes.';
-        } elseif (attempt_login($email, $password)) {
+    if ($pending2faUserId) {
+        $code = trim((string) ($_POST['totp_code'] ?? ''));
+        $sec = get_user_security((int) $pending2faUserId);
+        $verified = false;
+
+        if (!empty($sec['totp_secret']) && totp_verify($sec['totp_secret'], $code)) {
+            $verified = true;
+        } elseif (verify_and_consume_backup_code((int) $pending2faUserId, $code)) {
+            $verified = true;
+        }
+
+        if ($verified) {
+            complete_2fa_login((int) $pending2faUserId);
             redirect_to('index.php?page=dashboard');
         } else {
-            $error = 'Email or password is incorrect.';
+            $error = 'Invalid 6-digit verification code or backup recovery code.';
+        }
+    } else {
+        $email = trim((string) ($_POST['email'] ?? ''));
+        $password = (string) ($_POST['password'] ?? '');
+
+        if ((bool) app_config('app.disable_password_login')) {
+            $error = 'Password login is disabled on this instance. Please sign in with Google.';
+        } else {
+            $lockedFor = login_lockout_seconds($email);
+            if ($lockedFor > 0) {
+                $error = 'Too many login attempts. Try again in about ' . (int) ceil($lockedFor / 60) . ' minutes.';
+            } elseif (attempt_login($email, $password)) {
+                if (!empty($_SESSION['2fa_pending_user_id'])) {
+                    redirect_to('index.php?page=login&step=2fa');
+                }
+                redirect_to('index.php?page=dashboard');
+            } else {
+                $error = 'Email or password is incorrect.';
+            }
         }
     }
 }
@@ -166,6 +196,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <span class="font-bold text-gray-900 tracking-tight lg:hidden">API Hub</span>
             </div>
 
+            <?php if ($pending2faUserId): ?>
+            <!-- 2FA TOTP Challenge Header -->
+            <div class="mb-7">
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 mb-3">
+                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    Two-Factor Authentication
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Security Verification</h2>
+                <p class="text-sm text-gray-500 mt-1.5 font-medium">Enter the 6-digit code from your authenticator app or an 8-character recovery backup code.</p>
+            </div>
+
+            <!-- 2FA Form -->
+            <form method="post" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <?php foreach (flashes() as $flash): ?>
+                    <div class="p-3 text-sm rounded-xl <?= $flash['type'] === 'error' || $flash['type'] === 'danger' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700' ?>">
+                        <?= e($flash['message']) ?>
+                    </div>
+                <?php endforeach; ?>
+                <?php if ($error): ?>
+                    <div class="p-3 text-sm rounded-xl bg-red-50 text-red-700">
+                        <?= e($error) ?>
+                    </div>
+                <?php endif; ?>
+
+                <div>
+                    <label for="totp_code" class="block text-sm font-semibold text-gray-700 mb-1.5">Verification / Backup Code</label>
+                    <input type="text" id="totp_code" name="totp_code" 
+                           class="w-full px-3.5 py-3 text-center tracking-widest text-lg font-mono rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all" 
+                           placeholder="000000 or A1B2C3D4" 
+                           inputmode="text" autocomplete="one-time-code" maxlength="16" required autofocus>
+                    <p class="text-[11px] text-gray-400 mt-1 text-center">Google Authenticator, Authy, 1Password, or Single-Use Backup Code</p>
+                </div>
+
+                <button type="submit" class="w-full bg-brand-wa_light hover:bg-[#1DA851] text-white font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 shadow-sm shadow-brand-wa_light/20 active:scale-[0.98] flex justify-center items-center gap-2">
+                    Verify & Continue
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
+
+                <div class="pt-3 text-center">
+                    <a href="<?= e(base_url('index.php?page=login&action=cancel_2fa')) ?>" class="text-xs text-gray-500 hover:text-gray-900 font-medium transition-colors">
+                        &larr; Cancel and sign in with a different account
+                    </a>
+                </div>
+            </form>
+            <?php else: ?>
             <!-- Header -->
             <div class="mb-7">
                 <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Welcome Back</h2>
@@ -251,6 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </svg>
                 Sign in with Google
             </a>
+            <?php endif; ?>
 
             <?php if (app_config('app.enable_registration')): ?>
             <!-- Footer -->

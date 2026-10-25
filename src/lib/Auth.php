@@ -51,6 +51,15 @@ function attempt_login(string $email, string $password): bool
 
     clear_failed_logins($email);
     session_regenerate_id(true);
+
+    if (function_exists('get_user_security')) {
+        $sec = get_user_security((int) $user['id']);
+        if (!empty($sec['totp_enabled'])) {
+            $_SESSION['2fa_pending_user_id'] = (int) $user['id'];
+            return true;
+        }
+    }
+
     $_SESSION['user_id'] = (int) $user['id'];
     return true;
 }
@@ -225,3 +234,11 @@ function is_owner(?array $user): bool
     return in_array($userEmail, $adminList, true);
 }
 
+function complete_2fa_login(int $userId): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
+    }
+    $_SESSION['user_id'] = $userId;
+    unset($_SESSION['2fa_pending_user_id']);
+}

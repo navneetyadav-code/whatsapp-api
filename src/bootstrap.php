@@ -23,6 +23,6 @@ require_once __DIR__ . '/lib/Auth.php';
 require_once __DIR__ . '/lib/ApiCredentials.php';
 require_once __DIR__ . '/lib/MessageQueue.php';
 require_once __DIR__ . '/lib/WorkerClient.php';
+require_once __DIR__ . '/lib/Security.php';
 
 Database::configure($config['db']);
-

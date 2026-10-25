@@ -2,32 +2,55 @@
 
 declare(strict_types=1);
 
-if (current_user()) {
-    redirect_to('index.php?page=dashboard');
-}
-
 $clientId = app_config('google.client_id');
 $clientSecret = app_config('google.client_secret');
 $redirectUri = public_url('index.php?page=google-auth');
 
 if (!$clientId || !$clientSecret) {
-    exit('Google OAuth is not configured.');
+    flash('error', 'Google OAuth is not configured on this instance.');
+    redirect_to('index.php?page=login');
+}
+
+// 1. Authenticated user initiating Google Account Linking from Security Settings
+if (isset($_GET['action']) && $_GET['action'] === 'link') {
+    $user = require_auth();
+    $_SESSION['oauth_state'] = 'link_' . bin2hex(random_bytes(24));
+    $_SESSION['oauth_link_user_id'] = (int) $user['id'];
+
+    $authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query([
+        'client_id' => $clientId,
+        'redirect_uri' => $redirectUri,
+        'response_type' => 'code',
+        'scope' => 'openid email profile',
+        'state' => $_SESSION['oauth_state'],
+        'access_type' => 'online',
+        'prompt' => 'select_account'
+    ]);
+
+    header('Location: ' . $authUrl);
+    exit;
+}
+
+// If already logged in and not processing a callback, go to dashboard
+if (current_user() && !isset($_GET['code'])) {
+    redirect_to('index.php?page=dashboard');
 }
 
 // Handle Google Callback
 if (isset($_GET['code'])) {
-    $state = $_GET['state'] ?? '';
+    $state = (string) ($_GET['state'] ?? '');
     
-    // 1. Verify State Token (CSRF Protection)
+    // Verify State Token (CSRF Protection)
     if (empty($_SESSION['oauth_state']) || !hash_equals($_SESSION['oauth_state'], $state)) {
         flash('error', 'Invalid security state. Please try again.');
         redirect_to('index.php?page=login');
     }
+    $isLinkFlow = str_starts_with($state, 'link_');
     unset($_SESSION['oauth_state']);
 
-    $code = $_GET['code'];
+    $code = (string) $_GET['code'];
 
-    // 2. Exchange Code for Access Token
+    // Exchange Code for Access Token
     $ch = curl_init('https://oauth2.googleapis.com/token');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -51,7 +74,7 @@ if (isset($_GET['code'])) {
 
     $accessToken = $tokenData['access_token'];
 
-    // 3. Get User Info
+    // Retrieve User Profile
     $ch = curl_init('https://www.googleapis.com/oauth2/v2/userinfo');
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -67,18 +90,50 @@ if (isset($_GET['code'])) {
         redirect_to('index.php?page=login');
     }
 
-    $email = mb_strtolower(trim($userInfo['email']));
+    $email = mb_strtolower(trim((string) $userInfo['email']));
     $name = trim((string) ($userInfo['name'] ?? 'Google User'));
+    $googleId = (string) ($userInfo['id'] ?? '');
 
+    // Case A: Link Flow from Security Settings
+    if ($isLinkFlow) {
+        $linkUserId = (int) ($_SESSION['oauth_link_user_id'] ?? 0);
+        unset($_SESSION['oauth_link_user_id']);
+        $currentUser = current_user();
+
+        if (!$currentUser || (int) $currentUser['id'] !== $linkUserId) {
+            flash('error', 'Session mismatch while linking Google account.');
+            redirect_to('index.php?page=security');
+        }
+
+        link_google_account($linkUserId, $googleId, $email);
+        flash('success', "Google account ({$email}) connected successfully.");
+        redirect_to('index.php?page=security');
+    }
+
+    // Case B: Standard Sign-In
     $pdo = Database::pdo();
     $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
     if ($user) {
-        // User exists, log them in
+        $sec = get_user_security((int) $user['id']);
+
+        // Delink safeguard: If user explicitly unlinked Google and has password set
+        if (isset($sec['google_linked']) && (int) $sec['google_linked'] === 0 && !empty($sec['password_set'])) {
+            flash('error', 'Google sign-in has been disconnected for this account. Please sign in with your email and password.');
+            redirect_to('index.php?page=login');
+        }
+
         clear_failed_logins($email);
         session_regenerate_id(true);
+
+        // 2FA TOTP verification challenge
+        if (!empty($sec['totp_enabled'])) {
+            $_SESSION['2fa_pending_user_id'] = (int) $user['id'];
+            redirect_to('index.php?page=login&step=2fa');
+        }
+
         $_SESSION['user_id'] = (int) $user['id'];
         redirect_to('index.php?page=dashboard');
     } else {
@@ -88,14 +143,19 @@ if (isset($_GET['code'])) {
             redirect_to('index.php?page=login');
         }
 
-        // New user, register them
-        $randomPassword = bin2hex(random_bytes(16)); // Secure random password
-        $phone = ''; // Google doesn't provide phone by default in this scope
+        $randomPassword = bin2hex(random_bytes(16));
+        $phone = '';
         
         try {
-            // Using the existing register_user function from Auth.php
             $credentials = register_user($name, $email, $phone, $randomPassword);
             clear_failed_logins($email);
+
+            $newUser = current_user();
+            if ($newUser) {
+                link_google_account((int) $newUser['id'], $googleId, $email);
+                Database::pdo()->prepare('UPDATE user_security SET password_set = 0 WHERE user_id = ?')->execute([(int) $newUser['id']]);
+            }
+
             flash('success', 'Account created successfully via Google.');
             redirect_to('index.php?page=dashboard');
         } catch (Throwable $e) {
@@ -107,11 +167,11 @@ if (isset($_GET['code'])) {
 
 // If error from Google
 if (isset($_GET['error'])) {
-    flash('error', 'Google authentication failed: ' . htmlspecialchars($_GET['error']));
+    flash('error', 'Google authentication failed: ' . htmlspecialchars((string) $_GET['error']));
     redirect_to('index.php?page=login');
 }
 
-// Initiate Google OAuth Flow
+// Initiate Standard Google OAuth Flow
 $_SESSION['oauth_state'] = bin2hex(random_bytes(32));
 
 $authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query([
