@@ -161,7 +161,60 @@ function is_local_request(): bool
 
 function is_private_ip(string $ip): bool
 {
+    $ip = trim($ip, '[]');
+
     if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+        return true;
+    }
+
+    // Handle IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1)
+    if (str_starts_with(strtolower($ip), '::ffff:')) {
+        $v4 = substr($ip, 7);
+        if (filter_var($v4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return is_private_ip($v4);
+        }
+    }
+
+    if (in_array($ip, ['127.0.0.1', '::1', '0.0.0.0', '::'], true)) {
+        return true;
+    }
+
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        $parts = array_map('intval', explode('.', $ip));
+        if (count($parts) !== 4) {
+            return true;
+        }
+
+        // 0.0.0.0/8 (Broadcast/source)
+        if ($parts[0] === 0) return true;
+        // 10.0.0.0/8 (Private)
+        if ($parts[0] === 10) return true;
+        // 100.64.0.0/10 (Carrier-grade NAT / Shared)
+        if ($parts[0] === 100 && $parts[1] >= 64 && $parts[1] <= 127) return true;
+        // 127.0.0.0/8 (Loopback)
+        if ($parts[0] === 127) return true;
+        // 169.254.0.0/16 (Link-local / Cloud metadata)
+        if ($parts[0] === 169 && $parts[1] === 254) return true;
+        // 172.16.0.0/12 (Private)
+        if ($parts[0] === 172 && $parts[1] >= 16 && $parts[1] <= 31) return true;
+        // 192.168.0.0/16 (Private)
+        if ($parts[0] === 192 && $parts[1] === 168) return true;
+        // 192.0.0.0/24 (IETF Protocol Assignments)
+        if ($parts[0] === 192 && $parts[1] === 0 && $parts[2] === 0) return true;
+        // 198.18.0.0/15 (Benchmarking)
+        if ($parts[0] === 198 && ($parts[1] === 18 || $parts[1] === 19)) return true;
+        // 224.0.0.0/4 (Multicast) & 240.0.0.0/4 (Reserved)
+        if ($parts[0] >= 224) return true;
+
+        return false;
+    }
+
+    // Check IPv6 unique local (fc00::/7) and link-local (fe80::/10)
+    $lower = strtolower($ip);
+    if (str_starts_with($lower, 'fc') || str_starts_with($lower, 'fd')) {
+        return true;
+    }
+    if (str_starts_with($lower, 'fe8') || str_starts_with($lower, 'fe9') || str_starts_with($lower, 'fea') || str_starts_with($lower, 'feb')) {
         return true;
     }
 
@@ -373,15 +426,20 @@ function assert_safe_media_url(string $url): string
         throw new InvalidArgumentException('Media URL must use HTTP or HTTPS.');
     }
 
-    if ($host === '' || in_array($host, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true) || str_ends_with($host, '.local')) {
+    $cleanHost = trim($host, '[]');
+    if ($cleanHost === '' || in_array($cleanHost, ['localhost', '127.0.0.1', '::1', '0.0.0.0', '::'], true) || str_ends_with($cleanHost, '.local')) {
         throw new InvalidArgumentException('Media URL cannot point to localhost or loopback.');
     }
 
+    if (str_starts_with($cleanHost, '169.254.') || $cleanHost === 'metadata.google.internal' || $cleanHost === '100.100.100.200') {
+        throw new InvalidArgumentException('Media URL cannot point to cloud metadata endpoints.');
+    }
+
     $addresses = [];
-    if (filter_var($host, FILTER_VALIDATE_IP)) {
-        $addresses[] = $host;
+    if (filter_var($cleanHost, FILTER_VALIDATE_IP)) {
+        $addresses[] = $cleanHost;
     } else {
-        $records = dns_get_record($host, DNS_A | DNS_AAAA) ?: [];
+        $records = dns_get_record($cleanHost, DNS_A | DNS_AAAA) ?: [];
         foreach ($records as $r) {
             $addr = $r['ip'] ?? $r['ipv6'] ?? null;
             if ($addr) {
@@ -421,30 +479,68 @@ function download_remote_media(string $url, int $maxBytes = 20971520): array
         throw new RuntimeException('Unable to create temporary file for media download.');
     }
 
-    $ch = curl_init($safeUrl);
-    curl_setopt_array($ch, [
-        CURLOPT_FILE => $fp,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS => 3,
-        CURLOPT_TIMEOUT => 25,
-        CURLOPT_CONNECTTIMEOUT => 7,
-        CURLOPT_SSL_VERIFYPEER => true,
-        CURLOPT_SSL_VERIFYHOST => 2,
-        CURLOPT_USERAGENT => 'WhatsApp-API-Hub-MediaDownloader/1.0',
-        CURLOPT_NOPROGRESS => false,
-        CURLOPT_PROGRESSFUNCTION => static function ($resource, $downloadSize, $downloaded) use ($maxBytes): int {
-            if ($downloaded > $maxBytes || $downloadSize > $maxBytes) {
-                return 1; // Abort download immediately if exceeded max bytes
-            }
-            return 0;
-        },
-    ]);
+    $currentUrl = $safeUrl;
+    $maxRedirects = 3;
+    $redirectCount = 0;
+    $success = false;
+    $httpCode = 0;
+    $contentType = '';
+    $curlError = '';
 
-    $success = curl_exec($ch);
-    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
+    while (true) {
+        $ch = curl_init($currentUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $fp,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_TIMEOUT => 25,
+            CURLOPT_CONNECTTIMEOUT => 7,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_USERAGENT => 'WhatsApp-API-Hub-MediaDownloader/1.0',
+            CURLOPT_NOPROGRESS => false,
+            CURLOPT_PROGRESSFUNCTION => static function ($resource, $downloadSize, $downloaded) use ($maxBytes): int {
+                if ($downloaded > $maxBytes || $downloadSize > $maxBytes) {
+                    return 1; // Abort download immediately if exceeded max bytes
+                }
+                return 0;
+            },
+        ]);
+
+        $success = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $primaryIp = (string) curl_getinfo($ch, CURLINFO_PRIMARY_IP);
+        $redirectUrl = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL);
+        $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        // SEC-04: Defense against DNS rebinding / TOCTOU
+        if ($primaryIp !== '' && is_private_ip($primaryIp)) {
+            fclose($fp);
+            if (file_exists($tmpPath)) {
+                unlink($tmpPath);
+            }
+            throw new RuntimeException('Media URL resolved to a private or reserved network IP address during connection.');
+        }
+
+        // SEC-04: Validate redirect target URLs to prevent blind SSRF hopping
+        if (in_array($httpCode, [301, 302, 303, 307, 308], true)) {
+            if ($redirectCount >= $maxRedirects || empty($redirectUrl)) {
+                fclose($fp);
+                if (file_exists($tmpPath)) {
+                    unlink($tmpPath);
+                }
+                throw new RuntimeException('Media download exceeded maximum allowed redirects or gave invalid redirect.');
+            }
+            $currentUrl = assert_safe_media_url($redirectUrl);
+            $redirectCount++;
+            ftruncate($fp, 0);
+            rewind($fp);
+            continue;
+        }
+
+        break;
+    }
     fclose($fp);
 
     if (!$success || $httpCode < 200 || $httpCode >= 300) {
