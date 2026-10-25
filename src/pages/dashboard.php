@@ -591,9 +591,9 @@ function page_header(string $title, string $subtitle): void
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         <!-- Device Info Card -->
-        <section class="bg-white rounded-xl border border-slate-200 shadow-saas overflow-hidden">
+        <section class="connection-details-card bg-white rounded-xl border border-slate-200 shadow-saas overflow-hidden flex flex-col h-full">
             <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                     <h2 class="text-[15px] font-bold text-slate-900 tracking-tight">Connection Details</h2>
@@ -601,7 +601,7 @@ function page_header(string $title, string $subtitle): void
                 </div>
                 <span id="statusBadge" class="px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex items-center gap-1.5 <?= $deviceConnected ? ($deviceSleeping ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200') : 'bg-slate-100 text-slate-700 border-slate-200' ?>"><?= $deviceConnected ? ($deviceSleeping ? 'Sleeping' : 'Connected') : 'Disconnected' ?></span>
             </div>
-            <div class="p-6 space-y-4">
+            <div class="p-6 space-y-4 flex-1 flex flex-col justify-center">
                 <div class="flex items-start gap-4">
                     <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
@@ -650,7 +650,7 @@ function page_header(string $title, string $subtitle): void
                 </div>
             </div>
             
-            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3" id="deviceActions">
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center gap-3 mt-auto" id="deviceActions">
                 <?php if ($isOwner || $allowNewDevices): ?>
                 <!-- Connect / Sleep buttons toggled via JS -->
                 <button id="connectBtn" type="button" data-session-action="start" class="<?= $deviceConnected ? 'hidden' : '' ?> px-4 py-2.5 text-[13px] font-semibold text-white bg-brand-accent rounded-lg shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-accent transition-all flex items-center gap-2">
@@ -680,7 +680,7 @@ function page_header(string $title, string $subtitle): void
         </section>
 
         <!-- QR Code / Profile Card -->
-        <section class="bg-white rounded-xl border border-slate-200 shadow-saas overflow-hidden flex flex-col items-center justify-center p-8 text-center min-h-[400px]">
+        <section class="device-pair-card bg-white rounded-xl border border-slate-200 shadow-saas overflow-hidden flex flex-col items-center justify-center p-6 text-center h-full">
             <div id="profileContainer" class="<?= $deviceConnected ? '' : 'hidden' ?> flex flex-col items-center">
                 <div class="relative mb-4">
                     <img id="profileImage" src="" alt="WhatsApp Profile" class="w-32 h-32 rounded-full border-4 border-emerald-100 shadow-lg object-cover bg-slate-100">
@@ -698,14 +698,15 @@ function page_header(string $title, string $subtitle): void
                 <h2 class="text-[16px] font-bold text-slate-900">Device Linking Restricted</h2>
                 <p class="text-[13px] text-amber-800 mt-2 max-w-[280px] leading-relaxed font-medium"><?= e($restrictedNotice) ?></p>
                 <?php else: ?>
-                <div class="w-16 h-16 bg-brand-wa_light/10 text-brand-wa_med rounded-2xl flex items-center justify-center mb-4">
+                <div class="w-14 h-14 bg-brand-wa_light/10 text-brand-wa_med rounded-2xl flex items-center justify-center mb-3">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                 </div>
                 <h2 class="text-[16px] font-bold text-slate-900">Pair Device</h2>
-                <p class="text-[13px] text-slate-500 mt-1 mb-6 max-w-[250px]">Open WhatsApp on your phone, tap <strong>Linked devices</strong>, and scan the QR code to connect.</p>
+                <p class="text-[13px] text-slate-500 mt-1 mb-4 max-w-[250px]">Open WhatsApp on your phone, tap <strong>Linked devices</strong>, and scan the QR code to connect.</p>
                 
-                <div class="relative w-[280px] h-[280px] bg-white border border-slate-200/90 rounded-2xl shadow-sm p-3.5 flex items-center justify-center mx-auto" id="qrBox">
-                    <div id="qrPlaceholder" style="display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important;" class="w-full h-full bg-slate-50/80 rounded-xl border-2 border-dashed border-slate-200 p-4 text-center">
+                <style>#qrPlaceholder.hidden, #qrPlaceholder[hidden] { display: none !important; }</style>
+                <div class="relative w-[220px] h-[220px] bg-white border border-slate-200/90 rounded-2xl shadow-sm p-3.5 flex items-center justify-center mx-auto" id="qrBox">
+                    <div id="qrPlaceholder" class="w-full h-full bg-slate-50/80 rounded-xl border-2 border-dashed border-slate-200 p-4 text-center flex flex-col items-center justify-center">
                         <svg class="w-9 h-9 mb-2.5 text-slate-400 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                         <span class="text-[12px] font-medium text-slate-500 max-w-[170px] leading-relaxed">Click Connect to generate QR code</span>
                     </div>
@@ -1465,5 +1466,3 @@ function page_header(string $title, string $subtitle): void
 <?php endif; ?>
 </section>
 <script src="<?= e(base_url('assets/dashboard.js')) ?>?v=<?= time() ?>"></script>
-
-
