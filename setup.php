@@ -1,4 +1,22 @@
 <?php
+
+declare(strict_types=1);
+
+/**
+ * WhatsGateway — Setup & Initialization Utility
+ *
+ * SEC-05: Remote Execution Protection
+ * This script is strictly restricted to CLI execution to prevent remote database
+ * truncate attacks, arbitrary admin registration, and shell injection.
+ */
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Forbidden: setup.php can only be executed via the command line interface (CLI).\n";
+    exit(1);
+}
+
 $envPath = __DIR__ . '/.env';
 $isInstalled = file_exists($envPath);
 
