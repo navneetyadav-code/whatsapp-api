@@ -1,3 +1,7 @@
+# SEC-01 & MEDIA-PROTECTION: Deny all direct public HTTP/HTTPS access to uploaded media.
+# Files must only be streamed via authenticated application endpoints (e.g. /media.php).
+Require all denied
+
 # Prohibit script execution in the uploads directory
 <FilesMatch "(?i)\.(php|phtml|phar|pl|py|cgi|sh|asp|aspx|exe|bat|cmd)$">
     Require all denied

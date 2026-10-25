@@ -10,6 +10,9 @@ RewriteRule ^api/send/?$ api/send.php [L,QSA]
 RewriteRule ^messages/?$ api/send.php [L,QSA]
 RewriteRule ^send/?$ api/send.php [L,QSA]
 
+# Protected Media Routing
+RewriteRule ^media/([a-zA-Z0-9_\.-]+)/?$ media.php?file=$1 [L,QSA]
+
 # Clean URL Routing: Route all requests that are not existing files/directories to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

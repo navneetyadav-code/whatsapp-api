@@ -120,9 +120,21 @@ if ($to === '' || ($message === '' && $attachment === null)) {
 }
 
 $payloadType = $attachment ? ($attachment['type'] ?? 'document') : 'text';
+$priority = 5;
+if (isset($data['priority'])) {
+    $pRaw = strtolower(trim((string) $data['priority']));
+    if ($pRaw === 'high' || $pRaw === 'urgent') {
+        $priority = 10;
+    } elseif ($pRaw === 'low' || $pRaw === 'bulk') {
+        $priority = 1;
+    } elseif (is_numeric($pRaw)) {
+        $priority = max(1, min(100, (int) $pRaw));
+    }
+}
 $payload = [
     'source' => !empty($data['messaging_product']) ? 'meta_compat_api' : 'api',
     'type' => $payloadType,
+    'priority' => $priority,
 ];
 
 if ($attachment !== null) {
@@ -138,7 +150,7 @@ if (!empty($data['campaign_id'])) {
     $payload['campaign_id'] = (int) $data['campaign_id'];
 }
 
-$messageId = enqueue_message((int) $user['user_id'], (int) $user['id'], $to, $message, $payload);
+$messageId = enqueue_message((int) $user['user_id'], (int) $user['id'], $to, $message, $payload, $priority);
 $requestId = log_api_request((int) $user['user_id'], (int) $user['id'], 'send', 200);
 
 $cleanTo = preg_replace('/\D/', '', $to);

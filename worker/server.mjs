@@ -189,6 +189,10 @@ function emptySession(userId) {
     userId,
     state: 'idle',
     sleeping: false,
+    autoSleepEnabled: true,
+    autoSleepTimeoutSeconds: 60,
+    activeOperations: 0,
+    lastActivityAt: Date.now(),
     qr: null,
     hasQr: false,
     phone: null,
@@ -205,6 +209,9 @@ function publicSession(session) {
     userId: session.userId,
     state: session.state,
     sleeping: Boolean(session.sleeping),
+    auto_sleep_enabled: session.autoSleepEnabled !== false,
+    auto_sleep_timeout_seconds: Number(session.autoSleepTimeoutSeconds) || 60,
+    last_activity_at: session.lastActivityAt || Date.now(),
     qr: session.qr,
     hasQr: Boolean(session.qr),
     phone: session.phone,
@@ -706,17 +713,252 @@ async function startSession(userId, force = false, waitForReady = true) {
       }
     });
 
+async function handleMessageStatusUpdate(userId, providerMessageId, newStatus, timestamp = null) {
+  if (!providerMessageId) return;
+  const occurredAt = timestamp ? new Date(Number(timestamp) * 1000).toISOString() : new Date().toISOString();
+
+  // 1. Fetch message belonging to this exact tenant
+  const [rows] = await db.execute(
+    'SELECT id, user_id, recipient, normalized_recipient, status, delivered_at, read_at FROM message_queue WHERE provider_message_id = ? AND user_id = ? LIMIT 1',
+    [providerMessageId, userId]
+  );
+  const msg = rows[0];
+  if (!msg) {
+    return;
+  }
+
+  // 2. Monotonic state order: queued -> processing -> sent -> delivered -> read
+  // Never downgrade a read message to delivered
+  if (msg.status === 'read') {
+    return;
+  }
+  if (msg.status === 'delivered' && newStatus === 'delivered') {
+    return;
+  }
+
+  if (newStatus === 'delivered') {
+    const [res] = await db.execute(
+      `UPDATE message_queue
+       SET status = 'delivered',
+           delivered_at = COALESCE(delivered_at, NOW())
+       WHERE id = ? AND status IN ('queued', 'processing', 'sent')`,
+      [msg.id]
+    );
+
+    if (res.affectedRows > 0) {
+      await db.execute(
+        `UPDATE message_logs
+         SET status = 'delivered'
+         WHERE user_id = ? AND recipient = ? AND status IN ('queued', 'sent')
+         ORDER BY id DESC LIMIT 1`,
+        [userId, msg.normalized_recipient || msg.recipient]
+      );
+
+      await enqueueWebhookEvent(userId, 'message.delivered', {
+        message_id: msg.id,
+        provider_message_id: providerMessageId,
+        to: msg.normalized_recipient || msg.recipient,
+        delivered_at: occurredAt,
+        status: 'delivered'
+      }, msg.id);
+    }
+  } else if (newStatus === 'read') {
+    const [res] = await db.execute(
+      `UPDATE message_queue
+       SET status = 'read',
+           read_at = COALESCE(read_at, NOW()),
+           delivered_at = COALESCE(delivered_at, NOW())
+       WHERE id = ? AND status IN ('queued', 'processing', 'sent', 'delivered')`,
+      [msg.id]
+    );
+
+    if (res.affectedRows > 0) {
+      await db.execute(
+        `UPDATE message_logs
+         SET status = 'read'
+         WHERE user_id = ? AND recipient = ? AND status IN ('queued', 'sent', 'delivered')
+         ORDER BY id DESC LIMIT 1`,
+        [userId, msg.normalized_recipient || msg.recipient]
+      );
+
+      await enqueueWebhookEvent(userId, 'message.read', {
+        message_id: msg.id,
+        provider_message_id: providerMessageId,
+        to: msg.normalized_recipient || msg.recipient,
+        read_at: occurredAt,
+        status: 'read'
+      }, msg.id);
+    }
+  }
+}
+
+function normalizeInboundMessage(userId, msg, session = {}) {
+  const remoteJid = String(msg.key?.remoteJid || '');
+  const messageId = String(msg.key?.id || '');
+  const isGroup = remoteJid.endsWith('@g.us');
+  const senderNumber = remoteJid.replace(/@.*$/, '');
+  const participant = msg.key?.participant || null;
+  const senderName = msg.pushName || null;
+  const timestamp = Number(msg.messageTimestamp) || Math.floor(Date.now() / 1000);
+  const eventId = `evt_${crypto.randomUUID()}`;
+
+  let messageType = 'text';
+  let body = '';
+  let caption = null;
+  let mediaInfo = null;
+
+  const content = msg.message || {};
+
+  if (content.conversation) {
+    messageType = 'text';
+    body = content.conversation;
+  } else if (content.extendedTextMessage) {
+    messageType = 'text';
+    body = content.extendedTextMessage.text || '';
+  } else if (content.imageMessage) {
+    messageType = 'image';
+    caption = content.imageMessage.caption || null;
+    body = caption || '';
+    mediaInfo = {
+      mimetype: content.imageMessage.mimetype || 'image/jpeg',
+      fileLength: Number(content.imageMessage.fileLength) || null
+    };
+  } else if (content.videoMessage) {
+    messageType = 'video';
+    caption = content.videoMessage.caption || null;
+    body = caption || '';
+    mediaInfo = {
+      mimetype: content.videoMessage.mimetype || 'video/mp4',
+      seconds: content.videoMessage.seconds || null,
+      fileLength: Number(content.videoMessage.fileLength) || null
+    };
+  } else if (content.audioMessage) {
+    messageType = 'audio';
+    mediaInfo = {
+      mimetype: content.audioMessage.mimetype || 'audio/ogg',
+      seconds: content.audioMessage.seconds || null,
+      ptt: Boolean(content.audioMessage.ptt)
+    };
+  } else if (content.documentMessage) {
+    messageType = 'document';
+    caption = content.documentMessage.caption || null;
+    body = caption || '';
+    mediaInfo = {
+      fileName: content.documentMessage.fileName || 'document',
+      mimetype: content.documentMessage.mimetype || 'application/octet-stream',
+      fileLength: Number(content.documentMessage.fileLength) || null
+    };
+  } else if (content.stickerMessage) {
+    messageType = 'sticker';
+    mediaInfo = {
+      mimetype: content.stickerMessage.mimetype || 'image/webp'
+    };
+  } else if (content.contactMessage || content.contactsArrayMessage) {
+    messageType = 'contact';
+    body = content.contactMessage?.displayName || 'Contact';
+  } else if (content.locationMessage || content.liveLocationMessage) {
+    messageType = 'location';
+    const loc = content.locationMessage || content.liveLocationMessage;
+    mediaInfo = {
+      latitude: loc.degreesLatitude,
+      longitude: loc.degreesLongitude,
+      name: loc.name || null,
+      address: loc.address || null
+    };
+  } else if (content.reactionMessage) {
+    messageType = 'reaction';
+    body = content.reactionMessage.text || '';
+    mediaInfo = {
+      target_id: content.reactionMessage.key?.id || null
+    };
+  } else if (content.buttonsResponseMessage) {
+    messageType = 'button_reply';
+    body = content.buttonsResponseMessage.selectedDisplayText || content.buttonsResponseMessage.selectedButtonId || '';
+  } else if (content.listResponseMessage) {
+    messageType = 'list_reply';
+    body = content.listResponseMessage.title || content.listResponseMessage.singleSelectReply?.selectedRowId || '';
+  }
+
+  const payload = {
+    id: messageId,
+    from: senderNumber,
+    from_jid: remoteJid,
+    is_group: isGroup,
+    participant: participant,
+    sender_name: senderName,
+    type: messageType,
+    text: body,
+    caption: caption,
+    media: mediaInfo,
+    timestamp: timestamp
+  };
+
+  return {
+    eventId,
+    userId: Number(userId),
+    remoteJid,
+    messageId,
+    messageType,
+    senderName,
+    body,
+    timestamp,
+    payload
+  };
+}
+
     sock.ev.on('messages.upsert', async (m) => {
       // Guard: Ignore messages from superseded sockets
       if (session.sock !== sock) return;
 
       try {
         if (m.type !== 'notify') return;
+        session.lastActivityAt = Date.now();
+
         for (const msg of m.messages) {
           if (!msg.message || msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue;
-          
-          const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.buttonsResponseMessage?.selectedButtonId || msg.message.listResponseMessage?.title || '';
+
+          // 1. Normalize the incoming message
+          const norm = normalizeInboundMessage(userId, msg, session);
+
+          // 2. Persist inbound message to database before acknowledging
+          try {
+            await db.execute(
+              `INSERT INTO inbound_messages
+               (user_id, remote_jid, message_id, message_type, sender_name, body, payload, message_timestamp)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE
+                 sender_name = COALESCE(VALUES(sender_name), sender_name),
+                 body = COALESCE(VALUES(body), body),
+                 payload = COALESCE(VALUES(payload), payload)`,
+              [
+                userId,
+                norm.remoteJid,
+                norm.messageId,
+                norm.messageType,
+                norm.senderName,
+                norm.body,
+                JSON.stringify(norm.payload),
+                norm.timestamp
+              ]
+            );
+          } catch (dbErr) {
+            logger.warn({ dbErr: dbErr.message, userId }, 'Failed to persist inbound message');
+          }
+
+          // 3. Enqueue inbound webhook event asynchronously (non-blocking)
+          await enqueueWebhookEvent(userId, 'message.received', {
+            event_id: norm.eventId,
+            session: {
+              user_id: Number(userId),
+              phone: session.phone || null
+            },
+            message: norm.payload
+          }, norm.messageId);
+
+          // 4. Chatbot rule processing for text messages
+          const text = norm.body || '';
           if (!text.trim()) continue;
+
           const [rules] = await db.execute('SELECT * FROM chatbot_rules WHERE user_id = ? AND status = "active"', [userId]);
           if (!rules || rules.length === 0) continue;
 
@@ -736,15 +978,54 @@ async function startSession(userId, force = false, waitForReady = true) {
           }
 
           if (matchedRule) {
-             const payload = JSON.stringify({ source: 'chatbot', rule_id: matchedRule.id, type: 'text' });
-             await db.execute(
-               `INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload) VALUES (?, NULL, ?, 'text', ?, ?)`,
-               [userId, msg.key.remoteJid, matchedRule.reply_text, payload]
-             );
+            const payload = JSON.stringify({ source: 'chatbot', rule_id: matchedRule.id, type: 'text' });
+            await db.execute(
+              `INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority) VALUES (?, NULL, ?, 'text', ?, ?, 5)`,
+              [userId, msg.key.remoteJid, matchedRule.reply_text, payload]
+            );
           }
         }
       } catch (err) {
-        logger.error({ err, userId }, 'Chatbot rule processing failed');
+        logger.error({ err: err.message, userId }, 'Inbound message processing failed');
+      }
+    });
+
+    sock.ev.on('messages.update', async (updates) => {
+      if (session.sock !== sock) return;
+      session.lastActivityAt = Date.now();
+      try {
+        for (const item of updates) {
+          const providerMessageId = item.key?.id;
+          const status = item.update?.status;
+          if (!providerMessageId) continue;
+
+          // Baileys WAMessageStatus: 3 = DELIVERY_ACK, 4 = READ, 5 = PLAYED
+          if (status === 3 || status === 'DELIVERY_ACK') {
+            await handleMessageStatusUpdate(userId, providerMessageId, 'delivered', item.update?.messageTimestamp);
+          } else if (status === 4 || status === 5 || status === 'READ' || status === 'PLAYED') {
+            await handleMessageStatusUpdate(userId, providerMessageId, 'read', item.update?.messageTimestamp);
+          }
+        }
+      } catch (err) {
+        logger.error({ err: err.message, userId }, 'Failed to process messages.update event');
+      }
+    });
+
+    sock.ev.on('message-receipt.update', async (receipts) => {
+      if (session.sock !== sock) return;
+      session.lastActivityAt = Date.now();
+      try {
+        for (const item of receipts) {
+          const providerMessageId = item.key?.id;
+          if (!providerMessageId) continue;
+          if (item.receipt?.readTimestamp) {
+            await handleMessageStatusUpdate(userId, providerMessageId, 'read', item.receipt.readTimestamp);
+          } else if (item.receipt?.receiptTimestamp) {
+            await handleMessageStatusUpdate(userId, providerMessageId, 'delivered', item.receipt.receiptTimestamp);
+          }
+        }
+      } catch (err) {
+        logger.error({ err: err.message, userId }, 'Failed to process message-receipt.update event');
       }
     });
 
@@ -766,6 +1047,79 @@ async function startSession(userId, force = false, waitForReady = true) {
   }
 
   return session;
+}
+
+async function safelyCleanupAttachment(message, payload) {
+  try {
+    const attachment = payload?.attachment;
+    if (!attachment?.is_temp || !attachment.path) {
+      return;
+    }
+
+    const attachmentPath = resolve(String(attachment.path));
+    const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
+    const isWithinUploads = attachmentPath === allowedUploadsDir || attachmentPath.startsWith(allowedUploadsDir + sep);
+    const filename = basename(attachmentPath);
+
+    if (!isWithinUploads || filename === '.htaccess' || filename.startsWith('.')) {
+      return;
+    }
+
+    if (!existsSync(attachmentPath)) {
+      return;
+    }
+
+    // 1. If part of an active campaign, retain media until campaign finishes or cancels
+    if (payload?.campaign_id) {
+      const [campRows] = await db.execute(
+        `SELECT status FROM campaigns WHERE id = ? LIMIT 1`,
+        [payload.campaign_id]
+      );
+      if (campRows[0] && ['queued', 'processing', 'running'].includes(campRows[0].status)) {
+        return;
+      }
+    }
+
+    // 2. Check if any other queued or processing messages still reference this attachment
+    const [activeRows] = await db.execute(
+      `SELECT id FROM message_queue
+       WHERE id != ?
+         AND status IN ('queued', 'processing')
+         AND (payload LIKE ? OR payload LIKE ?)
+       LIMIT 1`,
+      [message.id, `%${filename}%`, `%${attachment.path.replace(/\\/g, '\\\\')}%`]
+    );
+    if (activeRows.length > 0) {
+      return;
+    }
+
+    // 3. Decrement or check media_assets record reference count
+    try {
+      const [assetRows] = await db.execute(
+        `SELECT id, reference_count FROM media_assets
+         WHERE file_path = ? OR storage_key = ? OR file_path LIKE ?
+         LIMIT 1`,
+        [attachment.path, filename, `%${filename}`]
+      );
+      if (assetRows.length > 0) {
+        const asset = assetRows[0];
+        if (asset.reference_count > 1) {
+          await db.execute(
+            `UPDATE media_assets SET reference_count = reference_count - 1 WHERE id = ?`,
+            [asset.id]
+          );
+          return;
+        }
+        await db.execute(`DELETE FROM media_assets WHERE id = ?`, [asset.id]);
+      }
+    } catch (_) {}
+
+    // No active references left: safely delete file
+    await rm(attachmentPath, { force: true });
+    logger.info({ path: attachmentPath }, 'Ephemeral media cleaned up safely.');
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Failed during safe media cleanup');
+  }
 }
 
 async function claimNextMessage() {
@@ -790,29 +1144,53 @@ async function claimNextMessage() {
     logger.warn({ count: expiredRows.affectedRows }, 'Expired worker leases returned to the retry queue');
   }
 
-  await db.execute(
-    `UPDATE message_queue
-     SET status = 'processing', locked_at = NOW(), locked_by = ?, attempts = attempts + 1
-     WHERE id = (
-       SELECT id FROM (
-         SELECT id FROM message_queue
-         WHERE status = 'queued' AND available_at <= NOW()
-         ORDER BY id ASC
-         LIMIT 1
-       ) AS next_message
-     )`,
-    [WORKER_ID]
-  );
+  // Atomic transaction claim with FOR UPDATE SKIP LOCKED
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  const [rows] = await db.execute(
-    `SELECT * FROM message_queue
-     WHERE status = 'processing' AND locked_by = ?
-     ORDER BY locked_at DESC
-     LIMIT 1`,
-    [WORKER_ID]
-  );
+    const [rows] = await conn.execute(
+      `SELECT * FROM message_queue
+       WHERE status = 'queued'
+         AND available_at <= NOW()
+       ORDER BY priority DESC, available_at ASC, id ASC
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED`
+    );
 
-  return rows[0] || null;
+    if (!rows || rows.length === 0) {
+      await conn.commit();
+      return null;
+    }
+
+    const message = rows[0];
+
+    await conn.execute(
+      `UPDATE message_queue
+       SET status = 'processing',
+           locked_at = NOW(),
+           locked_by = ?,
+           attempts = attempts + 1
+       WHERE id = ?`,
+      [WORKER_ID, message.id]
+    );
+
+    await conn.commit();
+
+    message.status = 'processing';
+    message.locked_by = WORKER_ID;
+    message.locked_at = new Date();
+    message.attempts = (Number(message.attempts) || 0) + 1;
+
+    return message;
+  } catch (error) {
+    try {
+      await conn.rollback();
+    } catch (_) {}
+    throw error;
+  } finally {
+    conn.release();
+  }
 }
 
 async function releaseMessageToQueue(message) {
@@ -841,8 +1219,14 @@ async function sendQueuedMessage(message) {
         'SELECT sleeping FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
         [message.user_id]
       );
-      if (sessionRows[0] && Number(sessionRows[0].sleeping) === 1) {
-        currentSession.sleeping = true;
+      if (sessionRows[0]) {
+        if (Number(sessionRows[0].sleeping) === 1) currentSession.sleeping = true;
+        if (sessionRows[0].auto_sleep_enabled !== undefined && sessionRows[0].auto_sleep_enabled !== null) {
+          currentSession.autoSleepEnabled = Number(sessionRows[0].auto_sleep_enabled) === 1;
+        }
+        if (sessionRows[0].auto_sleep_timeout_seconds) {
+          currentSession.autoSleepTimeoutSeconds = Number(sessionRows[0].auto_sleep_timeout_seconds);
+        }
       }
     } catch (error) {
       if (isMissingSleepingColumnError(error)) {
@@ -866,24 +1250,33 @@ async function sendQueuedMessage(message) {
 
   const session = await startSession(String(message.user_id));
 
-  // If session is connecting / waking up, wait up to 25 seconds for socket to be ready
+  // If session is not connected, schedule a non-blocking retry with exponential backoff & jitter
   if (session.state !== 'connected' || !session.sock) {
-    logger.info(`Waiting for session ${message.user_id} to establish WhatsApp connection...`);
-    const maxWaitMs = 25000;
-    const startWait = Date.now();
-    while (Date.now() - startWait < maxWaitMs) {
-      if (session.state === 'connected' && session.sock) {
-        break;
-      }
-      if (session.state === 'error') {
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
+    logger.info(`Session for user ${message.user_id} is not connected (state: ${session.state}). Scheduling background retry.`);
+    const attempts = Number(message.attempts) || 1;
+    const maxAttempts = Number(message.max_attempts) || 5;
 
-  if (session.state !== 'connected' || !session.sock) {
-    throw new Error('WhatsApp device is not connected or failed to wake up.');
+    if (attempts >= maxAttempts) {
+      await markMessageFailed(message, 'WhatsApp device is not connected or failed to wake up after maximum retry attempts.');
+      return;
+    }
+
+    // Exponential backoff with jitter (5s, 10s, 20s, 40s... capped at 120s)
+    const baseDelay = Math.min(120, 5 * Math.pow(2, Math.max(0, attempts - 1)));
+    const jitter = Math.floor(Math.random() * 5);
+    const delaySeconds = baseDelay + jitter;
+
+    await db.execute(
+      `UPDATE message_queue
+       SET status = 'queued',
+           locked_at = NULL,
+           locked_by = NULL,
+           error_message = 'Session waking up or not yet connected; retry scheduled.',
+           available_at = DATE_ADD(NOW(), INTERVAL ? SECOND)
+       WHERE id = ?`,
+      [delaySeconds, message.id]
+    );
+    return;
   }
 
   session.lastActivityAt = Date.now();
@@ -982,54 +1375,237 @@ async function sendQueuedMessage(message) {
   if (!session.sock) {
       throw new Error('WhatsApp connection lost during humanized delay.');
     }
-    const result = await session.sock.sendMessage(recipient.jid, outgoingMessage);
+    session.activeOperations = (session.activeOperations || 0) + 1;
+    session.lastActivityAt = Date.now();
+    let result;
+    try {
+      result = await session.sock.sendMessage(recipient.jid, outgoingMessage);
+    } finally {
+      session.activeOperations = Math.max(0, (session.activeOperations || 1) - 1);
+      session.lastActivityAt = Date.now();
+    }
   await markMessageSent(message, result, recipient.normalizedTo);
 }
 
-async function sendWebhook(userId, payload) {
+async function enqueueWebhookEvent(userId, event, payload, messageId = null) {
+  try {
+    const [rows] = await db.execute(
+      'SELECT id, target_url, secret, secret_alt, enabled FROM webhooks WHERE user_id = ? AND enabled = 1 AND target_url IS NOT NULL LIMIT 1',
+      [userId]
+    );
+    const webhook = rows[0];
+    if (!webhook) {
+      return null;
+    }
+
+    const eventId = payload?.event_id || `evt_${crypto.randomUUID()}`;
+    const fullPayload = {
+      event,
+      event_id: eventId,
+      user_id: Number(userId),
+      ...payload,
+      occurred_at: payload?.occurred_at || new Date().toISOString()
+    };
+
+    const payloadJson = JSON.stringify(fullPayload);
+
+    await db.execute(
+      `INSERT INTO webhook_queue
+       (event_id, user_id, webhook_id, event, payload, status)
+       VALUES (?, ?, ?, ?, ?, 'queued')
+       ON DUPLICATE KEY UPDATE id = id`,
+      [eventId, userId, webhook.id, event, payloadJson]
+    );
+
+    setImmediate(processWebhookQueueOnce);
+    return eventId;
+  } catch (error) {
+    logger.warn({ error: error.message, userId, event }, 'Failed to enqueue webhook event');
+    return null;
+  }
+}
+
+async function deliverWebhookJob(job) {
   const [rows] = await db.execute(
     'SELECT * FROM webhooks WHERE user_id = ? AND enabled = 1 AND target_url IS NOT NULL LIMIT 1',
-    [userId]
+    [job.user_id]
   );
   const webhook = rows[0];
   if (!webhook) {
+    await db.execute(
+      `UPDATE webhook_queue SET status = 'failed', last_error = 'Webhook disabled or removed', locked_at = NULL, locked_by = NULL WHERE id = ?`,
+      [job.id]
+    );
     return;
   }
 
-  const body = JSON.stringify({ ...payload, occurred_at: new Date().toISOString() });
-  const headers = { 'Content-Type': 'application/json' };
-  if (webhook.secret) {
-    headers['X-WA-Hub-Signature'] = crypto.createHmac('sha256', webhook.secret).update(body).digest('hex');
-  }
+  const payload = typeof job.payload === 'string' ? JSON.parse(job.payload) : job.payload;
+  const bodyString = typeof job.payload === 'string' ? job.payload : JSON.stringify(job.payload);
 
+  // 1. SSRF Guard
   try {
     await assertSafeWebhookUrl(webhook.target_url);
   } catch (error) {
-    await recordWebhookDelivery(webhook, payload, null, error.message, 1);
-    logger.warn({ error, userId }, 'Blocked unsafe webhook target');
+    await recordWebhookDelivery(webhook, payload, null, error.message, (job.attempts || 0) + 1);
+    await db.execute(
+      `UPDATE webhook_queue SET status = 'failed', last_error = ?, locked_at = NULL, locked_by = NULL WHERE id = ?`,
+      [error.message, job.id]
+    );
+    logger.warn({ error: error.message, userId: job.user_id }, 'Blocked unsafe webhook target');
     return;
   }
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  // 2. Prepare headers & HMAC signatures
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-WA-Hub-Event-Id': job.event_id,
+    'X-WA-Hub-Timestamp': timestamp
+  };
+
+  if (webhook.secret) {
+    const sig = crypto.createHmac('sha256', webhook.secret).update(bodyString).digest('hex');
+    headers['X-WA-Hub-Signature'] = sig;
+    headers['X-Hub-Signature-256'] = `sha256=${sig}`;
+  }
+
+  // Secret rotation support: if secondary secret exists, sign with that too
+  if (webhook.secret_alt) {
+    const oldSig = crypto.createHmac('sha256', webhook.secret_alt).update(bodyString).digest('hex');
+    headers['X-WA-Hub-Signature-Old'] = oldSig;
+  }
+
+  const currentAttempt = (Number(job.attempts) || 0) + 1;
+
+  // 3. Dispatch HTTP POST request
+  let success = false;
+  let statusCode = null;
+  let deliveryError = null;
+
+  try {
+    const response = await fetch(webhook.target_url, {
+      method: 'POST',
+      headers,
+      body: bodyString,
+      redirect: 'error',
+      signal: AbortSignal.timeout(8000)
+    });
+    statusCode = response.status;
+    if (response.ok) {
+      success = true;
+    } else {
+      deliveryError = `HTTP ${response.status} ${response.statusText}`;
+    }
+  } catch (err) {
+    deliveryError = err.message || 'Network error';
+  }
+
+  // 4. Record delivery attempt in webhook_deliveries
+  await recordWebhookDelivery(webhook, payload, statusCode, deliveryError, currentAttempt);
+
+  if (success) {
+    await db.execute(
+      `UPDATE webhook_queue
+       SET status = 'delivered', locked_at = NULL, locked_by = NULL, attempts = ?
+       WHERE id = ?`,
+      [currentAttempt, job.id]
+    );
+    logger.info({ eventId: job.event_id, userId: job.user_id, attempt: currentAttempt }, 'Webhook successfully delivered');
+  } else {
+    const maxAttempts = Number(job.max_attempts) || 5;
+    if (currentAttempt >= maxAttempts) {
+      await db.execute(
+        `UPDATE webhook_queue
+         SET status = 'dead_letter', attempts = ?, last_error = ?, locked_at = NULL, locked_by = NULL
+         WHERE id = ?`,
+        [currentAttempt, deliveryError, job.id]
+      );
+      logger.warn({ eventId: job.event_id, userId: job.user_id, attempts: currentAttempt, error: deliveryError }, 'Webhook delivery reached terminal failure (dead letter)');
+    } else {
+      const baseDelay = Math.min(300, 5 * Math.pow(2, currentAttempt - 1));
+      const jitter = Math.floor(Math.random() * 5);
+      const delaySeconds = baseDelay + jitter;
+
+      await db.execute(
+        `UPDATE webhook_queue
+         SET status = 'queued', attempts = ?, last_error = ?,
+             available_at = DATE_ADD(NOW(), INTERVAL ? SECOND), locked_at = NULL, locked_by = NULL
+         WHERE id = ?`,
+        [currentAttempt, deliveryError, delaySeconds, job.id]
+      );
+      logger.info({ eventId: job.event_id, userId: job.user_id, attempt: currentAttempt, nextRetrySeconds: delaySeconds }, 'Webhook delivery failed; scheduled retry');
+    }
+  }
+}
+
+let webhookQueueBusy = false;
+async function processWebhookQueueOnce() {
+  if (webhookQueueBusy) return;
+  webhookQueueBusy = true;
+
+  try {
+    await db.execute(
+      `UPDATE webhook_queue
+       SET status = 'dead_letter', locked_at = NULL, locked_by = NULL,
+           last_error = COALESCE(last_error, 'Webhook worker lease expired after final attempt.')
+       WHERE status = 'processing'
+         AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         AND attempts >= max_attempts`
+    );
+
+    await db.execute(
+      `UPDATE webhook_queue
+       SET status = 'queued', locked_at = NULL, locked_by = NULL,
+           last_error = COALESCE(last_error, 'Webhook worker lease expired; returned to retry queue.')
+       WHERE status = 'processing'
+         AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         AND attempts < max_attempts`
+    );
+
+    let job = null;
+    const conn = await db.getConnection();
     try {
-      const response = await fetch(webhook.target_url, {
-        method: 'POST',
-        headers,
-        body,
-        redirect: 'error',
-        signal: AbortSignal.timeout(8000)
-      });
-      await recordWebhookDelivery(webhook, payload, response.status, response.ok ? null : `HTTP ${response.status}`, attempt);
-      if (response.ok) {
-        return;
+      await conn.beginTransaction();
+      const [rows] = await conn.execute(
+        `SELECT * FROM webhook_queue
+         WHERE status = 'queued' AND available_at <= NOW()
+         ORDER BY id ASC
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED`
+      );
+
+      if (rows && rows.length > 0) {
+        job = rows[0];
+        await conn.execute(
+          `UPDATE webhook_queue
+           SET status = 'processing', locked_at = NOW(), locked_by = ?
+           WHERE id = ?`,
+          [WORKER_ID, job.id]
+        );
       }
-    } catch (error) {
-      await recordWebhookDelivery(webhook, payload, null, error.message, attempt);
-      logger.warn({ error, userId, attempt }, 'Webhook delivery failed');
+      await conn.commit();
+    } catch (err) {
+      try { await conn.rollback(); } catch (_) {}
+      throw err;
+    } finally {
+      conn.release();
     }
 
-    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+    if (!job) {
+      return;
+    }
+
+    await deliverWebhookJob(job);
+    setImmediate(processWebhookQueueOnce);
+  } catch (err) {
+    logger.error({ err: err.message }, 'Webhook queue processor error');
+  } finally {
+    webhookQueueBusy = false;
   }
+}
+
+async function sendWebhook(userId, payload) {
+  return enqueueWebhookEvent(userId, payload?.event || 'message.event', payload, payload?.message_id || null);
 }
 
 async function markMessageSent(message, result, normalizedTo) {
@@ -1053,29 +1629,15 @@ async function markMessageSent(message, result, normalizedTo) {
     provider_message_id: result?.key?.id || null
   });
 
-  // Ephemeral media cleanup to conserve disk space
-  await cleanupEphemeralMedia(message);
-}
-
-async function cleanupEphemeralMedia(message) {
+  // Ephemeral media cleanup with reference lifecycle management
   try {
     const payload = message?.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
-    if (payload?.attachment?.is_temp && payload.attachment.path) {
-      const resolvedPath = resolve(String(payload.attachment.path));
-      const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
-      const isWithinUploads = resolvedPath === allowedUploadsDir || resolvedPath.startsWith(allowedUploadsDir + sep);
-      const fileBase = basename(resolvedPath);
-      if (isWithinUploads && fileBase !== '.htaccess' && !fileBase.startsWith('.') && existsSync(resolvedPath)) {
-        await rm(resolvedPath, { force: true });
-      }
-    }
-  } catch (err) {
-    logger.warn({ err }, 'Could not clean up ephemeral media file');
-  }
+    await safelyCleanupAttachment(message, payload);
+  } catch (_) {}
 }
 
-async function markMessageFailed(message, error, normalizedTo = null) {
-  const finalFail = Number(message.attempts) >= Number(message.max_attempts);
+async function markMessageFailed(message, error, normalizedTo = null, isUncertain = false) {
+  const finalFail = isUncertain || Number(message.attempts) >= Number(message.max_attempts);
   const nextStatus = finalFail ? 'failed' : 'queued';
   const delay = Math.min(300, 15 * Math.max(1, Number(message.attempts)));
 
@@ -1100,8 +1662,11 @@ async function markMessageFailed(message, error, normalizedTo = null) {
       error
     });
 
-    // Cleanup temporary media if final attempt failed
-    await cleanupEphemeralMedia(message);
+    // Cleanup temporary media with reference lifecycle management if final attempt failed
+    try {
+      const payload = message?.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+      await safelyCleanupAttachment(message, payload);
+    } catch (_) {}
   }
 }
 
@@ -1119,25 +1684,47 @@ async function processQueueOnce() {
       try {
         await sendQueuedMessage(message);
       } catch (error) {
-        await markMessageFailed(message, error.message);
+        const isUncertain = error.code === 'ECONNRESET' || error.message?.includes('socket') || error.message?.includes('timeout');
+        await markMessageFailed(message, error.message, null, isUncertain);
       }
       setImmediate(processQueueOnce);
     } else {
       const now = Date.now();
       for (const session of sessions.values()) {
-        if (session.wasSleeping && !session.sleeping) {
-          const lastActivity = session.lastActivityAt || now;
-          if (now - lastActivity > 60 * 1000) {
-            logger.info(`Session for user ${session.userId} was inactive for 1 minute. Returning to sleep mode.`);
-            session.wasSleeping = false;
-            session.sleeping = true;
-            session.qr = null;
-            session.hasQr = false;
-            session.error = null;
-            destroySocket(session);
-            session.state = session.phone ? 'connected' : 'idle';
-            await updateSessionRecord(session.userId, session);
+        if (!session.autoSleepEnabled) {
+          continue; // Auto-sleep disabled by tenant
+        }
+        if (session.state !== 'connected' || !session.sock || session.sleeping) {
+          continue; // Session is not connected or already sleeping
+        }
+        if ((session.activeOperations || 0) > 0) {
+          continue; // Ongoing send or critical operation in progress; do not disconnect!
+        }
+
+        const timeoutSeconds = Math.max(15, Math.min(86400, Number(session.autoSleepTimeoutSeconds) || 60));
+        const timeoutMs = timeoutSeconds * 1000;
+        const lastActivity = session.lastActivityAt || now;
+
+        if (now - lastActivity >= timeoutMs) {
+          // Verify no active messages queued or processing for this tenant
+          const [activeQueue] = await db.execute(
+            `SELECT id FROM message_queue WHERE user_id = ? AND status IN ('queued', 'processing') AND available_at <= NOW() LIMIT 1`,
+            [session.userId]
+          );
+          if (activeQueue && activeQueue.length > 0) {
+            session.lastActivityAt = now;
+            continue;
           }
+
+          logger.info(`Session for user ${session.userId} reached idle timeout of ${timeoutSeconds}s without activity. Entering auto-sleep.`);
+          session.wasSleeping = false;
+          session.sleeping = true;
+          session.qr = null;
+          session.hasQr = false;
+          session.error = null;
+          destroySocket(session);
+          session.state = session.phone ? 'connected' : 'idle';
+          await updateSessionRecord(session.userId, session);
         }
       }
     }
@@ -1241,6 +1828,34 @@ app.post('/sessions/:userId/logout', async (req, res) => {
   res.json({ ok: true, session: publicSession(getSession(req.params.userId)) });
 });
 
+app.post('/sessions/:userId/auto-sleep', async (req, res) => {
+  const userId = req.params.userId;
+  const session = getSession(userId);
+  const enabled = req.body?.auto_sleep_enabled !== undefined ? Boolean(req.body.auto_sleep_enabled) : true;
+  const rawTimeout = Number(req.body?.auto_sleep_timeout_seconds) || 60;
+  const timeoutSeconds = Math.max(15, Math.min(86400, rawTimeout));
+
+  session.autoSleepEnabled = enabled;
+  session.autoSleepTimeoutSeconds = timeoutSeconds;
+  session.lastActivityAt = Date.now();
+
+  try {
+    await db.execute(
+      `UPDATE whatsapp_sessions
+       SET auto_sleep_enabled = ?, auto_sleep_timeout_seconds = ?
+       WHERE user_id = ?`,
+      [Number(enabled), timeoutSeconds, userId]
+    );
+  } catch (_) {}
+
+  res.json({
+    ok: true,
+    user_id: Number(userId),
+    auto_sleep_enabled: enabled,
+    auto_sleep_timeout_seconds: timeoutSeconds
+  });
+});
+
 app.post('/sessions/:userId/sleep', async (req, res) => {
   const session = getSession(req.params.userId);
   session.sleeping = true;
@@ -1332,6 +1947,7 @@ async function startWorker() {
   const server = app.listen(PORT, '127.0.0.1', () => {
     console.info(`[worker] listener=http://127.0.0.1:${PORT} health_route=GET /health database=ready`);
     setInterval(processQueueOnce, QUEUE_POLL_MS);
+    setInterval(processWebhookQueueOnce, QUEUE_POLL_MS);
   });
   attachClientErrorDiagnostics(server, logger);
 }

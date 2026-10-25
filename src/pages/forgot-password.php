@@ -75,7 +75,7 @@ It expires in 15 minutes.";
         if ($viaPhone && $phone !== '') {
             $sysKey = app_config('system_api.key');
             $apiKeyId = null;
-            $userId = 1;
+            $userId = null;
 
             if ($sysKey) {
                 $stmtKey = Database::pdo()->prepare('SELECT id, user_id FROM api_keys WHERE key_hash = ? LIMIT 1');
@@ -87,10 +87,38 @@ It expires in 15 minutes.";
                 }
             }
 
-            $msgBody = "Your WhatsGateway password reset OTP is: *$otp*
-It expires in 15 minutes.";
-            enqueue_message($userId, $apiKeyId, $phone, $msgBody);
-            $sentVia[] = 'WhatsApp';
+            if (!$userId) {
+                $adminEmails = array_filter(array_map('trim', explode(',', (string) app_config('admin_email', ''))));
+                if (!empty($adminEmails)) {
+                    $inPlaceholders = implode(',', array_fill(0, count($adminEmails), '?'));
+                    $stmtAdmin = Database::pdo()->prepare(
+                        "SELECT u.id FROM users u JOIN whatsapp_sessions s ON s.user_id = u.id WHERE u.email IN ($inPlaceholders) AND s.status = 'connected' ORDER BY u.id ASC LIMIT 1"
+                    );
+                    $stmtAdmin->execute($adminEmails);
+                    $adminRow = $stmtAdmin->fetch();
+                    if ($adminRow) {
+                        $userId = (int) $adminRow['id'];
+                    }
+                }
+            }
+
+            if (!$userId) {
+                $stmtAny = Database::pdo()->query(
+                    "SELECT user_id FROM whatsapp_sessions WHERE status = 'connected' ORDER BY updated_at DESC LIMIT 1"
+                );
+                $anyRow = $stmtAny ? $stmtAny->fetch() : null;
+                if ($anyRow) {
+                    $userId = (int) $anyRow['user_id'];
+                }
+            }
+
+            if ($userId) {
+                $msgBody = "Your WhatsGateway password reset OTP is: *$otp*\nIt expires in 15 minutes.";
+                enqueue_message($userId, $apiKeyId, $phone, $msgBody, ['type' => 'text', 'source' => 'system_otp', 'priority' => 10], 10);
+                $sentVia[] = 'WhatsApp';
+            } else {
+                error_log('Password reset OTP via WhatsApp skipped: No active WhatsApp session or system API key configured.');
+            }
         }
 
         json_response(['ok' => true, 'sent_via' => $sentVia]);

@@ -714,6 +714,52 @@ function page_header(string $title, string $subtitle): void
                 <?php endif; ?>
             </div>
         </section>
+
+        <!-- Auto-Sleep Configuration Card -->
+        <section class="bg-white rounded-xl border border-slate-200 shadow-saas overflow-hidden lg:col-span-2">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div>
+                    <h2 class="text-[15px] font-bold text-slate-900 tracking-tight">Session Auto-Sleep Settings</h2>
+                    <p class="text-[12px] text-slate-500 mt-0.5">Configure automatic disconnection when the session is idle to conserve server resources.</p>
+                </div>
+                <span class="px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm <?= !empty($session['auto_sleep_enabled']) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200' ?>">
+                    <?= !empty($session['auto_sleep_enabled']) ? 'Enabled' : 'Disabled' ?>
+                </span>
+            </div>
+            <form method="post" action="<?= e(base_url('index.php?page=session-auto-sleep')) ?>" class="p-6 space-y-5">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                
+                <div class="flex items-start gap-3">
+                    <input type="checkbox" id="autoSleepEnabled" name="auto_sleep_enabled" value="1" <?= !empty($session['auto_sleep_enabled']) ? 'checked' : '' ?> class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-accent focus:ring-brand-accent">
+                    <div>
+                        <label for="autoSleepEnabled" class="text-[14px] font-semibold text-slate-900 cursor-pointer">Enable Session Auto-Sleep</label>
+                        <p class="text-[12px] text-slate-500 mt-0.5">Automatically puts this WhatsApp session to sleep when inactive.</p>
+                    </div>
+                </div>
+
+                <div class="max-w-xs">
+                    <label for="autoSleepTimeout" class="block text-[13px] font-semibold text-slate-700 mb-1">Idle Timeout (seconds)</label>
+                    <input type="number" id="autoSleepTimeout" name="auto_sleep_timeout_seconds" min="15" max="86400" value="<?= (int) ($session['auto_sleep_timeout_seconds'] ?? 60) ?>" required class="w-full px-3 py-2 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-accent/20 focus:border-brand-accent bg-white shadow-sm font-mono">
+                    <p class="text-[11px] text-slate-400 mt-1">Default: 60s. Allowed range: 15 to 86,400 seconds (24h).</p>
+                </div>
+
+                <div class="p-4 bg-amber-50/70 border border-amber-200/80 rounded-lg text-amber-900 text-[12px] leading-relaxed">
+                    <p class="font-semibold flex items-center gap-1.5 mb-1 text-amber-800">
+                        <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        Operational Notice & Disclaimers
+                    </p>
+                    <ul class="list-disc list-inside space-y-1 text-amber-800/90 text-[11px]">
+                        <li><strong>Inbound & Chatbot:</strong> When auto-sleep disconnects a session, real-time inbound message processing and chatbot responses are paused until reconnection or new outbound activity.</li>
+                        <li><strong>Operational Independence:</strong> Auto-sleep is an idle power-saving mechanism strictly separate from business working hours and campaign scheduling.</li>
+                        <li><strong>Compliance:</strong> Auto-sleep, randomized delays, and disconnection frequency do not constitute an anti-ban guarantee.</li>
+                    </ul>
+                </div>
+
+                <button type="submit" class="px-4 py-2 text-[13px] font-semibold text-white bg-slate-900 rounded-lg shadow-sm hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all">
+                    Save Auto-Sleep Settings
+                </button>
+            </form>
+        </section>
     </div>
 
 <?php elseif ($section === 'api-keys'): ?>
@@ -1003,6 +1049,8 @@ function page_header(string $title, string $subtitle): void
                                 'queued' => 'bg-slate-100 text-slate-700 border-slate-200',
                                 'processing' => 'bg-blue-50 text-blue-700 border-blue-200',
                                 'sent' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                'delivered' => 'bg-teal-50 text-teal-700 border-teal-200',
+                                'read' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
                                 'failed' => 'bg-rose-50 text-rose-700 border-rose-200',
                                 'cancelled' => 'bg-orange-50 text-orange-700 border-orange-200'
                             ];
@@ -1010,6 +1058,8 @@ function page_header(string $title, string $subtitle): void
                                 'queued' => 'bg-slate-500',
                                 'processing' => 'bg-blue-500 animate-pulse',
                                 'sent' => 'bg-emerald-500',
+                                'delivered' => 'bg-teal-500',
+                                'read' => 'bg-indigo-500',
                                 'failed' => 'bg-rose-500',
                                 'cancelled' => 'bg-orange-500'
                             ];
