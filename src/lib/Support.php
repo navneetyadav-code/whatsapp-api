@@ -655,7 +655,11 @@ function save_uploaded_media(array $fileInfo, ?string $declaredType = null, int 
     $finalFilename = 'media_' . bin2hex(random_bytes(16)) . '.' . $ext;
     $target = $uploadDir . $finalFilename;
 
-    if (!move_uploaded_file($fileInfo['tmp_name'], $target)) {
+    $stored = is_uploaded_file($fileInfo['tmp_name'])
+        ? move_uploaded_file($fileInfo['tmp_name'], $target)
+        : (file_exists($fileInfo['tmp_name']) && copy($fileInfo['tmp_name'], $target));
+
+    if (!$stored) {
         throw new RuntimeException('Failed to store uploaded file on server.');
     }
 
