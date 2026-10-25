@@ -124,15 +124,21 @@ if ($page === 'message-send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Secure media upload handling (validated against allowed MIME types, extension whitelisting, and temporary cleanup)
     $payload = [];
-    if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
+    if (!empty($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
         try {
-            $payload['attachment'] = save_uploaded_media($_FILES['attachment']);
-        } catch (Throwable $e) {
-            $errMsg = $e->getMessage();
+            $saved = save_uploaded_media($_FILES['attachment']);
+            $payload['attachment'] = [
+                'path' => $saved['path'],
+                'name' => $saved['name'],
+                'type' => $saved['type'],
+                'mime' => $saved['mime'],
+            ];
+        } catch (Throwable $uploadException) {
+            $uploadError = $uploadException->getMessage();
             if ($isAjax) {
-                json_response(['ok' => false, 'error' => $errMsg], 422);
+                json_response(['ok' => false, 'error' => $uploadError], 422);
             }
-            flash('error', $errMsg);
+            flash('error', $uploadError);
             redirect_to('index.php?page=message');
         }
     }

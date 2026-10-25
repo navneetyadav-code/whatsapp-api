@@ -6,6 +6,7 @@ worker/*.log
 *.pid
 public/uploads/*
 !public/uploads/.gitkeep
+!public/uploads/.htaccess
 __pycache__/
 *.pyc
 .whatsapp_cli.json
