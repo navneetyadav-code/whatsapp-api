@@ -9,47 +9,103 @@ declare(strict_types=1);
  * against local, staging, or production WhatsGateway endpoints.
  */
 
-$defaultApiUrl = 'http://localhost/wa/public/api/send.php';
+require_once dirname(__DIR__) . '/src/bootstrap.php';
+
+// Security: Restrict unauthenticated remote access to developer test console (SEC-03)
+$isLocal = is_local_request();
+if (!$isLocal) {
+    require_auth();
+}
+
+$defaultApiUrl = base_url('api/send.php');
 $apiUrl = !empty($_POST['api_url']) ? trim((string) $_POST['api_url']) : $defaultApiUrl;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!$isLocal) {
+        verify_csrf();
+    }
+
     $to = trim((string) ($_POST['phone'] ?? ''));
     $message = trim((string) ($_POST['message'] ?? ''));
     $apiKey = trim((string) ($_POST['api_key'] ?? ''));
     $mediaUrl = trim((string) ($_POST['media_url'] ?? ''));
     $humanize = !empty($_POST['humanize']);
 
-    $bodyData = [
-        'to' => $to,
-        'message' => $message,
-        'humanize' => $humanize,
-    ];
+    // SSRF Protection: Validate target API URL and media URL
+    $targetHost = strtolower((string) (parse_url($apiUrl, PHP_URL_HOST) ?? ''));
+    $cleanTargetHost = trim($targetHost, '[]');
+    $targetScheme = strtolower((string) (parse_url($apiUrl, PHP_URL_SCHEME) ?? ''));
 
-    if ($mediaUrl !== '') {
-        $bodyData['media_url'] = $mediaUrl;
+    $isDisallowed = !filter_var($apiUrl, FILTER_VALIDATE_URL)
+        || !in_array($targetScheme, ['http', 'https'], true)
+        || $cleanTargetHost === ''
+        || str_starts_with($cleanTargetHost, '169.254.')
+        || $cleanTargetHost === 'metadata.google.internal'
+        || $cleanTargetHost === '100.100.100.200'
+        || (!$isLocal && (in_array($cleanTargetHost, ['localhost', '127.0.0.1', '::1', '0.0.0.0'], true) || is_private_ip(gethostbyname($cleanTargetHost))));
+
+    if ($isDisallowed) {
+        $result = [
+            'code' => 400,
+            'response' => ['ok' => false, 'error' => 'API endpoint is restricted or invalid.'],
+        ];
+    } else {
+        if ($mediaUrl !== '') {
+            try {
+                assert_safe_media_url($mediaUrl);
+            } catch (Throwable $e) {
+                $result = [
+                    'code' => 400,
+                    'response' => ['ok' => false, 'error' => 'Invalid media URL: ' . $e->getMessage()],
+                ];
+            }
+        }
+
+        if (!isset($result)) {
+            $bodyData = [
+                'to' => $to,
+                'message' => $message,
+                'humanize' => $humanize,
+            ];
+
+            if ($mediaUrl !== '') {
+                $bodyData['media_url'] = $mediaUrl;
+            }
+
+            $payload = json_encode($bodyData, JSON_UNESCAPED_SLASHES);
+
+            $ch = curl_init($apiUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $apiKey,
+                'X-Api-Key: ' . $apiKey,
+                'ngrok-skip-browser-warning: true',
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $primaryIp = (string) curl_getinfo($ch, CURLINFO_PRIMARY_IP);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            if (!$isLocal && $primaryIp !== '' && is_private_ip($primaryIp)) {
+                $result = [
+                    'code' => 400,
+                    'response' => ['ok' => false, 'error' => 'API endpoint resolved to a restricted IP address.'],
+                ];
+            } else {
+                $result = [
+                    'code' => $httpCode ?: 500,
+                    'response' => json_decode((string) $response, true) ?: ($curlError ?: $response),
+                ];
+            }
+        }
     }
-
-    $payload = json_encode($bodyData, JSON_UNESCAPED_SLASHES);
-
-    $ch = curl_init($apiUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $apiKey,
-        'X-Api-Key: ' . $apiKey,
-        'ngrok-skip-browser-warning: true',
-    ]);
-
-    $response = curl_exec($ch);
-    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    $result = [
-        'code' => $httpCode,
-        'response' => json_decode((string) $response, true) ?: $response,
-    ];
 }
 ?>
 <!DOCTYPE html>
@@ -82,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <p style="font-size: 14px; color: #64748b; margin-bottom: 1.5rem;">Interactive test console for sending WhatsApp messages and media through WhatsGateway.</p>
         
         <form method="POST" autocomplete="off" data-form-type="other">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <div class="form-group">
                 <label>API Endpoint URL</label>
                 <input type="text" name="api_url" placeholder="http://localhost/wa/public/api/send.php" required value="<?= htmlspecialchars($apiUrl) ?>">
