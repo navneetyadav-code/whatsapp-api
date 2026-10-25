@@ -98,63 +98,50 @@ Dedicated, zero-dependency examples in five programming languages are located in
 
 ## 4. System Architecture & Directory Structure
 
+<p align="center">
+  <img src="public/assets/architecture.png" alt="WhatsGateway System Architecture Diagram" width="100%">
+</p>
+
+### High-Level Request & Delivery Flow
+
 ```mermaid
-flowchart TD
-    subgraph Clients["Client Integrations"]
-        C1["cURL / HTTP Client"]
-        C2["Python / Node / Go / Java SDK"]
-        C3["Web Browser / Dashboard"]
+flowchart LR
+    subgraph Clients["1. Clients & Ingestion"]
+        direction TB
+        C1["REST API Consumers<br/>(cURL, Python, Node, Go, Java)"]
+        C2["Admin Dashboard<br/>(PHP & Tailwind SaaS)"]
     end
 
-    subgraph Apache["Apache HTTP Server / DocumentRoot: public/"]
-        A1[".htaccess URL Rewriter"]
-        A2["public/api/send.php (REST API)"]
-        A3["public/api/health.php (Health Check)"]
-        A4["public/index.php (Front Controller)"]
-        A5["public/session.php (AJAX Session API)"]
+    subgraph Gateway["2. Web Gateway & Security"]
+        direction TB
+        G1["Apache URL Rewriter<br/>(.htaccess & Routing)"]
+        G2["Authentication & Guardrails<br/>(API Key HMAC, 2FA, SSRF Filter)"]
+        G3["REST API Ingestion<br/>(public/api/send.php)"]
     end
 
-    subgraph Core["Core PHP Engine (src/)"]
-        B1["src/bootstrap.php"]
-        B2["src/lib/ApiCredentials.php (Auth & Limits)"]
-        B3["src/lib/MessageQueue.php (Enqueue & Stats)"]
-        B4["src/lib/WorkerClient.php (Internal RPC)"]
-        B5["src/lib/Support.php (Media Downloader & SSRF)"]
-        B6["src/pages/ (Dashboard & Views)"]
+    subgraph Storage["3. Persistent Storage"]
+        direction TB
+        DB[("MySQL / MariaDB / TiDB<br/>ACID Message Queue & Sessions")]
     end
 
-    subgraph DB[("MySQL / MariaDB / TiDB Cloud")]
-        D1["message_queue"]
-        D2["api_keys & api_request_logs"]
-        D3["whatsapp_sessions"]
-        D4["webhooks & webhook_deliveries"]
-        D5["contacts & campaigns & chatbot_rules"]
+    subgraph Worker["4. Node.js Worker & Engine"]
+        direction TB
+        W1["Express IPC Controller (:3107)"]
+        W2["FIFO Queue Poller & Humanized Delay"]
+        W3["Baileys Multi-Device Client"]
+        W4["Chatbot Engine & Outbound Webhooks"]
     end
 
-    subgraph Worker["Node.js Background Worker (worker/server.mjs:3107)"]
-        W1["Express IPC API (Queue Notify & Session)"]
-        W2["Queue Poller & Message Claimer"]
-        W3["Humanized Presence Delay"]
-        W4["Baileys WhatsApp Client (MultiFileAuthState)"]
-        W5["Webhook Dispatcher (HMAC-SHA256)"]
-        W6["Chatbot Auto-Responder"]
+    subgraph WhatsApp["5. WhatsApp Network"]
+        WA["Meta WhatsApp Servers<br/>(Noise Protocol WebSocket)"]
     end
 
-    subgraph WhatsApp["WhatsApp Network"]
-        WA["WhatsApp Web Multi-Device WebSocket"]
-    end
-
-    C1 -->|POST /api/send.php| A2
-    C2 -->|POST /v20.0/.../messages| A1 --> A2
-    C3 -->|Web UI & AJAX| A4 & A5
-    A2 & A4 & A5 --> Core
-    Core -->|Read / Write| DB
-    Core -->|POST /queue/notify| W1
-    W2 -->|Poll & Claim Messages| DB
-    W2 --> W3 --> W4
-    W4 <-->|Encrypted Noise Socket| WA
-    W4 -->|Incoming message upsert| W6 -->|Insert reply| D1
-    W4 -->|Delivery Event| W5 -->|HTTPS Callback| C1
+    Clients -->|HTTP POST / Auth| Gateway
+    Gateway -->|Verify & Enqueue| Storage
+    Gateway -.->|Fast Wakeup Notify| Worker
+    Worker -->|Claim Pending Messages| Storage
+    Worker <==>|Encrypted Protocol| WhatsApp
+    Worker -.->|Webhooks / Delivery Acks| Clients
 ```
 
 ### Directory Structure

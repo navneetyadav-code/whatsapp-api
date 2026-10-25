@@ -10,3 +10,5 @@ public/uploads/*
 __pycache__/
 *.pyc
 .whatsapp_cli.json
+
+/.archify/
