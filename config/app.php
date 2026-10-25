@@ -100,6 +100,7 @@ return [
         'enable_test_page' => config_bool('ENABLE_TEST_PAGE', $appEnv !== 'production'),
         'enable_registration' => config_bool('ENABLE_REGISTRATION', false),
         'default_country_code' => config_env('DEFAULT_COUNTRY_CODE', 'in'),
+        'disable_password_login' => config_bool('DISABLE_PASSWORD_LOGIN', false),
         'allow_new_devices' => config_bool('ALLOW_NEW_DEVICES', false),
         'admin_email' => config_env('ADMIN_EMAIL', 'navneetyadav982008@gmail.com,unknownkumar1113@gmail.com'),
         'restricted_notice' => 'This is not allowed in current architecture. Contact info.assistgroupofficial@gmail.com',

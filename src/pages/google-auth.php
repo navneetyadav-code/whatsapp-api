@@ -77,6 +77,7 @@ if (isset($_GET['code'])) {
 
     if ($user) {
         // User exists, log them in
+        clear_failed_logins($email);
         session_regenerate_id(true);
         $_SESSION['user_id'] = (int) $user['id'];
         redirect_to('index.php?page=dashboard');
@@ -93,6 +94,7 @@ if (isset($_GET['code'])) {
         try {
             // Using the existing register_user function from Auth.php
             $credentials = register_user($name, $email, $phone, $randomPassword);
+            clear_failed_logins($email);
             flash('success', 'Account created successfully via Google.');
             redirect_to('index.php?page=dashboard');
         } catch (Throwable $e) {

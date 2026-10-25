@@ -31,12 +31,20 @@ function attempt_login(string $email, string $password): bool
     if (login_lockout_seconds($email) > 0) {
         return false;
     }
+    if ((bool) app_config('app.disable_password_login')) {
+        return false;
+    }
 
     $stmt = Database::pdo()->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
-    if (!$user || !password_verify($password, $user['password_hash'])) {
+    // Constant-time defense against user enumeration via bcrypt timing
+    $dummyHash = '$2y$10$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUV0123456789';
+    $hashToVerify = ($user && !empty($user['password_hash'])) ? (string) $user['password_hash'] : $dummyHash;
+    $passwordValid = password_verify($password, $hashToVerify);
+
+    if (!$user || !$passwordValid) {
         record_failed_login($email);
         return false;
     }
@@ -53,17 +61,38 @@ function login_lockout_seconds(string $email): int
     $lockoutMinutes = max(1, (int) app_config('security.login_lockout_minutes'));
 
     try {
-        $stmt = Database::pdo()->prepare(
-            'SELECT COUNT(*) FROM login_attempts
-             WHERE email = ? AND ip_address = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)'
-        );
-        $stmt->execute([mb_strtolower(trim($email)), client_ip(), $lockoutMinutes]);
-        $attempts = (int) $stmt->fetchColumn();
+        $email = mb_strtolower(trim($email));
+        $pdo = Database::pdo();
+
+        // 1. Account-level lockout: protects an account against distributed brute force across rotating IPs
+        if ($email !== '') {
+            $stmtEmail = $pdo->prepare(
+                'SELECT COUNT(*) FROM login_attempts
+                 WHERE email = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)'
+            );
+            $stmtEmail->execute([$email, $lockoutMinutes]);
+            if ((int) $stmtEmail->fetchColumn() >= $maxAttempts) {
+                return $lockoutMinutes * 60;
+            }
+        }
+
+        // 2. IP-level lockout: protects against credential spraying across many different accounts from one IP
+        $ip = client_ip();
+        if ($ip !== '') {
+            $stmtIp = $pdo->prepare(
+                'SELECT COUNT(*) FROM login_attempts
+                 WHERE ip_address = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)'
+            );
+            $stmtIp->execute([$ip, $lockoutMinutes]);
+            if ((int) $stmtIp->fetchColumn() >= ($maxAttempts * 3)) {
+                return $lockoutMinutes * 60;
+            }
+        }
     } catch (Throwable) {
         return 0;
     }
 
-    return $attempts >= $maxAttempts ? $lockoutMinutes * 60 : 0;
+    return 0;
 }
 
 function record_failed_login(string $email): void
@@ -79,8 +108,8 @@ function record_failed_login(string $email): void
 function clear_failed_logins(string $email): void
 {
     try {
-        $stmt = Database::pdo()->prepare('DELETE FROM login_attempts WHERE email = ? AND ip_address = ?');
-        $stmt->execute([mb_strtolower(trim($email)), client_ip()]);
+        $stmt = Database::pdo()->prepare('DELETE FROM login_attempts WHERE email = ?');
+        $stmt->execute([mb_strtolower(trim($email))]);
     } catch (Throwable) {
         // See record_failed_login().
     }

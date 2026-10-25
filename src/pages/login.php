@@ -10,13 +10,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim((string) ($_POST['email'] ?? ''));
     $password = (string) ($_POST['password'] ?? '');
 
-    $lockedFor = login_lockout_seconds($email);
-    if ($lockedFor > 0) {
-        $error = 'Too many login attempts. Try again in about ' . (int) ceil($lockedFor / 60) . ' minutes.';
-    } elseif (attempt_login($email, $password)) {
-        redirect_to('index.php?page=dashboard');
+    if ((bool) app_config('app.disable_password_login')) {
+        $error = 'Password login is disabled on this instance. Please sign in with Google.';
     } else {
-        $error = 'Email or password is incorrect.';
+        $lockedFor = login_lockout_seconds($email);
+        if ($lockedFor > 0) {
+            $error = 'Too many login attempts. Try again in about ' . (int) ceil($lockedFor / 60) . ' minutes.';
+        } elseif (attempt_login($email, $password)) {
+            redirect_to('index.php?page=dashboard');
+        } else {
+            $error = 'Email or password is incorrect.';
+        }
     }
 }
 ?>
@@ -176,6 +180,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <?= e($flash['message']) ?>
                     </div>
                 <?php endforeach; ?>
+                <?php if ((bool) app_config('app.disable_password_login')): ?>
+                    <div class="p-3 text-sm rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
+                        Password login is disabled on this instance. Please sign in with Google below.
+                    </div>
+                <?php endif; ?>
                 <?php if ($error): ?>
                     <div class="p-3 text-sm rounded-xl bg-red-50 text-red-700">
                         <?= e($error) ?>
