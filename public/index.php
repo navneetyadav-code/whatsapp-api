@@ -224,6 +224,13 @@ if ($page === 'contact-import' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_to('index.php?page=contacts');
     }
 
+    // SEC-09: Enforce maximum file size bound (5MB)
+    $maxBytes = 5 * 1024 * 1024;
+    if ((int) ($_FILES['contacts_csv']['size'] ?? 0) > $maxBytes) {
+        flash('error', 'CSV file exceeds maximum limit of 5MB.');
+        redirect_to('index.php?page=contacts');
+    }
+
     $handle = fopen($_FILES['contacts_csv']['tmp_name'], 'r');
     if (!$handle) {
         flash('error', 'Could not read the CSV file.');
@@ -231,32 +238,68 @@ if ($page === 'contact-import' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $imported = 0;
-    $stmt = Database::pdo()->prepare(
-        'INSERT INTO contacts (user_id, name, phone, opt_in, notes) VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE name = VALUES(name), opt_in = VALUES(opt_in), notes = VALUES(notes)'
-    );
+    $maxRows = 5000;
+    $rowCount = 0;
+    $rowsToInsert = [];
 
     while (($row = fgetcsv($handle)) !== false) {
+        $rowCount++;
+        if ($rowCount > $maxRows) {
+            fclose($handle);
+            flash('error', "CSV file exceeds maximum limit of {$maxRows} rows.");
+            redirect_to('index.php?page=contacts');
+        }
+
         if (count($row) < 2) {
             continue;
         }
 
-        $name = trim((string) $row[0]);
-        $phone = trim((string) $row[1]);
-        if ($name === '' || $phone === '' || strcasecmp($name, 'name') === 0) {
+        $name = mb_substr(trim((string) $row[0]), 0, 100);
+        $phone = substr(preg_replace('/[^\d+]/', '', trim((string) $row[1])), 0, 32);
+        if ($name === '' || $phone === '' || strcasecmp($name, 'name') === 0 || strcasecmp($phone, 'phone') === 0) {
             continue;
         }
 
-        $stmt->execute([
-            (int) $user['id'],
-            $name,
-            $phone,
-            isset($row[2]) ? ((int) $row[2] ? 1 : 0) : 1,
-            trim((string) ($row[3] ?? '')) ?: null,
-        ]);
-        $imported++;
+        $rowsToInsert[] = [
+            'name' => $name,
+            'phone' => $phone,
+            'opt_in' => isset($row[2]) ? ((int) $row[2] ? 1 : 0) : 1,
+            'notes' => isset($row[3]) ? (mb_substr(trim((string) $row[3]), 0, 255) ?: null) : null,
+        ];
     }
     fclose($handle);
+
+    if (empty($rowsToInsert)) {
+        flash('error', 'No valid contact records found in CSV file.');
+        redirect_to('index.php?page=contacts');
+    }
+
+    $pdo = Database::pdo();
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO contacts (user_id, name, phone, opt_in, notes) VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE name = VALUES(name), opt_in = VALUES(opt_in), notes = VALUES(notes)'
+        );
+
+        foreach ($rowsToInsert as $record) {
+            $stmt->execute([
+                (int) $user['id'],
+                $record['name'],
+                $record['phone'],
+                $record['opt_in'],
+                $record['notes'],
+            ]);
+            $imported++;
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        flash('error', 'Database error during contact import: ' . $e->getMessage());
+        redirect_to('index.php?page=contacts');
+    }
 
     flash('success', "Imported {$imported} contacts.");
     redirect_to('index.php?page=contacts');
