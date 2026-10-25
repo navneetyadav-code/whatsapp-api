@@ -15,7 +15,7 @@ declare(strict_types=1);
 // ==============================================================================
 // DEFAULT CONFIGURATION
 // ==============================================================================
-$defaultApiKey = 'wa_live_72b292e05ac3c5810fb259006dae5f30e1af1f048c0fbd15';
+$defaultApiKey = 'wa_live_YOUR_ACTUAL_API_KEY_HERE';
 $defaultApiUrl = 'https://whatsapp-api-xepo.onrender.com/api/send';
 
 $responseResult = null;
