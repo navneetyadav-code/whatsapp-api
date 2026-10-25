@@ -121,6 +121,13 @@ It expires in 15 minutes.";
             }
         }
 
+        if (empty($sentVia)) {
+            json_response([
+                'ok' => false,
+                'error' => 'Unable to send OTP. Email delivery failed (check SMTP credentials in Render), and no WhatsApp session is currently connected.'
+            ], 500);
+        }
+
         json_response(['ok' => true, 'sent_via' => $sentVia]);
     } elseif ($action === 'verify_otp') {
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));

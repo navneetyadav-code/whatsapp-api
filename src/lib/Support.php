@@ -335,18 +335,24 @@ function seo_meta(?string $page): array {
     return $defaults;
 }
 
-function send_smtp_email(string $to, string $subject, string $body): void {
+function send_smtp_email(string $to, string $subject, string $body): bool {
     $host = app_config('smtp.host');
-    $port = app_config('smtp.port') ?: 587;
+    $port = (int) (app_config('smtp.port') ?: 587);
     $user = app_config('smtp.user');
     $pass = app_config('smtp.pass');
     $from = app_config('smtp.from');
     $fromName = app_config('smtp.from_name');
 
-    if (!$host) return;
+    if (!$host) {
+        error_log("SMTP Error: No SMTP host configured.");
+        return false;
+    }
 
-    $socket = fsockopen($host, $port, $errno, $errstr, 10);
-    if (!$socket) return;
+    $socket = @fsockopen($host, $port, $errno, $errstr, 10);
+    if (!$socket) {
+        error_log("SMTP Connection Error: $errno - $errstr");
+        return false;
+    }
     
     stream_set_timeout($socket, 10);
     fread($socket, 1024); // read greeting
@@ -354,10 +360,19 @@ function send_smtp_email(string $to, string $subject, string $body): void {
     fwrite($socket, "EHLO localhost\r\n");
     fread($socket, 1024);
 
-    if ($port == 587) {
+    if ($port === 587) {
         fwrite($socket, "STARTTLS\r\n");
-        fread($socket, 1024);
-        stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT);
+        $tls = fread($socket, 1024);
+        if (!str_starts_with($tls, '220')) {
+            error_log("SMTP STARTTLS Error: " . trim($tls));
+            fclose($socket);
+            return false;
+        }
+        if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            error_log("SMTP TLS Handshake failed.");
+            fclose($socket);
+            return false;
+        }
         fwrite($socket, "EHLO localhost\r\n");
         fread($socket, 1024);
     }
@@ -368,7 +383,12 @@ function send_smtp_email(string $to, string $subject, string $body): void {
         fwrite($socket, base64_encode($user) . "\r\n");
         fread($socket, 1024);
         fwrite($socket, base64_encode($pass) . "\r\n");
-        fread($socket, 1024);
+        $passResponse = fread($socket, 1024);
+        if (!str_starts_with($passResponse, '235')) {
+            error_log("SMTP Authentication failed: " . trim($passResponse));
+            fclose($socket);
+            return false;
+        }
     }
 
     fwrite($socket, "MAIL FROM: <$from>\r\n");
@@ -385,9 +405,11 @@ function send_smtp_email(string $to, string $subject, string $body): void {
     $headers .= "\r\n";
 
     fwrite($socket, $headers . $body . "\r\n.\r\n");
-    fread($socket, 1024);
+    $dataResponse = fread($socket, 1024);
     fwrite($socket, "QUIT\r\n");
     fclose($socket);
+
+    return str_starts_with($dataResponse, '250');
 }
 
 /**
