@@ -1,20 +1,38 @@
 <?php
 
 if (current_user()) {
-    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) || isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) {
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)) {
         json_response(['ok' => false, 'error' => 'Already logged in.'], 400);
     }
     redirect_to('index.php?page=dashboard');
 }
 
+if ((bool) app_config('app.disable_password_login')) {
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) || $_SERVER['REQUEST_METHOD'] === 'POST') {
+        json_response(['ok' => false, 'error' => 'Password reset is disabled on this instance. Please use Google Sign-In.'], 403);
+    }
+    flash('error', 'Password reset is disabled on this instance.');
+    redirect_to('index.php?page=login');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+
+    $csrfToken = (string) ($data['csrf_token'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    if (!hash_equals(csrf_token(), $csrfToken)) {
+        json_response(['ok' => false, 'error' => 'Invalid or expired security token. Please refresh the page.'], 419);
+    }
+
     $action = $data['action'] ?? '';
 
     if ($action === 'request_otp') {
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             json_response(['ok' => false, 'error' => 'Invalid email address.'], 400);
+        }
+
+        if (login_lockout_seconds($email) > 0) {
+            json_response(['ok' => false, 'error' => 'Too many attempts. Account is temporarily locked. Please try again in 15 minutes.'], 429);
         }
 
         $pdo = Database::pdo();
@@ -28,12 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         if (!$user) {
+            // Constant response: do not disclose whether user exists
             json_response(['ok' => true]);
         }
 
         $userId = (int) $user['id'];
         $phone = $user['phone'] ?? '';
         $otp = sprintf('%06d', random_int(0, 999999));
+
+        // Purge previous active tokens for this email before inserting the new one
+        $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
 
         $stmt = $pdo->prepare("INSERT INTO password_resets (email, phone, otp, expires_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 15 MINUTE))");
         $stmt->execute([$email, $phone, $otp]);
@@ -44,7 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($viaEmail) {
             $subject = "Your Password Reset OTP";
-            $message = "Your OTP is: $otp\nIt expires in 15 minutes.";
+            $message = "Your OTP is: $otp
+It expires in 15 minutes.";
             send_smtp_email($email, $subject, $message);
             $sentVia[] = 'email';
         }
@@ -64,7 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $msgBody = "Your WhatsGateway password reset OTP is: *$otp*\nIt expires in 15 minutes.";
+            $msgBody = "Your WhatsGateway password reset OTP is: *$otp*
+It expires in 15 minutes.";
             enqueue_message($userId, $apiKeyId, $phone, $msgBody);
             $sentVia[] = 'WhatsApp';
         }
@@ -75,16 +99,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $otp = trim((string) ($data['otp'] ?? ''));
         $newPassword = (string) ($data['new_password'] ?? '');
 
+        if (login_lockout_seconds($email) > 0) {
+            json_response(['ok' => false, 'error' => 'Too many failed attempts. Account is temporarily locked. Please try again later.'], 429);
+        }
+
         if (strlen($newPassword) < 8) {
             json_response(['ok' => false, 'error' => 'Password must be at least 8 characters.'], 400);
         }
 
         $pdo = Database::pdo();
-        $stmt = $pdo->prepare("SELECT * FROM password_resets WHERE email = ? AND otp = ? AND expires_at > NOW() ORDER BY expires_at DESC LIMIT 1");
-        $stmt->execute([$email, $otp]);
+        $stmt = $pdo->prepare("SELECT * FROM password_resets WHERE email = ? AND expires_at > NOW() ORDER BY expires_at DESC LIMIT 1");
+        $stmt->execute([$email]);
         $reset = $stmt->fetch();
 
-        if (!$reset) {
+        if (!$reset || !hash_equals((string) $reset['otp'], $otp)) {
+            record_failed_login($email);
+
+            $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE email = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+            $stmtCount->execute([$email]);
+            $failedCount = (int) $stmtCount->fetchColumn();
+
+            if ($failedCount >= 5) {
+                $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
+                json_response(['ok' => false, 'error' => 'Too many failed OTP attempts. Your reset code has been invalidated for security. Please request a new one later.'], 429);
+            }
+
             json_response(['ok' => false, 'error' => 'Invalid or expired OTP.'], 400);
         }
 
@@ -94,9 +133,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("DELETE FROM password_resets WHERE email = ?");
         $stmt->execute([$email]);
 
+        clear_failed_logins($email);
+        session_regenerate_id(true);
+
         json_response(['ok' => true]);
     }
-    
+
     json_response(['ok' => false, 'error' => 'Invalid action.'], 400);
 }
 ?>
@@ -344,8 +386,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             fetch(window.location.href, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'request_otp', email: emailInput })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '<?= e(csrf_token()) ?>'
+                },
+                body: JSON.stringify({ action: 'request_otp', email: emailInput, csrf_token: '<?= e(csrf_token()) ?>' })
             })
             .then(res => res.json())
             .then(data => {
@@ -399,8 +444,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             fetch(window.location.href, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'verify_otp', email: emailInput, otp: otpInput, new_password: newPasswordInput })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '<?= e(csrf_token()) ?>'
+                },
+                body: JSON.stringify({ action: 'verify_otp', email: emailInput, otp: otpInput, new_password: newPasswordInput, csrf_token: '<?= e(csrf_token()) ?>' })
             })
             .then(res => res.json())
             .then(data => {
