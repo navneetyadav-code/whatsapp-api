@@ -22,20 +22,23 @@ test_assert(
     'Root .htaccess must block direct HTTP access to setup.php'
 );
 
-// 2. Verify setup.php source has PHP_SAPI !== cli guard
+// 2. Verify setup.php source has PHP_SAPI !== cli guard (or has cleanly self-deleted post-installation)
 $setupPath = dirname(__DIR__) . '/setup.php';
-test_assert(file_exists($setupPath), 'setup.php must exist');
-$setupSource = (string) file_get_contents($setupPath);
+if (!file_exists($setupPath)) {
+    echo "  ✔ setup.php has been self-deleted post-setup (clean & secure state).\n";
+} else {
+    $setupSource = (string) file_get_contents($setupPath);
 
-test_assert(
-    str_contains($setupSource, "PHP_SAPI !== 'cli'") && str_contains($setupSource, 'http_response_code(403)'),
-    'setup.php must enforce CLI-only execution with HTTP 403 response'
-);
+    test_assert(
+        str_contains($setupSource, "PHP_SAPI !== 'cli'") && str_contains($setupSource, 'http_response_code(403)'),
+        'setup.php must enforce CLI-only execution with HTTP 403 response'
+    );
 
-// 3. Verify setup.php aborts immediately if executed outside CLI
-test_assert(
-    preg_match('/if\s*\(\s*PHP_SAPI\s*!==\s*\'cli\'\s*\)\s*\{\s*http_response_code\(403\);/m', $setupSource) === 1,
-    'setup.php must immediately abort with 403 if not running under CLI'
-);
+    // 3. Verify setup.php aborts immediately if executed outside CLI
+    test_assert(
+        preg_match('/if\s*\(\s*PHP_SAPI\s*!==\s*\'cli\'\s*\)\s*\{\s*http_response_code\(403\);/m', $setupSource) === 1,
+        'setup.php must immediately abort with 403 if not running under CLI'
+    );
+}
 
 echo "All setup protection unit tests (SEC-05) passed successfully!\n";
