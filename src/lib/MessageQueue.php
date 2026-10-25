@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
-function enqueue_message(int $userId, ?int $apiKeyId, string $to, string $message, array $payload = []): int
+function enqueue_message(int $userId, ?int $apiKeyId, string $to, string $message, array $payload = [], int $priority = 5): int
 {
+    $effectivePriority = isset($payload['priority']) ? (int) $payload['priority'] : $priority;
+    $effectivePriority = max(1, min(100, $effectivePriority));
+
     $stmt = Database::pdo()->prepare(
-        'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload)
-         VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $userId,
@@ -15,6 +18,7 @@ function enqueue_message(int $userId, ?int $apiKeyId, string $to, string $messag
         $payload['type'] ?? 'text',
         $message,
         json_encode($payload, JSON_UNESCAPED_SLASHES),
+        $effectivePriority,
     ]);
 
     $insertId = (int) Database::pdo()->lastInsertId();
@@ -79,7 +83,7 @@ function message_stats(int $userId): array
         "SELECT status, COUNT(*) AS total FROM message_queue WHERE user_id = ? GROUP BY status"
     );
     $stmt->execute([$userId]);
-    $stats = ['queued' => 0, 'processing' => 0, 'sent' => 0, 'failed' => 0, 'cancelled' => 0];
+    $stats = ['queued' => 0, 'processing' => 0, 'sent' => 0, 'delivered' => 0, 'read' => 0, 'failed' => 0, 'cancelled' => 0];
     foreach ($stmt->fetchAll() as $row) {
         $stats[$row['status']] = (int) $row['total'];
     }
@@ -144,8 +148,8 @@ function create_campaign_for_contacts(int $userId, string $name, string $templat
         foreach ($contacts as $contact) {
             $body = apply_contact_template($template, $contact);
             $queue = $pdo->prepare(
-                'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload)
-                 VALUES (?, NULL, ?, "text", ?, ?)'
+                'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
+                 VALUES (?, NULL, ?, "text", ?, ?, 1)'
             );
             $queue->execute([
                 $userId,

@@ -486,14 +486,61 @@ function assert_safe_media_url(string $url): string
 /**
  * Securely download remote media with timeouts, size bounds, and magic-byte inspection
  */
+/**
+ * Returns the sanitized, hardened upload directory for media attachments.
+ */
+function get_media_upload_dir(): string
+{
+    $custom = app_config('app.upload_dir');
+    $uploadDir = $custom ? (string) $custom : (dirname(__DIR__, 2) . '/public/uploads/');
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+    return rtrim($uploadDir, '/\\') . DIRECTORY_SEPARATOR;
+}
+
+/**
+ * Generates a tamper-proof HMAC signature for short-lived private media access
+ */
+function generate_media_signature(string $filename, int $userId, int $expires): string
+{
+    $secret = (string) (app_config('security.worker_token') ?: 'whatsgateway-media-key');
+    return hash_hmac('sha256', "media:{$filename}:{$userId}:{$expires}", $secret);
+}
+
+/**
+ * Verifies a time-limited HMAC media access signature
+ */
+function verify_media_signature(string $filename, int $userId, int $expires, string $signature): bool
+{
+    if (time() > $expires) {
+        return false;
+    }
+    $expected = generate_media_signature($filename, $userId, $expires);
+    return hash_equals($expected, $signature);
+}
+
+/**
+ * Generates an authenticated, signed URL for secure media preview or download
+ */
+function media_secure_url(string $filePath, int $userId, int $ttlSeconds = 7200): string
+{
+    $filename = basename($filePath);
+    $expires = time() + $ttlSeconds;
+    $sig = generate_media_signature($filename, $userId, $expires);
+    return public_url('media.php?' . http_build_query([
+        'file' => $filename,
+        'u' => $userId,
+        'expires' => $expires,
+        'sig' => $sig,
+    ]));
+}
+
 function download_remote_media(string $url, int $maxBytes = 20971520): array
 {
     $safeUrl = assert_safe_media_url($url);
 
-    $uploadDir = dirname(__DIR__, 2) . '/public/uploads/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
-    }
+    $uploadDir = get_media_upload_dir();
 
     $tmpPath = $uploadDir . 'tmp_' . bin2hex(random_bytes(12)) . '.bin';
     $fp = fopen($tmpPath, 'w+b');
@@ -660,10 +707,7 @@ function save_base64_media(string $base64Data, ?string $filename = null, ?string
         throw new InvalidArgumentException('Base64 media payload exceeds maximum allowed size (' . round($maxBytes / 1048576) . 'MB max).');
     }
 
-    $uploadDir = dirname(__DIR__, 2) . '/public/uploads/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
-    }
+    $uploadDir = get_media_upload_dir();
 
     $tmpPath = $uploadDir . 'tmp_' . bin2hex(random_bytes(12)) . '.bin';
     file_put_contents($tmpPath, $binary);
@@ -765,10 +809,7 @@ function save_uploaded_media(array $fileInfo, ?string $declaredType = null, int 
         throw new RuntimeException('Executable file uploads are strictly forbidden.');
     }
 
-    $uploadDir = dirname(__DIR__, 2) . '/public/uploads/';
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
-    }
+    $uploadDir = get_media_upload_dir();
 
     $finalFilename = 'media_' . bin2hex(random_bytes(16)) . '.' . $ext;
     $target = $uploadDir . $finalFilename;

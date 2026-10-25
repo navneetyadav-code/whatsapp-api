@@ -30,30 +30,35 @@ function migrationRun(): void
         'PRIMARY KEY (`version`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
-    $migrationPath = dirname(__DIR__) . '/migrations/001_initial_schema.sql';
-    $sql = file_get_contents($migrationPath);
-    if ($sql === false) {
-        throw new RuntimeException('Could not read migrations/001_initial_schema.sql.');
-    }
-
-    $sql = preg_replace('/^\s*--.*$/m', '', $sql) ?? $sql;
-    $statements = preg_split('/;\s*(?:\R|$)/', $sql, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $migrationFiles = glob(dirname(__DIR__) . '/migrations/*.sql');
+    sort($migrationFiles);
     $tableDefinitions = [];
-    foreach ($statements as $statement) {
-        $statement = trim($statement);
-        if ($statement === '') {
-            continue;
+
+    foreach ($migrationFiles as $migrationPath) {
+        $version = basename($migrationPath, '.sql');
+        $sql = file_get_contents($migrationPath);
+        if ($sql === false) {
+            throw new RuntimeException("Could not read {$migrationPath}.");
         }
-        if (preg_match('/^CREATE TABLE IF NOT EXISTS `([a-z0-9_]+)`/i', $statement, $matches)) {
-            $tableDefinitions[$matches[1]] = $statement;
+
+        $sql = preg_replace('/^\s*--.*$/m', '', $sql) ?? $sql;
+        $statements = preg_split('/;\s*(?:\R|$)/', $sql, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        foreach ($statements as $statement) {
+            $statement = trim($statement);
+            if ($statement === '') {
+                continue;
+            }
+            if (preg_match('/^CREATE TABLE IF NOT EXISTS `([a-z0-9_]+)`/i', $statement, $matches)) {
+                $tableDefinitions[$matches[1]] = $statement;
+            }
+            $pdo->exec($statement);
         }
-        $pdo->exec($statement);
     }
 
     foreach ($tableDefinitions as $table => $definition) {
+        migrationEnsureColumns($pdo, $table, $definition);
         migrationEnsureIndexes($pdo, $table, $definition);
         migrationEnsureForeignKeys($pdo, $table, $definition);
-        migrationEnsureColumns($pdo, $table, $definition);
     }
 
     $requiredTables = array_keys($tableDefinitions);
@@ -70,7 +75,9 @@ function migrationRun(): void
     }
 
     $record = $pdo->prepare('INSERT IGNORE INTO schema_migrations (version) VALUES (?)');
-    $record->execute(['001_initial_schema']);
+    foreach ($migrationFiles as $migrationPath) {
+        $record->execute([basename($migrationPath, '.sql')]);
+    }
     fwrite(STDOUT, 'Database schema is ready: ' . count($requiredTables) . ' application tables in ' . $database . '.' . PHP_EOL);
 }
 
@@ -140,15 +147,33 @@ function migrationEnsureForeignKeys(PDO $pdo, string $table, string $definition)
 
 function migrationEnsureColumns(PDO $pdo, string $table, string $definition): void
 {
-    preg_match_all('/^\s*`([^`]+)`\s+[a-z]/mi', $definition, $matches);
-    $expected = $matches[1] ?? [];
+    $lines = preg_split('/\R/', $definition);
+    $columnDefs = [];
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if (preg_match('/^`([^`]+)`\s+(.+?),?$/', $trimmed, $colMatch)) {
+            $colName = $colMatch[1];
+            $colDef = rtrim($colMatch[2], ',');
+            if (!in_array(strtoupper($colName), ['PRIMARY', 'KEY', 'UNIQUE', 'CONSTRAINT', 'FOREIGN'], true)) {
+                $columnDefs[$colName] = $colDef;
+            }
+        }
+    }
+
     $actual = $pdo->query('SHOW COLUMNS FROM `' . $table . '`')->fetchAll(PDO::FETCH_COLUMN);
-    $missing = array_values(array_diff($expected, $actual));
-    if ($missing !== []) {
-        throw new RuntimeException(
-            'Existing table ' . $table . ' is missing required columns: ' . implode(', ', $missing) .
-            '. No existing columns or data were changed.'
-        );
+    $actualSet = array_flip($actual);
+
+    foreach ($columnDefs as $colName => $colDef) {
+        if (!isset($actualSet[$colName])) {
+            try {
+                $pdo->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $colName . '` ' . $colDef);
+                fwrite(STDOUT, "  ✔ Added missing column '{$colName}' to table '{$table}'.\n");
+            } catch (Throwable $e) {
+                throw new RuntimeException(
+                    "Failed to add missing column {$colName} to {$table}: " . $e->getMessage()
+                );
+            }
+        }
     }
 }
 

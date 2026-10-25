@@ -399,6 +399,31 @@ if ($page === 'chatbot-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect_to('index.php?page=chatbot');
 }
 
+if ($page === 'session-auto-sleep' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $enabled = isset($_POST['auto_sleep_enabled']) ? 1 : 0;
+    $rawTimeout = (int) ($_POST['auto_sleep_timeout_seconds'] ?? 60);
+    $timeout = max(15, min(86400, $rawTimeout));
+
+    $stmt = Database::pdo()->prepare(
+        'UPDATE whatsapp_sessions
+         SET auto_sleep_enabled = ?, auto_sleep_timeout_seconds = ?, updated_at = NOW()
+         WHERE user_id = ?'
+    );
+    $stmt->execute([$enabled, $timeout, (int) $user['id']]);
+
+    try {
+        worker_request('POST', "sessions/{$user['id']}/auto-sleep", [
+            'auto_sleep_enabled' => (bool) $enabled,
+            'auto_sleep_timeout_seconds' => $timeout,
+        ], 2);
+    } catch (\Throwable $e) {}
+
+    flash('success', 'Auto-Sleep settings updated successfully.');
+    redirect_to('index.php?page=device');
+}
+
 if ($page === 'webhook' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();
@@ -409,20 +434,34 @@ if ($page === 'webhook' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_to('index.php?page=webhooks');
     }
 
+    $stmtOld = Database::pdo()->prepare('SELECT secret, secret_alt FROM webhooks WHERE user_id = ? LIMIT 1');
+    $stmtOld->execute([(int) $user['id']]);
+    $current = $stmtOld->fetch() ?: [];
+
     $secret = trim((string) ($_POST['secret'] ?? '')) ?: null;
+    $secretAlt = $current['secret_alt'] ?? null;
+    $secretRotatedAt = null;
+
     if (isset($_POST['rotate_secret']) || (isset($_POST['enabled']) && $targetUrl && !$secret)) {
-        $secret = bin2hex(random_bytes(32));
+        $newSecret = bin2hex(random_bytes(32));
+        if (!empty($current['secret']) && $current['secret'] !== $newSecret) {
+            $secretAlt = $current['secret'];
+            $secretRotatedAt = date('Y-m-d H:i:s');
+        }
+        $secret = $newSecret;
         $_SESSION['new_webhook_secret'] = $secret;
     }
 
     $stmt = Database::pdo()->prepare(
-        'INSERT INTO webhooks (user_id, target_url, secret, enabled) VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE target_url = VALUES(target_url), secret = VALUES(secret), enabled = VALUES(enabled)'
+        'INSERT INTO webhooks (user_id, target_url, secret, secret_alt, secret_rotated_at, enabled) VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE target_url = VALUES(target_url), secret = VALUES(secret), secret_alt = VALUES(secret_alt), secret_rotated_at = COALESCE(VALUES(secret_rotated_at), secret_rotated_at), enabled = VALUES(enabled)'
     );
     $stmt->execute([
         (int) $user['id'],
         $targetUrl,
         $secret,
+        $secretAlt,
+        $secretRotatedAt,
         isset($_POST['enabled']) && $targetUrl ? 1 : 0,
     ]);
     flash('success', 'Webhook settings saved.');
