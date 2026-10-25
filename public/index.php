@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
 }
 
 $publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home', 'api', 'send', 'messages'];
-$dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot'];
+$dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot', 'security'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -477,6 +477,7 @@ $view = match (true) {
     $page === 'login' => dirname(__DIR__) . '/src/pages/login.php',
     $page === 'register' => dirname(__DIR__) . '/src/pages/register.php',
     $page === 'docs' => dirname(__DIR__) . '/src/pages/docs.php',
+    $page === 'security' => dirname(__DIR__) . '/src/pages/security.php',
     in_array($page, $dashboardPages, true) => dirname(__DIR__) . '/src/pages/dashboard.php',
     default => dirname(__DIR__) . '/src/pages/dashboard.php',
 };

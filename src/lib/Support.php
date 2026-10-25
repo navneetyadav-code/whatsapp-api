@@ -326,6 +326,10 @@ function seo_meta(?string $page): array {
         case 'api-keys':
             $defaults['title'] = 'REST API Keys & Authentication | Free WhatsApp API';
             break;
+        case 'security':
+            $defaults['title'] = 'Security & Authentication | WhatsGateway';
+            $defaults['description'] = 'Manage account authentication, configure RFC 6238 two-factor authentication, and link login providers.';
+            break;
     }
 
     return $defaults;

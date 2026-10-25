@@ -209,3 +209,16 @@ CREATE TABLE IF NOT EXISTS `message_queue` (
   CONSTRAINT `fk_message_queue_api_key` FOREIGN KEY (`api_key_id`) REFERENCES `api_keys` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_message_queue_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS `user_security` (
+  `user_id` bigint(20) unsigned NOT NULL,
+  `totp_secret` varchar(128) DEFAULT NULL,
+  `totp_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `google_linked` tinyint(1) NOT NULL DEFAULT 0,
+  `google_id` varchar(190) DEFAULT NULL,
+  `google_email` varchar(190) DEFAULT NULL,
+  `password_set` tinyint(1) NOT NULL DEFAULT 1,
+  `backup_codes` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`user_id`),
+  CONSTRAINT `fk_user_security_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
