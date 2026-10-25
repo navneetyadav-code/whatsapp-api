@@ -11,6 +11,11 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 
+if (!app_config('app.enable_test_page')) {
+    http_response_code(404);
+    exit('Not Found');
+}
+
 // Security: Restrict unauthenticated remote access to developer test console (SEC-03)
 $isLocal = is_local_request();
 if (!$isLocal) {
@@ -78,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
             curl_setopt($ch, CURLOPT_TIMEOUT, 15);
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
