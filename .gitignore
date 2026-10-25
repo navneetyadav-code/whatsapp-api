@@ -1,4 +1,6 @@
 /.env
+*.env
+*.env.local
 worker/node_modules/
 worker/sessions/
 worker/*.log
