@@ -22,3 +22,5 @@ __pycache__/
 .whatsapp_cli.json
 
 /.archify/
+/test.php
+/public/test.php
