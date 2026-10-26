@@ -7,5 +7,5 @@ Options -Indexes
 </IfModule>
 
 <IfModule mod_alias.c>
-    RedirectMatch 404 "^/whatsapp-api/(config|src|worker)(/|$)"
+    RedirectMatch 404 "^/(whatsapp-api/)?(config|src|worker|scripts|tests)(/|$)"
 </IfModule>

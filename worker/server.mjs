@@ -2137,7 +2137,7 @@ app.post('/sessions/:userId/wake', async (req, res) => {
 
 app.post('/sessions/:userId/send', async (req, res) => {
   const session = getSession(req.params.userId);
-  const recipient = normalizeRecipient(req.body.to);
+  const recipient = normalizeRecipient(req.body?.to);
   const message = String(req.body.message || '').trim();
 
   if (!recipient.jid || !message) {
