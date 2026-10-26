@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $allowNewDevices = (bool) app_config('app.allow_new_devices');
-$isOwner = function_exists('is_owner') ? is_owner($user) : true;
+$isOwner = function_exists('is_owner') ? is_owner($user) : false;
 $restrictedNotice = (string) (app_config('app.restricted_notice') ?: 'This is not allowed in current architecture. Contact info.assistgroupofficial@gmail.com');
 
 $sessionStmt = $pdo->prepare('SELECT * FROM whatsapp_sessions WHERE user_id = ? LIMIT 1');

@@ -14,6 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $userId = (int) $user['id'];
 
 if ($action === 'start') {
+    $allowNewDevices = (bool) app_config('app.allow_new_devices');
+
+    if (!$allowNewDevices && !is_owner($user)) {
+        json_response([
+            'ok' => false,
+            'error' => (string) (app_config('app.restricted_notice') ?: 'New device linking is disabled on this instance.'),
+        ], 403);
+    }
     sync_session_status($userId, [
         'state' => 'connecting',
         'sleeping' => false,
