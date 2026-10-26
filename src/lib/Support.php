@@ -405,14 +405,24 @@ function send_resend_api_email(string $apiKey, string $from, string $to, string 
 }
 
 function send_smtp_email(string $to, string $subject, string $body): bool {
+    // Sanitize parameters against SMTP command and header injection (CWE-93 / CWE-88)
+    $to = str_replace(["\r", "\n"], '', trim($to));
+    $subject = str_replace(["\r", "\n"], '', trim($subject));
+
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        error_log("SMTP Error: Invalid recipient email address: {$to}");
+        return false;
+    }
+
     $resendKey = trim((string) (app_config('smtp.resend_api_key') ?: getenv('RESEND_API_KEY') ?: ''));
     $brevoKey = trim((string) (app_config('smtp.brevo_api_key') ?: getenv('BREVO_API_KEY') ?: ''));
     $user = trim((string) app_config('smtp.user'));
-    $from = trim((string) (app_config('smtp.from') ?: ''));
+    $from = str_replace(["\r", "\n"], '', trim((string) (app_config('smtp.from') ?: '')));
     if ($from === '' || str_ends_with($from, '@localhost')) {
         $from = ($user !== '' && filter_var($user, FILTER_VALIDATE_EMAIL)) ? $user : 'info.assistgroupofficial@gmail.com';
     }
-    $fromName = trim((string) (app_config('smtp.from_name') ?: 'WhatsGateway'));
+    $from = str_replace(["\r", "\n"], '', $from);
+    $fromName = str_replace(["\r", "\n"], '', trim((string) (app_config('smtp.from_name') ?: 'WhatsGateway')));
 
     if ($resendKey !== '') {
         $resendFrom = (str_contains($from, '@resend.dev') || !str_ends_with($from, '@gmail.com')) ? "{$fromName} <{$from}>" : "WhatsGateway <onboarding@resend.dev>";
@@ -482,13 +492,18 @@ function send_smtp_email(string $to, string $subject, string $body): bool {
     fwrite($socket, "DATA\r\n");
     fread($socket, 1024);
 
+    // Sanitize body: normalize line endings and apply dot-stuffing to prevent premature stream termination
+    $normalizedBody = str_replace("\r\n", "\n", $body);
+    $normalizedBody = preg_replace('/^\./m', '..', $normalizedBody);
+    $normalizedBody = str_replace("\n", "\r\n", $normalizedBody);
+
     $headers = "From: $fromName <$from>\r\n";
     $headers .= "To: $to\r\n";
     $headers .= "Subject: $subject\r\n";
     $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
     $headers .= "\r\n";
 
-    fwrite($socket, $headers . $body . "\r\n.\r\n");
+    fwrite($socket, $headers . $normalizedBody . "\r\n.\r\n");
     $dataResponse = fread($socket, 1024);
     fwrite($socket, "QUIT\r\n");
     fclose($socket);

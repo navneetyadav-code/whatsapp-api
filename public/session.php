@@ -5,9 +5,15 @@ declare(strict_types=1);
 require_once dirname(__DIR__) . '/src/bootstrap.php';
 
 $user = require_auth();
-$action = $_GET['action'] ?? 'status';
+$action = $_POST['action'] ?? $_GET['action'] ?? 'status';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$stateChangingActions = ['start', 'logout', 'sleep', 'wake', 'send-test'];
+if (in_array($action, $stateChangingActions, true)) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        json_response(['ok' => false, 'error' => 'Method not allowed. Use POST.'], 405);
+    }
+    verify_csrf();
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
 }
 
