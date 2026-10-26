@@ -2239,6 +2239,7 @@ async function startWorker() {
 
   const server = app.listen(PORT, '127.0.0.1', () => {
     console.info(`[worker] listener=http://127.0.0.1:${PORT} health_route=GET /health database=ready`);
+    console.info('[worker] ⭐ Star WhatsGateway on GitHub: https://github.com/navneetyadav-code/whatsapp-api');
     setInterval(processQueueOnce, QUEUE_POLL_MS);
     setInterval(processWebhookQueueOnce, QUEUE_POLL_MS);
   });

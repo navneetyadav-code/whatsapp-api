@@ -434,7 +434,22 @@ pm2 start server.mjs --name "whatsapp-worker" --watch false
 pm2 logs whatsapp-worker
 ```
 
-### Docker Container Execution
+### 1-Command Setup with Docker Compose (Recommended)
+
+Spin up MySQL, PHP 8.2 Apache, and the Node.js Baileys worker in seconds:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/navneetyadav-code/whatsapp-api.git
+cd whatsapp-api
+
+# 2. Launch the full stack (App + MySQL + Worker)
+docker compose up -d
+
+# 3. Access your dashboard at http://localhost:8080
+```
+
+### Standalone Docker Container Execution
 
 ```bash
 # Build Docker image

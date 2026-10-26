@@ -184,15 +184,10 @@ unset($_SESSION['newly_generated_backup_codes']);
 
 <div class="space-y-6">
     <!-- Top Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/80">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/80 mb-6">
         <div>
-            <div class="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                <span>Account Settings</span>
-                <span>/</span>
-                <span class="text-slate-600">Security</span>
-            </div>
-            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Security & Authentication</h1>
-            <p class="text-sm text-slate-500 mt-1">Configure two-factor authentication, manage multiple sign-in providers, and protect your account.</p>
+            <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Security & Authentication</h1>
+            <p class="text-[13px] text-slate-500 mt-0.5 font-medium">Configure two-factor authentication, manage sign-in providers, and monitor session integrity.</p>
         </div>
 
         <div class="flex items-center gap-2">
@@ -261,35 +256,44 @@ unset($_SESSION['newly_generated_backup_codes']);
     </script>
     <?php endif; ?>
 
-    <!-- Status Strip: Posture Overview -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div class="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-xs flex items-center justify-between">
-            <div>
-                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Two-Factor Authentication</span>
-                <p class="text-sm font-bold text-slate-900 mt-0.5"><?= $isTotpEnabled ? 'Active (RFC 6238)' : 'Disabled' ?></p>
+    <!-- Integrated Posture Ribbon -->
+    <div class="bg-white rounded-xl border border-slate-200/80 shadow-subtle mb-6 overflow-hidden">
+        <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+            <div class="p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-semibold text-slate-500 tracking-tight">Two-Factor Authentication</div>
+                    <div class="text-xl font-bold <?= $isTotpEnabled ? 'text-emerald-600' : 'text-slate-900' ?> tracking-tight mt-0.5"><?= $isTotpEnabled ? 'Active (RFC 6238)' : 'Disabled' ?></div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">Time-based OTP token protection</div>
+                </div>
+                <div class="w-8 h-8 rounded-lg <?= $isTotpEnabled ? 'bg-emerald-50 border border-emerald-100 text-emerald-600' : 'bg-slate-50 border border-slate-100 text-slate-400' ?> flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
             </div>
-            <span class="w-2.5 h-2.5 rounded-full <?= $isTotpEnabled ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-slate-300' ?>"></span>
-        </div>
-
-        <div class="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-xs flex items-center justify-between">
-            <div>
-                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Password Sign-In</span>
-                <p class="text-sm font-bold text-slate-900 mt-0.5"><?= $hasPassword ? 'Password Configured' : 'No Password Set' ?></p>
+            <div class="p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-semibold text-slate-500 tracking-tight">Master Password Auth</div>
+                    <div class="text-xl font-bold <?= $hasPassword ? 'text-emerald-600' : 'text-amber-600' ?> tracking-tight mt-0.5"><?= $hasPassword ? 'Configured' : 'No Password Set' ?></div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">Bcrypt password hashing</div>
+                </div>
+                <div class="w-8 h-8 rounded-lg <?= $hasPassword ? 'bg-emerald-50 border border-emerald-100 text-emerald-600' : 'bg-amber-50 border border-amber-100 text-amber-600' ?> flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </div>
             </div>
-            <span class="w-2.5 h-2.5 rounded-full <?= $hasPassword ? 'bg-emerald-500 ring-4 ring-emerald-100' : 'bg-amber-400 ring-4 ring-amber-100' ?>"></span>
-        </div>
-
-        <div class="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-xs flex items-center justify-between">
-            <div>
-                <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Google OAuth SSO</span>
-                <p class="text-sm font-bold text-slate-900 mt-0.5"><?= $isGoogleLinked ? 'Account Linked' : 'Disconnected' ?></p>
+            <div class="p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-[11px] font-semibold text-slate-500 tracking-tight">Federated Single Sign-On</div>
+                    <div class="text-xl font-bold <?= $isGoogleLinked ? 'text-blue-600' : 'text-slate-900' ?> tracking-tight mt-0.5"><?= $isGoogleLinked ? 'Google Linked' : 'Disconnected' ?></div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">OAuth 2.0 Identity Provider</div>
+                </div>
+                <div class="w-8 h-8 rounded-lg <?= $isGoogleLinked ? 'bg-blue-50 border border-blue-100 text-blue-600' : 'bg-slate-50 border border-slate-100 text-slate-400' ?> flex items-center justify-center shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                </div>
             </div>
-            <span class="w-2.5 h-2.5 rounded-full <?= $isGoogleLinked ? 'bg-blue-500 ring-4 ring-blue-100' : 'bg-slate-300' ?>"></span>
         </div>
     </div>
 
     <!-- Unified Master Settings Panel (Linear/Stripe Style, NOT Cards) -->
-    <div class="bg-white rounded-xl border border-slate-200/90 shadow-saas divide-y divide-slate-100 overflow-hidden">
+    <div class="bg-white rounded-xl border border-slate-200/90 shadow-card divide-y divide-slate-100 overflow-hidden">
 
         <!-- ==================== SECTION 1: TWO-FACTOR AUTHENTICATION ==================== -->
         <div class="p-6 lg:p-8">

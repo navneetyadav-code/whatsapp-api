@@ -65,33 +65,38 @@ if ($userForLayout) {
     <link rel="stylesheet" href="<?= e(base_url('assets/app.css')) ?>?v=<?= time() ?>">
     
     <?php if ($isAuthed): ?>
-    <!-- New Tailwind CSS -->
+    <!-- Premium Fonts: Plus Jakarta Sans (Interface) & JetBrains Mono (Technical Data) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/css/intlTelInput.css">
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.10/build/js/intlTelInput.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+                        sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
                     },
                     colors: {
                         brand: {
                             wa_dark: '#075E54', 
                             wa_med: '#128C7E',  
                             wa_light: '#25D366',
-                            accent: '#0F172A'
+                            accent: '#0B1120'
                         }
                     },
                     boxShadow: {
-                        'saas': '0 0 0 1px rgba(0,0,0,.03), 0 1px 2px -1px rgba(0,0,0,.04), 0 2px 4px rgba(0,0,0,.02)',
-                        'saas-hover': '0 0 0 1px rgba(0,0,0,.04), 0 4px 6px -1px rgba(0,0,0,.04), 0 2px 4px -2px rgba(0,0,0,.02)',
-                        'saas-nav': '0 1px 0 0 rgba(0,0,0,.05)',
+                        'subtle': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+                        'card': '0 0 0 1px rgba(15, 23, 42, 0.06), 0 1px 2px 0 rgba(15, 23, 42, 0.03)',
+                        'card-hover': '0 0 0 1px rgba(15, 23, 42, 0.1), 0 4px 12px 0 rgba(15, 23, 42, 0.04)',
+                        'elevated': '0 0 0 1px rgba(15, 23, 42, 0.08), 0 10px 25px -5px rgba(15, 23, 42, 0.08)',
+                        'saas': '0 0 0 1px rgba(15, 23, 42, 0.05), 0 1px 2px 0 rgba(15, 23, 42, 0.03)',
+                        'saas-hover': '0 0 0 1px rgba(15, 23, 42, 0.09), 0 3px 8px -1px rgba(15, 23, 42, 0.04)',
                     }
                 }
             }
@@ -103,24 +108,33 @@ if ($userForLayout) {
     <style>
         .iti { width: 100%; }
         body {
-            background-color: #ffffff;
+            background-color: #FBFBFC;
             color: #0F172A;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
         }
-        .bg-stripes {
-            background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.01) 10px, rgba(0, 0, 0, 0.01) 20px);
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+        ::selection {
+            background: #d1fae5;
+            color: #064e3b;
         }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
         @keyframes growUp { from { height: 0; opacity: 0; } to { opacity: 1; } }
         .animate-grow { animation: growUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .glass-header {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        /* Focus ring & micro-tactile states */
+        .btn-tactile:active {
+            transform: scale(0.98);
         }
         /* Mobile keyboard, auto-zoom, and layout shift fixes */
         @media screen and (max-width: 768px) {
@@ -145,15 +159,18 @@ if ($userForLayout) {
     <div id="sidebarOverlay" class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-20 hidden md:hidden transition-opacity"></div>
 
     <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col h-full md:h-screen min-w-0 bg-white relative overflow-hidden">
+    <main class="flex-1 flex flex-col h-full md:h-screen min-w-0 bg-[#FBFBFC] relative overflow-hidden">
         <?php require __DIR__ . '/components/navbar.php'; ?>
         
         <!-- Scrollable Workspace -->
-        <div id="workspaceContent" class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#FAFAFA] p-4 md:p-6 lg:p-8 overscroll-contain">
+        <div id="workspaceContent" class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#FBFBFC] p-4 md:p-6 lg:p-7 overscroll-contain">
             <div class="max-w-6xl mx-auto space-y-6">
                 <?php foreach (flashes() as $flash): ?>
-                    <div class="p-4 mb-4 text-sm rounded-lg <?= $flash['type'] === 'success' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800' ?>">
-                        <?= e($flash['message']) ?>
+                    <div class="p-3.5 mb-4 text-[13px] font-medium rounded-lg border flex items-center justify-between <?= $flash['type'] === 'success' ? 'bg-emerald-50/80 border-emerald-200/80 text-emerald-800' : 'bg-red-50/80 border-red-200/80 text-red-800' ?>">
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full <?= $flash['type'] === 'success' ? 'bg-emerald-500' : 'bg-red-500' ?>"></span>
+                            <?= e($flash['message']) ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
                 
@@ -177,6 +194,15 @@ if ($userForLayout) {
             closeSidebarBtn.addEventListener('click', toggleSidebar);
             sidebarOverlay.addEventListener('click', toggleSidebar);
         }
+
+        // Global Command Palette Shortcut (⌘K / Ctrl+K)
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                const searchInput = document.getElementById('navbarSearchInput');
+                if (searchInput) searchInput.focus();
+            }
+        });
     </script>
 <?php elseif ($isPublicDocs): ?>
     <main class="public-doc-shell">

@@ -445,18 +445,18 @@ window.showToast = function(message, type = 'error') {
         ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
         : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
     
-    toast.className = 'fixed top-4 right-4 z-50 flex items-center w-full max-w-sm p-4 mb-4 text-slate-700 bg-white rounded-xl shadow-2xl border-l-4 transition-all duration-300 transform translate-x-full opacity-0 ' + borderColor;
+    toast.className = 'fixed top-4 right-4 z-50 flex items-center w-full max-w-sm p-3.5 mb-3 text-slate-800 bg-white rounded-xl shadow-elevated border border-slate-200/90 transition-all duration-200 transform translate-y-[-8px] opacity-0';
     
-    toast.innerHTML = '<div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg ' + iconColor + '">' + svgIcon + '</div><div class="ml-3 text-[13px] font-medium text-slate-700">' + message + '</div>';
+    toast.innerHTML = '<div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg ' + iconColor + '">' + svgIcon + '</div><div class="ml-3 text-[13px] font-medium text-slate-800">' + message + '</div>';
     
     document.body.appendChild(toast);
     
     setTimeout(() => {
-        toast.classList.remove('translate-x-full', 'opacity-0');
+        toast.classList.remove('translate-y-[-8px]', 'opacity-0');
     }, 10);
     
     setTimeout(() => {
-        toast.classList.add('translate-x-full', 'opacity-0');
+        toast.classList.add('translate-y-[-8px]', 'opacity-0');
         setTimeout(() => toast.remove(), 300);
     }, 4000);
 };
