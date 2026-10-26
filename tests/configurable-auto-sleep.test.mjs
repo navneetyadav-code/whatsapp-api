@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const workerSource = readFileSync(new URL('../worker/server.mjs', import.meta.url), 'utf8');
-const dashboardPhp = readFileSync(new URL('../src/pages/dashboard.php', import.meta.url), 'utf8');
+const devicePhpPath = new URL('../src/pages/dashboard/device.php', import.meta.url);
+const dashboardPhp = existsSync(devicePhpPath)
+  ? readFileSync(devicePhpPath, 'utf8')
+  : readFileSync(new URL('../src/pages/dashboard.php', import.meta.url), 'utf8');
 const indexPhp = readFileSync(new URL('../public/index.php', import.meta.url), 'utf8');
 const canonicalSchemaSql = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
 const initialMigrationSql = readFileSync(new URL('../migrations/001_initial_schema.sql', import.meta.url), 'utf8');

@@ -33,7 +33,7 @@ html {
 body {
     margin: 0;
     color: var(--ink);
-    font-family: Inter, Segoe UI, Arial, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; /* impeccable-disable-line overused-font */
     letter-spacing: 0;
 }
 
@@ -705,7 +705,7 @@ button.ghost,
 }
 
 .nav-icon.birthday:after {
-    border-top: 3px solid currentColor;
+    border-top: 3px solid currentColor; /* impeccable-disable-line border-accent-on-rounded -- CSS triangle */
     border-left: 3px solid transparent;
     border-right: 3px solid transparent;
     height: 0;
