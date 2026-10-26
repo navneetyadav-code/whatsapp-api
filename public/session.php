@@ -25,7 +25,7 @@ if ($action === 'start') {
     if (!$allowNewDevices && !is_owner($user)) {
         json_response([
             'ok' => false,
-            'error' => (string) app_config('app.restricted_notice'),
+            'error' => (string) (app_config('app.restricted_notice') ?: 'New device linking is disabled on this instance.'),
         ], 403);
     }
 
@@ -66,62 +66,44 @@ if ($action === 'wake') {
     json_response($response, !empty($response['ok']) ? 200 : 502);
 }
 
-if ($action === 'send-test') {
-    $data = request_json();
-    $to = trim((string) ($data['to'] ?? ''));
-    $message = trim((string) ($data['message'] ?? ''));
-
-    if ($to === '' || $message === '') {
-        json_response(['ok' => false, 'error' => 'Recipient and message are required.'], 422);
+if ($action === 'status') {
+    $response = worker_request('GET', "sessions/{$userId}/status");
+    if (!empty($response['ok']) && isset($response['session'])) {
+        sync_session_status($userId, $response['session']);
     }
 
-    $messageId = enqueue_message($userId, null, $to, $message, [
-        'source' => 'dashboard',
-        'type' => 'text',
-    ]);
+    $pdo = Database::pdo();
+    $stmt = $pdo->prepare('SELECT status, phone, push_name, updated_at FROM whatsapp_sessions WHERE user_id = ? LIMIT 1');
+    $stmt->execute([$userId]);
+    $dbSession = $stmt->fetch() ?: [];
 
-    json_response(['ok' => true, 'status' => 'queued', 'message_id' => $messageId], 202);
+    json_response([
+        'ok' => !empty($response['ok']),
+        'session' => array_merge($dbSession, $response['session'] ?? []),
+    ]);
 }
 
 if ($action === 'queue-status') {
+    $pdo = Database::pdo();
     $page = max(1, (int) ($_GET['p'] ?? 1));
     $perPage = 20;
+
     $stats = message_stats($userId);
-    $messages = paginate_messages($userId, $page, $perPage);
     $totalMessages = count_messages($userId);
     $totalPages = max(1, (int) ceil($totalMessages / $perPage));
+    $queueMessages = paginate_messages($userId, $page, $perPage);
 
     json_response([
         'ok' => true,
-        'stats' => [
-            'queued' => (int) ($stats['queued'] ?? 0),
-            'processing' => (int) ($stats['processing'] ?? 0),
-            'failed' => (int) ($stats['failed'] ?? 0),
-            'sent' => (int) ($stats['sent'] ?? 0),
-            'cancelled' => (int) ($stats['cancelled'] ?? 0),
+        'stats' => $stats,
+        'pagination' => [
+            'current_page' => $page,
+            'per_page' => $perPage,
+            'total_messages' => $totalMessages,
+            'total_pages' => $totalPages,
         ],
-        'page' => $page,
-        'totalPages' => $totalPages,
-        'totalMessages' => $totalMessages,
-        'messages' => array_map(function ($m) {
-            return [
-                'id' => (int) $m['id'],
-                'recipient' => (string) ($m['normalized_recipient'] ?: $m['recipient']),
-                'status' => (string) $m['status'],
-                'attempts' => (int) $m['attempts'],
-                'max_attempts' => (int) $m['max_attempts'],
-                'body' => (string) $m['body'],
-                'error_message' => $m['error_message'] ? (string) $m['error_message'] : null,
-                'created_at' => (string) $m['created_at'],
-                'sent_at' => $m['sent_at'] ? (string) $m['sent_at'] : null,
-            ];
-        }, $messages),
-        'csrf_token' => csrf_token(),
+        'messages' => $queueMessages,
     ]);
 }
 
-$response = worker_request('GET', "sessions/{$userId}/status");
-if (!empty($response['ok'])) {
-    sync_session_status($userId, $response['session'] ?? []);
-}
-json_response($response, !empty($response['ok']) ? 200 : 502);
+json_response(['ok' => false, 'error' => 'Invalid action.'], 400);

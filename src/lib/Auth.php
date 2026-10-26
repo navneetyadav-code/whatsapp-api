@@ -220,10 +220,6 @@ function is_owner(?array $user): bool
         return false;
     }
 
-    if ((int) $user['id'] === 1) {
-        return true;
-    }
-
     $adminEmails = (string) (app_config('app.admin_email') ?? '');
     $adminList = array_filter(array_map(
         static fn (string $item): string => mb_strtolower(trim($item)),
@@ -231,7 +227,14 @@ function is_owner(?array $user): bool
     ));
 
     $userEmail = mb_strtolower(trim((string) ($user['email'] ?? '')));
-    return in_array($userEmail, $adminList, true);
+
+    // If explicit admin emails are specified in configuration, require strict match
+    if (!empty($adminList)) {
+        return in_array($userEmail, $adminList, true);
+    }
+
+    // Default fallback for single-tenant local environments without configured admin_email
+    return (int) $user['id'] === 1;
 }
 
 function complete_2fa_login(int $userId): void
