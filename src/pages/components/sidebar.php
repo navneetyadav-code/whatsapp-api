@@ -53,10 +53,33 @@ $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
             <span>Message Queue</span>
         </a>
 
-        <a href="<?= e(base_url('index.php?page=campaigns')) ?>" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'campaigns' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
-            <svg class="w-4 h-4 <?= $currentPage === 'campaigns' ? 'text-emerald-600' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
-            <span>Campaigns</span>
-        </a>
+        <!-- Section: Campaigns Hub (Segmented Navigation) -->
+        <div class="space-y-0.5">
+            <a href="<?= e(base_url('index.php?page=campaigns&tab=ledger')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'campaigns' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
+                <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 <?= $currentPage === 'campaigns' ? 'text-emerald-600' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
+                    <span>Campaigns</span>
+                </div>
+                <span class="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold border border-slate-200/60 font-mono">Hub</span>
+            </a>
+            <?php if ($currentPage === 'campaigns'): 
+                $activeCampaignTab = (string) ($_GET['tab'] ?? 'ledger');
+            ?>
+                <div class="pl-7 pr-1 py-1 space-y-0.5 text-[11px] border-l-2 border-emerald-500/40 ml-4 my-1">
+                    <a href="<?= e(base_url('index.php?page=campaigns&tab=ledger')) ?>" class="flex items-center justify-between <?= $activeCampaignTab === 'ledger' ? 'text-slate-900 font-bold bg-slate-200/60' : 'text-slate-600 hover:text-slate-900 hover:font-medium' ?> py-1 px-2 rounded transition-colors">
+                        <span>Dispatch Ledger</span>
+                        <span class="text-[9px] font-mono text-slate-500 bg-white border border-slate-200/70 px-1 rounded"><?= count($campaigns ?? []) ?></span>
+                    </a>
+                    <a href="<?= e(base_url('index.php?page=campaigns&tab=create')) ?>" class="flex items-center justify-between <?= $activeCampaignTab === 'create' ? 'text-slate-900 font-bold bg-slate-200/60' : 'text-slate-600 hover:text-slate-900 hover:font-medium' ?> py-1 px-2 rounded transition-colors">
+                        <span>New Broadcast</span>
+                        <span class="text-[9px] font-mono text-emerald-600 font-bold bg-emerald-50 px-1 rounded border border-emerald-200/60">Studio</span>
+                    </a>
+                    <a href="<?= e(base_url('index.php?page=campaigns&tab=test')) ?>" class="flex items-center justify-between <?= $activeCampaignTab === 'test' ? 'text-slate-900 font-bold bg-slate-200/60' : 'text-slate-600 hover:text-slate-900 hover:font-medium' ?> py-1 px-2 rounded transition-colors">
+                        <span>Test Dispatch</span>
+                    </a>
+                </div>
+            <?php endif; ?>
+        </div>
 
         <a href="<?= e(base_url('index.php?page=chatbot')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'chatbot' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
             <div class="flex items-center gap-2.5">

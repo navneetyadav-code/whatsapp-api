@@ -341,9 +341,141 @@ if ($page === 'campaign-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_to('index.php?page=campaigns');
     }
 
-    $campaignId = create_campaign((int) $user['id'], $name, $template);
-    flash('success', "Campaign #{$campaignId} queued for opted-in contacts.");
-    redirect_to('index.php?page=campaigns');
+    $scheduledAt = null;
+    $scheduleInput = trim((string) ($_POST['scheduled_at'] ?? ''));
+    if ($scheduleInput !== '') {
+        $timestamp = strtotime($scheduleInput);
+        if ($timestamp !== false && $timestamp > time()) {
+            $scheduledAt = date('Y-m-d H:i:s', $timestamp);
+        }
+    }
+
+    $attachment = null;
+    if (!empty($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
+        try {
+            $saved = save_uploaded_media($_FILES['attachment']);
+            $attachment = [
+                'path' => $saved['path'],
+                'name' => $saved['name'],
+                'type' => $saved['type'],
+                'mime' => $saved['mime'],
+            ];
+        } catch (Throwable $uploadException) {
+            flash('error', $uploadException->getMessage());
+            redirect_to('index.php?page=campaigns');
+        }
+    }
+
+    $campaignId = create_campaign((int) $user['id'], $name, $template, $scheduledAt, $attachment);
+    if ($scheduledAt) {
+        flash('success', "Campaign #{$campaignId} scheduled for " . date('M j, Y g:i A', strtotime($scheduledAt)) . ".");
+    } else {
+        flash('success', "Campaign #{$campaignId} queued for opted-in contacts.");
+    }
+    redirect_to('index.php?page=campaigns&tab=ledger');
+}
+
+if ($page === 'campaign-pause' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $campaignId = (int) ($_POST['campaign_id'] ?? 0);
+    if ($campaignId > 0) {
+        pause_campaign((int) $user['id'], $campaignId);
+        flash('success', "Campaign #{$campaignId} has been paused.");
+    }
+    redirect_to('index.php?page=campaigns&tab=ledger');
+}
+
+if ($page === 'campaign-resume' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $campaignId = (int) ($_POST['campaign_id'] ?? 0);
+    if ($campaignId > 0) {
+        resume_campaign((int) $user['id'], $campaignId);
+        try {
+            worker_request('POST', 'queue/notify', ['user_id' => (int) $user['id']], 1);
+        } catch (\Throwable $e) {}
+        flash('success', "Campaign #{$campaignId} has been resumed.");
+    }
+    redirect_to('index.php?page=campaigns&tab=ledger');
+}
+
+if ($page === 'campaign-cancel' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $campaignId = (int) ($_POST['campaign_id'] ?? 0);
+    if ($campaignId > 0) {
+        cancel_campaign((int) $user['id'], $campaignId);
+        flash('success', "Campaign #{$campaignId} and all pending dispatches were cancelled.");
+    }
+    redirect_to('index.php?page=campaigns&tab=ledger');
+}
+
+if ($page === 'campaign-resend' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $campaignId = (int) ($_POST['campaign_id'] ?? 0);
+    if ($campaignId > 0) {
+        $newId = resend_campaign((int) $user['id'], $campaignId);
+        if ($newId) {
+            flash('success', "Campaign duplicated and queued as #{$newId}.");
+        } else {
+            flash('error', "Could not resend campaign #{$campaignId}.");
+        }
+    }
+    redirect_to('index.php?page=campaigns&tab=ledger');
+}
+
+if ($page === 'campaign-test-send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $phone = trim((string) ($_POST['test_phone'] ?? ''));
+    $testName = trim((string) ($_POST['test_name'] ?? 'Preview Contact'));
+    $template = trim((string) ($_POST['message_template'] ?? ''));
+
+    if ($phone === '') {
+        flash('error', 'Test recipient phone number is required.');
+        redirect_to('index.php?page=campaigns&tab=test');
+    }
+    if ($template === '') {
+        flash('error', 'Message template cannot be empty.');
+        redirect_to('index.php?page=campaigns&tab=test');
+    }
+
+    $phone = normalize_phone($phone);
+    $formattedMsg = apply_contact_template($template, ['name' => $testName, 'phone' => $phone]);
+
+    $payload = [
+        'source' => 'campaign_test',
+        'type' => 'text',
+    ];
+
+    if (!empty($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
+        try {
+            $saved = save_uploaded_media($_FILES['attachment']);
+            $payload['attachment'] = [
+                'path' => $saved['path'],
+                'name' => $saved['name'],
+                'type' => $saved['type'],
+                'mime' => $saved['mime'],
+            ];
+            $payload['type'] = $saved['type'];
+        } catch (Throwable $uploadException) {
+            flash('error', $uploadException->getMessage());
+            redirect_to('index.php?page=campaigns&tab=test');
+        }
+    }
+
+    try {
+        enqueue_message((int) $user['id'], null, $phone, $formattedMsg, $payload, 10);
+        try {
+            worker_request('POST', 'queue/notify', ['user_id' => (int) $user['id']], 1);
+        } catch (\Throwable $e) {}
+        flash('success', "Test message dispatched to {$phone} with priority queue.");
+    } catch (\Throwable $e) {
+        flash('error', 'Failed to dispatch test message: ' . $e->getMessage());
+    }
+    redirect_to('index.php?page=campaigns&tab=test');
 }
 
 if ($page === 'chatbot-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
