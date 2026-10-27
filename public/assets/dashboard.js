@@ -289,6 +289,10 @@ const initUIToggles = () => {
 
 
 const initRichTextEditor = () => {
+    if (typeof window !== 'undefined' && window.WaStudio && typeof window.WaStudio.initAll === 'function') {
+        window.WaStudio.initAll();
+        return;
+    }
     const editors = document.querySelectorAll('textarea.wa-editor');
     
     editors.forEach(textarea => {
@@ -335,19 +339,23 @@ const initRichTextEditor = () => {
             btn.title = f.title;
             
             btn.addEventListener('click', () => {
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const selected = textarea.value.substring(start, end);
-                
-                const before = textarea.value.substring(0, start);
-                const after = textarea.value.substring(end);
-                
-                textarea.value = before + f.tag + selected + f.tag + after;
-                textarea.focus();
-                
-                // Reposition cursor inside tags
-                const newPos = start + f.tag.length + selected.length;
-                textarea.setSelectionRange(newPos, newPos);
+                if (window.WaStudio && typeof window.WaStudio.wrapSelection === 'function') {
+                    window.WaStudio.wrapSelection(textarea, f.tag, f.tag, f.title.toLowerCase());
+                } else {
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const selected = textarea.value.substring(start, end);
+                    
+                    const before = textarea.value.substring(0, start);
+                    const after = textarea.value.substring(end);
+                    
+                    textarea.value = before + f.tag + selected + f.tag + after;
+                    textarea.focus();
+                    
+                    // Reposition cursor inside tags
+                    const newPos = start + f.tag.length + selected.length;
+                    textarea.setSelectionRange(newPos, newPos);
+                }
             });
             
             toolbar.appendChild(btn);
@@ -367,19 +375,28 @@ const initRichTextEditor = () => {
                 btn.title = 'Insert ' + p;
                 
                 btn.addEventListener('click', () => {
-                    const start = textarea.selectionStart;
-                    const end = textarea.selectionEnd;
-                    const before = textarea.value.substring(0, start);
-                    const after = textarea.value.substring(end);
-                    
-                    textarea.value = before + p + after;
-                    textarea.focus();
-                    const newPos = start + p.length;
-                    textarea.setSelectionRange(newPos, newPos);
+                    if (window.WaStudio && typeof window.WaStudio.insertToken === 'function') {
+                        window.WaStudio.insertToken(textarea, p);
+                    } else {
+                        const start = textarea.selectionStart;
+                        const end = textarea.selectionEnd;
+                        const before = textarea.value.substring(0, start);
+                        const after = textarea.value.substring(end);
+                        
+                        textarea.value = before + p + after;
+                        textarea.focus();
+                        const newPos = start + p.length;
+                        textarea.setSelectionRange(newPos, newPos);
+                    }
                 });
                 
                 toolbar.appendChild(btn);
             });
+        }
+        
+        // Bind keyboard shortcuts from WaStudio
+        if (window.WaStudio && typeof window.WaStudio.bindShortcuts === 'function') {
+            window.WaStudio.bindShortcuts(textarea);
         }
         
         wrapper.appendChild(toolbar);

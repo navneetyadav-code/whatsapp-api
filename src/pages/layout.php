@@ -136,6 +136,15 @@ if ($userForLayout) {
         .btn-tactile:active {
             transform: scale(0.98);
         }
+        /* Universal Button Reset: Prevents legacy app.css green border pollution across dashboard */
+        button {
+            font-family: inherit;
+        }
+        button:not([class*="border"]):not(.button):not(.ghost):not(.icon-square):not(.btn-legacy) {
+            border: none;
+            box-shadow: none;
+            min-height: unset;
+        }
         /* Mobile keyboard, auto-zoom, and layout shift fixes */
         @media screen and (max-width: 768px) {
             input, textarea, select, .wa-editor {

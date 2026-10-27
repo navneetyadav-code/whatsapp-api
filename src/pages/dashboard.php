@@ -62,4 +62,5 @@ if (!function_exists('page_header')) {
 <section class="dashboard" data-session-page="1">
     <?php require __DIR__ . '/dashboard/' . $sections[$section]['view']; ?>
 </section>
+<script src="<?= e(base_url('assets/wa-studio.js')) ?>?v=<?= time() ?>"></script>
 <script src="<?= e(base_url('assets/dashboard.js')) ?>?v=<?= time() ?>"></script>

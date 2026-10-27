@@ -364,7 +364,7 @@ select:focus {
     justify-content: center;
 }
 
-button,
+button.btn-legacy,
 .button,
 .ghost,
 .icon-square {
@@ -380,7 +380,7 @@ button,
     transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
-button,
+button.btn-legacy,
 .button {
     background: linear-gradient(180deg, #12a989 0%, #087560 100%);
     border: 1px solid #087560;
