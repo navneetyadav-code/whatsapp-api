@@ -1,5 +1,14 @@
 <?php
 $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
+$userForSidebar = $user ?? current_user();
+$chatUnreadCount = 0;
+if (!empty($userForSidebar['id'])) {
+    try {
+        $unreadStmt = Database::pdo()->prepare('SELECT COALESCE(SUM(unread_count), 0) FROM chat_conversations WHERE user_id = ?');
+        $unreadStmt->execute([(int) $userForSidebar['id']]);
+        $chatUnreadCount = (int) $unreadStmt->fetchColumn();
+    } catch (\Throwable $e) {}
+}
 ?>
 <!-- Sidebar (High-Density Modern Rail) -->
 <aside id="sidebar" class="bg-[#F8FAFC] border-r border-slate-200/80 text-slate-600 w-64 flex-shrink-0 flex flex-col transition-transform duration-300 z-30 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 select-none">
@@ -26,6 +35,18 @@ $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
             <svg class="w-4 h-4 <?= $currentPage === 'dashboard' ? 'text-emerald-600' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
             <span>Overview</span>
         </a>
+
+        <a href="<?= e(base_url('index.php?page=live-chat')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'live-chat' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
+            <div class="flex items-center gap-2.5">
+                <svg class="w-4 h-4 <?= $currentPage === 'live-chat' ? 'text-emerald-600' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                <span>Live Chat</span>
+            </div>
+            <?php if ($chatUnreadCount > 0): ?>
+                <span class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[10px] font-bold font-mono shadow-xs animate-pulse"><?= $chatUnreadCount ?></span>
+            <?php else: ?>
+                <span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200/60 font-mono">Live</span>
+            <?php endif; ?>
+        </a>
         
         <a href="<?= e(base_url('index.php?page=message')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'message' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
             <div class="flex items-center gap-2.5">
@@ -38,6 +59,14 @@ $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
         <a href="<?= e(base_url('index.php?page=contacts')) ?>" class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'contacts' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
             <svg class="w-4 h-4 <?= $currentPage === 'contacts' ? 'text-emerald-600' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
             <span>Contacts</span>
+        </a>
+
+        <a href="<?= e(base_url('index.php?page=feedback')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'feedback' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
+            <div class="flex items-center gap-2.5">
+                <svg class="w-4 h-4 <?= $currentPage === 'feedback' ? 'text-amber-500' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                <span>Feedback</span>
+            </div>
+            <span class="text-[10px] font-mono font-bold text-amber-600 px-1.5 py-0.2 bg-amber-50 border border-amber-200/60 rounded">5★</span>
         </a>
 
         <!-- Section: Gateway -->

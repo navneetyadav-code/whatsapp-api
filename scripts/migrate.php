@@ -35,12 +35,17 @@ function migrationRun(): void
         'PRIMARY KEY (`version`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
 
+    $appliedStmt = $pdo->query('SELECT `version` FROM `schema_migrations`');
+    $appliedVersions = $appliedStmt ? $appliedStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+    $appliedSet = array_flip($appliedVersions);
+
     $migrationFiles = glob(dirname(__DIR__) . '/migrations/*.sql');
     sort($migrationFiles);
     $tableDefinitions = [];
 
     foreach ($migrationFiles as $migrationPath) {
         $version = basename($migrationPath, '.sql');
+        $isAlreadyApplied = isset($appliedSet[$version]);
         $sql = file_get_contents($migrationPath);
         if ($sql === false) {
             throw new RuntimeException("Could not read {$migrationPath}.");
@@ -56,7 +61,20 @@ function migrationRun(): void
             if (preg_match('/^CREATE TABLE IF NOT EXISTS `([a-z0-9_]+)`/i', $statement, $matches)) {
                 $tableDefinitions[$matches[1]] = $statement;
             }
-            $pdo->exec($statement);
+            if (!$isAlreadyApplied) {
+                try {
+                    $pdo->exec($statement);
+                } catch (PDOException $e) {
+                    $code = (int) ($e->errorInfo[1] ?? 0);
+                    // Ignore duplicate table (1050), duplicate column (1060), duplicate key (1061)
+                    if (!in_array($code, [1050, 1060, 1061], true)) {
+                        throw $e;
+                    }
+                }
+            }
+        }
+        if (!$isAlreadyApplied) {
+            $pdo->prepare('INSERT IGNORE INTO schema_migrations (version) VALUES (?)')->execute([$version]);
         }
     }
 
@@ -115,8 +133,15 @@ function migrationEnsureIndexes(PDO $pdo, string $table, string $definition): vo
         }
         $indexKind = $kind === 'PRIMARY' ? 'PRIMARY KEY' : ($unique ? 'UNIQUE INDEX' : 'INDEX');
         $quotedName = $kind === 'PRIMARY' ? '' : ' `' . $name . '`';
-        $pdo->exec('ALTER TABLE `' . $table . '` ADD ' . $indexKind . $quotedName . ' (' . $index['columns'] . ')');
-        $present[$name] = true;
+        try {
+            $pdo->exec('ALTER TABLE `' . $table . '` ADD ' . $indexKind . $quotedName . ' (' . $index['columns'] . ')');
+            $present[$name] = true;
+        } catch (PDOException $e) {
+            $code = (int) ($e->errorInfo[1] ?? 0);
+            if (!in_array($code, [1060, 1061], true)) {
+                throw $e;
+            }
+        }
     }
 }
 
@@ -143,10 +168,17 @@ function migrationEnsureForeignKeys(PDO $pdo, string $table, string $definition)
         $delete = isset($constraint[5]) && trim($constraint[5]) !== ''
             ? ' ON DELETE ' . trim($constraint[5])
             : '';
-        $pdo->exec(
-            'ALTER TABLE `' . $table . '` ADD CONSTRAINT `' . $constraint[1] . '` ' .
-            'FOREIGN KEY (' . $constraint[2] . ') REFERENCES `' . $constraint[3] . '` (' . $constraint[4] . ')' . $delete
-        );
+        try {
+            $pdo->exec(
+                'ALTER TABLE `' . $table . '` ADD CONSTRAINT `' . $constraint[1] . '` ' .
+                'FOREIGN KEY (' . $constraint[2] . ') REFERENCES `' . $constraint[3] . '` (' . $constraint[4] . ')' . $delete
+            );
+        } catch (PDOException $e) {
+            $code = (int) ($e->errorInfo[1] ?? 0);
+            if ($code !== 1061) {
+                // Ignore constraint already exists
+            }
+        }
     }
 }
 

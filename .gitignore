@@ -22,6 +22,7 @@ __pycache__/
 .whatsapp_cli.json
 
 /.archify/
+/scratch/
 /test.php
 /public/test.php
 # Local test scripts & diagnostic utilities
