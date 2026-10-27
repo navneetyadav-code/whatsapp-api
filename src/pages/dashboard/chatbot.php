@@ -1,11 +1,36 @@
-    <!-- Page Header -->
+    <!-- Page Header & Tab Navigation -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Chatbot & Auto-Reply Rules</h1>
-            <p class="text-[13px] text-slate-500 mt-0.5 font-medium">Configure intelligent keyword triggers and default fallback replies for inbound WhatsApp messages.</p>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">AI Agent, RAG & Automation Studio</h1>
+            <p class="text-[13px] text-slate-500 mt-0.5 font-medium">Configure intelligent multi-provider LLMs, company knowledge retrieval, keyword rules, and human escalation alarms.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="<?= e(base_url('index.php?page=live-chat')) ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-all active:scale-[0.98]">
+                <span>💬 Open Live Chat</span>
+            </a>
         </div>
     </div>
 
+    <!-- Navigation Tabs -->
+    <div class="flex items-center gap-1.5 border-b border-slate-200/90 pb-3 mb-6 overflow-x-auto">
+        <a href="<?= e(base_url('index.php?page=chatbot&tab=rules')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'rules' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
+            ⚡ Keyword Triggers (<?= count($chatbotRules) ?>)
+        </a>
+        <a href="<?= e(base_url('index.php?page=chatbot&tab=ai-agent')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'ai-agent' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
+            🤖 AI Persona & Providers
+        </a>
+        <a href="<?= e(base_url('index.php?page=chatbot&tab=knowledge')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'knowledge' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
+            📚 Company Knowledge (RAG) (<?= count($knowledgeChunks) ?>)
+        </a>
+        <a href="<?= e(base_url('index.php?page=chatbot&tab=escalations')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'escalations' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
+            🚨 Escalations & Buzzer Logs
+        </a>
+    </div>
+
+    <?php if ($activeTab === 'rules'): ?>
+    <!-- ========================================== -->
+    <!-- TAB 1: KEYWORD AUTOMATION RULES            -->
+    <!-- ========================================== -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <!-- Active Rules Column -->
         <div class="lg:col-span-2 space-y-4">
@@ -96,6 +121,266 @@
             </div>
         </div>
     </div>
-    
+
+    <?php elseif ($activeTab === 'ai-agent'): ?>
+    <!-- ========================================== -->
+    <!-- TAB 2: AI AGENT & MULTI-PROVIDER ENGINE    -->
+    <!-- ========================================== -->
+    <div class="max-w-4xl bg-white rounded-xl border border-slate-200/80 p-6 shadow-card mb-8">
+        <div class="flex items-center justify-between pb-4 border-b border-slate-200/80 mb-6">
+            <div>
+                <h2 class="text-base font-bold text-slate-900">AI Support Agent Configuration</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Customize your AI assistant persona, API keys, and multi-provider fallback cascade.</p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold <?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200' ?>">
+                <span class="w-2 h-2 rounded-full <?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400' ?>"></span>
+                <span><?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'Autonomous AI Active' : 'Autonomous AI Paused' ?></span>
+            </span>
+        </div>
+
+        <form method="post" action="<?= e(base_url('index.php?page=ai-agent-save')) ?>" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+
+            <!-- Master Toggles -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/80">
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" name="auto_reply_enabled" value="1" <?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'checked' : '' ?> class="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
+                    <div>
+                        <span class="block text-xs font-bold text-slate-900">Enable Autonomous AI Replies</span>
+                        <span class="block text-[11px] text-slate-500">When checked, incoming customer questions are answered automatically by the AI Agent using your Knowledge Base.</span>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" name="enabled" value="1" <?= (int) ($aiSettings['enabled'] ?? 1) === 1 ? 'checked' : '' ?> class="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
+                    <div>
+                        <span class="block text-xs font-bold text-slate-900">Master AI Agent Activation</span>
+                        <span class="block text-[11px] text-slate-500">Enables LLM provider initialization and sentiment/frustration analysis.</span>
+                    </div>
+                </label>
+            </div>
+
+            <!-- System Role & Persona Description -->
+            <div>
+                <label class="block text-xs font-bold text-slate-800 mb-1">
+                    System Role & Persona Description
+                </label>
+                <p class="text-[11px] text-slate-500 mb-2">Describe what your chatbot is and how it should behave (e.g. role, company identity, tone, response constraints). Official RAG knowledge chunks will be injected automatically below this prompt.</p>
+                <textarea name="system_prompt" rows="5" required class="w-full text-xs px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-subtle font-sans leading-relaxed"><?= e($aiSettings['system_prompt'] ?? '') ?></textarea>
+            </div>
+
+            <!-- Provider Priority Cascade -->
+            <div>
+                <label class="block text-xs font-bold text-slate-800 mb-1">Provider Cascade Priority</label>
+                <p class="text-[11px] text-slate-500 mb-2">If your primary provider encounters rate limits or network errors, WhatsGateway automatically cascades to the secondary and tertiary providers in real time.</p>
+                <select name="provider_priority" class="w-full sm:w-80 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-subtle font-semibold">
+                    <option value="gemini" <?= ($aiSettings['provider_priority'] ?? '') === 'gemini' ? 'selected' : '' ?>>1. Google Gemini ➔ 2. Groq ➔ 3. OpenRouter</option>
+                    <option value="groq" <?= ($aiSettings['provider_priority'] ?? '') === 'groq' ? 'selected' : '' ?>>1. Groq (Llama 3.3) ➔ 2. Gemini ➔ 3. OpenRouter</option>
+                    <option value="openrouter" <?= ($aiSettings['provider_priority'] ?? '') === 'openrouter' ? 'selected' : '' ?>>1. OpenRouter (Free LLMs) ➔ 2. Gemini ➔ 3. Groq</option>
+                </select>
+            </div>
+
+            <!-- Provider API Keys Grid -->
+            <div class="border border-slate-200/90 rounded-xl p-4 space-y-4 bg-slate-50/50">
+                <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Multi-Provider API Keys</h3>
+
+                <!-- Google Gemini -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Google Gemini API Key</label>
+                        <input type="password" name="gemini_api_key" placeholder="<?= !empty($aiSettings['gemini_api_key']) ? '•••••••••••••••••••• (Saved)' : 'Enter Google Gemini API Key' ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Gemini Model ID</label>
+                        <input type="text" name="gemini_model" value="<?= e($aiSettings['gemini_model'] ?? 'gemini-1.5-flash') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    </div>
+                </div>
+
+                <!-- Groq -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Groq API Key</label>
+                        <input type="password" name="groq_api_key" placeholder="<?= !empty($aiSettings['groq_api_key']) ? '•••••••••••••••••••• (Saved)' : 'Enter Groq API Key' ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Groq Model ID</label>
+                        <input type="text" name="groq_model" value="<?= e($aiSettings['groq_model'] ?? 'llama-3.3-70b-versatile') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    </div>
+                </div>
+
+                <!-- OpenRouter -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">OpenRouter API Key (Free Models Supported)</label>
+                        <input type="password" name="openrouter_api_key" placeholder="<?= !empty($aiSettings['openrouter_api_key']) ? '•••••••••••••••••••• (Saved)' : 'Enter OpenRouter API Key' ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">OpenRouter Model ID</label>
+                        <input type="text" name="openrouter_model" value="<?= e($aiSettings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tuning Parameters -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">Temperature (Creativity / Precision)</label>
+                    <input type="number" step="0.05" min="0.0" max="1.0" name="temperature" value="<?= e($aiSettings['temperature'] ?? '0.40') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    <p class="text-[10px] text-slate-400 mt-1">Recommended: 0.2 - 0.4 for factual support grounded strictly in knowledge base.</p>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">Max Output Tokens</label>
+                    <input type="number" step="50" min="100" max="2000" name="max_tokens" value="<?= e($aiSettings['max_tokens'] ?? 500) ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
+                    <p class="text-[10px] text-slate-400 mt-1">Keeps WhatsApp messages readable and cost-effective.</p>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-200 flex justify-end">
+                <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-xs transition-all active:scale-[0.98]">
+                    Save AI Agent Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <?php elseif ($activeTab === 'knowledge'): ?>
+    <!-- ========================================== -->
+    <!-- TAB 3: COMPANY KNOWLEDGE BASE (RAG)        -->
+    <!-- ========================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Knowledge Chunks List -->
+        <div class="lg:col-span-2 space-y-4">
+            <div class="bg-blue-50/70 border border-blue-200/80 rounded-xl p-4 text-xs text-blue-900 flex items-start gap-3">
+                <span class="text-base">💡</span>
+                <div>
+                    <strong>Zero-Cloud Vector Retrieval (Option A):</strong>
+                    <p class="text-[11px] text-blue-800 mt-0.5 leading-relaxed">Each document chunk below is converted into a high-dimensional vector. When a customer messages your WhatsApp number, our Node.js worker performs in-memory Cosine Similarity ranking in sub-millisecond time and injects only the top-matching factual excerpts into the LLM prompt.</p>
+                </div>
+            </div>
+
+            <?php foreach ($knowledgeChunks as $chunk): ?>
+                <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card transition-all">
+                    <div class="flex items-start justify-between gap-3 mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <h3 class="text-sm font-bold text-slate-900"><?= e($chunk['title']) ?></h3>
+                        </div>
+                        <form method="post" action="<?= e(base_url('index.php?page=ai-knowledge-delete')) ?>" onsubmit="return confirm('Delete this knowledge chunk?');">
+                            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                            <input type="hidden" name="id" value="<?= (int) $chunk['id'] ?>">
+                            <button type="submit" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded transition-colors" title="Delete chunk">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </form>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200/70 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">
+                        <?= e($chunk['content']) ?>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-2">
+                        <span>Characters: <?= strlen($chunk['content']) ?></span>
+                        <span>Model: <?= e($chunk['embedding_model'] ?? 'local-tfidf') ?></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+
+            <?php if (!$knowledgeChunks): ?>
+                <div class="bg-white border border-slate-200/80 rounded-xl p-10 text-center shadow-card">
+                    <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto mb-3 border border-slate-100 text-slate-400 text-xl">
+                        📖
+                    </div>
+                    <h3 class="text-sm font-bold text-slate-900 mb-0.5">No Company Knowledge Chunks</h3>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto">Add your company FAQs, product catalogs, refund policies, or business hours to ground your AI assistant in truth.</p>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Add Knowledge Chunk Form -->
+        <div>
+            <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card sticky top-6">
+                <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                    <span class="text-emerald-600">+</span>
+                    Add Knowledge Document / FAQ
+                </h2>
+                <form method="post" action="<?= e(base_url('index.php?page=ai-knowledge-create')) ?>" class="space-y-4">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Topic / Title</label>
+                        <input type="text" name="title" required placeholder="e.g. Return & Refund Policy" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-medium">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Document Content / Details</label>
+                        <textarea name="content" rows="8" required placeholder="Paste full policy text, pricing breakdown, business hours, or support answers..." class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none resize-none font-sans leading-relaxed"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-4 rounded-lg shadow-xs transition-all active:scale-[0.98]">
+                        Save Knowledge Chunk
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <?php elseif ($activeTab === 'escalations'): ?>
+    <!-- ========================================== -->
+    <!-- TAB 4: HUMAN ESCALATIONS & BUZZER LOGS     -->
+    <!-- ========================================== -->
+    <div class="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden mb-8">
+        <div class="p-4 border-b border-slate-200/80 flex items-center justify-between">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900">Recent Escalation Alarms</h2>
+                <p class="text-xs text-slate-500">Log of customer frustration triggers, human takeover requests, and buzzer events.</p>
+            </div>
+            <a href="<?= e(base_url('index.php?page=live-chat')) ?>" class="text-xs font-bold text-emerald-700 hover:text-emerald-800">Go to Live Chat ➔</a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 border-b border-slate-200/70 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3">Timestamp</th>
+                        <th class="px-4 py-3">Customer</th>
+                        <th class="px-4 py-3">Trigger Reason</th>
+                        <th class="px-4 py-3">Trigger Excerpt</th>
+                        <th class="px-4 py-3">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <?php foreach ($recentEscalations as $esc): ?>
+                        <tr class="hover:bg-slate-50/70 transition-colors">
+                            <td class="px-4 py-3 text-slate-500 font-mono text-[11px] whitespace-nowrap"><?= e($esc['created_at']) ?></td>
+                            <td class="px-4 py-3 font-semibold text-slate-900">
+                                <div><?= e($esc['contact_name'] ?: '+' . $esc['phone']) ?></div>
+                                <div class="text-[10px] text-slate-400 font-mono">+<?= e($esc['phone']) ?></div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold <?= $esc['status'] === 'active' ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-slate-100 text-slate-700' ?>">
+                                    <?= e($esc['reason_code']) ?>
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-slate-600 max-w-xs truncate" title="<?= e($esc['trigger_text'] ?? '') ?>">
+                                <?= e($esc['trigger_text'] ?? '—') ?>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold <?= $esc['status'] === 'active' ? 'bg-rose-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' ?>">
+                                    <?= e(strtoupper($esc['status'])) ?>
+                                </span>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+
+                    <?php if (!$recentEscalations): ?>
+                        <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-slate-400">
+                                No escalations recorded yet.
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Footer Spacer -->
     <div class="h-8"></div>
