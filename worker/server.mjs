@@ -17,6 +17,12 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   useMultiFileAuthState
 } from '@whiskeysockets/baileys';
+import {
+  detectFrustrationAndEscalation,
+  retrieveRelevantKnowledge,
+  buildPromptWithRag,
+  generateAiReply
+} from './ai-agent.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv(resolve(__dirname, '..', '.env'));
@@ -1297,19 +1303,20 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                 }
               }
 
-              // Standard conversation upsert (reopens closed conversation on customer message)
+              // Standard conversation upsert (reopens closed conversation on customer message, preserves escalated)
               if (!feedbackHandled) {
                 await db.execute(
-                  `INSERT INTO chat_conversations (user_id, phone, contact_name, last_message, last_message_at, unread_count, status, closed_at, awaiting_feedback)
-                   VALUES (?, ?, ?, ?, NOW(), 1, 'open', NULL, 0)
+                  `INSERT INTO chat_conversations (user_id, phone, contact_name, last_message, last_message_at, unread_count, status, closed_at, awaiting_feedback, consecutive_bot_replies)
+                   VALUES (?, ?, ?, ?, NOW(), 1, 'open', NULL, 0, 0)
                    ON DUPLICATE KEY UPDATE
                      contact_name = COALESCE(VALUES(contact_name), contact_name),
                      last_message = VALUES(last_message),
                      last_message_at = NOW(),
                      unread_count = unread_count + 1,
-                     status = 'open',
+                     status = IF(status = 'escalated', 'escalated', 'open'),
                      closed_at = NULL,
-                     awaiting_feedback = 0`,
+                     awaiting_feedback = 0,
+                     consecutive_bot_replies = 0`,
                   [userId, senderPhone, senderName, messagePreview]
                 );
               }
@@ -1436,7 +1443,122 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             continue;
           }
 
-          // 6. Chatbot rule processing for text messages with loop protection
+          // 6. Escalation & Frustration check
+          let wasEscalated = false;
+          if (!feedbackHandled && senderPhone) {
+            const escCheck = detectFrustrationAndEscalation(norm.body);
+            if (escCheck.shouldEscalate) {
+              wasEscalated = true;
+              logger.warn({ userId, senderPhone, reason: escCheck.reason, score: escCheck.score }, '🚨 Escalation trigger detected! Pausing bot and alerting human agents.');
+
+              await db.execute(
+                `UPDATE chat_conversations
+                 SET status = 'escalated',
+                     escalated_at = NOW(),
+                     escalation_reason = ?,
+                     bot_paused = 1,
+                     consecutive_bot_replies = 0
+                 WHERE user_id = ? AND phone = ?`,
+                [escCheck.reason, userId, senderPhone]
+              );
+
+              const [cRows] = await db.execute(
+                'SELECT id FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
+                [userId, senderPhone]
+              );
+              if (cRows && cRows.length > 0) {
+                const convId = cRows[0].id;
+                await db.execute(
+                  `INSERT INTO chat_escalations (user_id, conversation_id, reason_code, trigger_text, status, created_at)
+                   VALUES (?, ?, ?, ?, 'active', NOW())`,
+                  [userId, convId, escCheck.reason, (norm.body || '').slice(0, 500)]
+                );
+
+                const handoverMsg = 'I understand you need assistance from our team. I have escalated this conversation to our support representatives and paused automated replies. A team member will join you shortly. 🔔';
+                try {
+                  await session.socket.sendMessage(msg.key.remoteJid, { text: handoverMsg });
+                  await db.execute(
+                    `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
+                     VALUES (?, ?, 'bot', 'Support System', 'text', ?, 'sent')`,
+                    [userId, convId, handoverMsg]
+                  );
+                } catch (sendErr) {
+                  logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch handover confirmation');
+                }
+              }
+            }
+          }
+
+          if (wasEscalated) {
+            continue;
+          }
+
+          // 7. Enterprise AI Agent & Zero-Cloud RAG processing
+          let aiHandled = false;
+          if (!feedbackHandled && isBotPaused !== 1) {
+            const text = (norm.body || '').trim();
+            if (text) {
+              try {
+                const [aiSettingsRows] = await db.execute(
+                  'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
+                  [userId]
+                );
+                const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
+
+                if (aiSettings && (aiSettings.gemini_api_key || aiSettings.groq_api_key || aiSettings.openrouter_api_key)) {
+                  const [convCheck] = await db.execute(
+                    'SELECT id, consecutive_bot_replies, status, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
+                    [userId, senderPhone]
+                  );
+                  if (convCheck && convCheck.length > 0) {
+                    const conv = convCheck[0];
+                    if (conv.status !== 'escalated' && conv.bot_paused !== 1 && Number(conv.consecutive_bot_replies || 0) < 6) {
+                      const relevantChunks = await retrieveRelevantKnowledge(db, userId, text, 3, 0.15);
+                      const { systemPrompt, userMessage } = buildPromptWithRag(
+                        aiSettings.system_prompt,
+                        relevantChunks,
+                        text
+                      );
+
+                      const replyText = await generateAiReply(aiSettings, systemPrompt, userMessage);
+                      if (replyText && replyText.trim()) {
+                        const [guard] = await db.execute(
+                          'SELECT status, bot_paused FROM chat_conversations WHERE id = ? LIMIT 1',
+                          [conv.id]
+                        );
+                        if (guard && guard.length > 0 && guard[0].status !== 'escalated' && guard[0].bot_paused !== 1) {
+                          await session.socket.sendMessage(msg.key.remoteJid, { text: replyText.trim() });
+                          await db.execute(
+                            `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
+                             VALUES (?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
+                            [userId, conv.id, replyText.trim()]
+                          );
+                          await db.execute(
+                            `UPDATE chat_conversations
+                             SET last_message = ?,
+                                 last_message_at = NOW(),
+                                 consecutive_bot_replies = consecutive_bot_replies + 1
+                             WHERE id = ?`,
+                            [replyText.trim().slice(0, 200), conv.id]
+                          );
+                          aiHandled = true;
+                          logger.info({ userId, convId: conv.id }, 'Dispatched contextual AI Agent reply');
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (aiErr) {
+                logger.warn({ aiErr: aiErr.message, userId }, 'AI Agent processing error, falling back to rule-based chatbot');
+              }
+            }
+          }
+
+          if (aiHandled) {
+            continue;
+          }
+
+          // 8. Chatbot rule processing for text messages with loop protection
           if (feedbackHandled) {
             continue; // Do not trigger chatbot auto-replies on feedback submissions
           }

@@ -531,6 +531,87 @@ if ($page === 'chatbot-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect_to('index.php?page=chatbot');
 }
 
+if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $pdo = Database::pdo();
+
+    $enabled = isset($_POST['enabled']) ? 1 : 0;
+    $autoReplyEnabled = isset($_POST['auto_reply_enabled']) ? 1 : 0;
+    $providerPriority = in_array($_POST['provider_priority'] ?? '', ['gemini', 'groq', 'openrouter'], true) ? $_POST['provider_priority'] : 'gemini';
+    $systemPrompt = trim((string) ($_POST['system_prompt'] ?? ''));
+    $temperature = max(0.0, min(1.0, (float) ($_POST['temperature'] ?? 0.4)));
+    $maxTokens = max(50, min(2000, (int) ($_POST['max_tokens'] ?? 500)));
+
+    $geminiKey = trim((string) ($_POST['gemini_api_key'] ?? ''));
+    $groqKey = trim((string) ($_POST['groq_api_key'] ?? ''));
+    $openrouterKey = trim((string) ($_POST['openrouter_api_key'] ?? ''));
+
+    $geminiModel = trim((string) ($_POST['gemini_model'] ?? 'gemini-1.5-flash')) ?: 'gemini-1.5-flash';
+    $groqModel = trim((string) ($_POST['groq_model'] ?? 'llama-3.3-70b-versatile')) ?: 'llama-3.3-70b-versatile';
+    $openrouterModel = trim((string) ($_POST['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free')) ?: 'meta-llama/llama-3.3-70b-instruct:free';
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO ai_agent_settings (user_id, enabled, provider_priority, gemini_api_key, groq_api_key, openrouter_api_key, gemini_model, groq_model, openrouter_model, system_prompt, temperature, max_tokens, auto_reply_enabled)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           enabled = VALUES(enabled),
+           provider_priority = VALUES(provider_priority),
+           gemini_api_key = IF(VALUES(gemini_api_key) != "", VALUES(gemini_api_key), gemini_api_key),
+           groq_api_key = IF(VALUES(groq_api_key) != "", VALUES(groq_api_key), groq_api_key),
+           openrouter_api_key = IF(VALUES(openrouter_api_key) != "", VALUES(openrouter_api_key), openrouter_api_key),
+           gemini_model = VALUES(gemini_model),
+           groq_model = VALUES(groq_model),
+           openrouter_model = VALUES(openrouter_model),
+           system_prompt = VALUES(system_prompt),
+           temperature = VALUES(temperature),
+           max_tokens = VALUES(max_tokens),
+           auto_reply_enabled = VALUES(auto_reply_enabled)'
+    );
+    $stmt->execute([
+        $userId, $enabled, $providerPriority, $geminiKey, $groqKey, $openrouterKey,
+        $geminiModel, $groqModel, $openrouterModel, $systemPrompt, $temperature, $maxTokens, $autoReplyEnabled
+    ]);
+
+    flash('success', 'AI Agent configuration updated successfully.');
+    redirect_to('index.php?page=chatbot&tab=ai-agent');
+}
+
+if ($page === 'ai-knowledge-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $pdo = Database::pdo();
+
+    $title = trim((string) ($_POST['title'] ?? ''));
+    $content = trim((string) ($_POST['content'] ?? ''));
+
+    if ($title === '' || $content === '') {
+        flash('error', 'Title and content are required.');
+        redirect_to('index.php?page=chatbot&tab=knowledge');
+    }
+
+    $stmt = $pdo->prepare('INSERT INTO ai_knowledge_chunks (user_id, title, content, is_active) VALUES (?, ?, ?, 1)');
+    $stmt->execute([$userId, $title, $content]);
+
+    flash('success', 'Knowledge chunk added to RAG database.');
+    redirect_to('index.php?page=chatbot&tab=knowledge');
+}
+
+if ($page === 'ai-knowledge-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $id = (int) ($_POST['id'] ?? 0);
+
+    $stmt = Database::pdo()->prepare('DELETE FROM ai_knowledge_chunks WHERE id = ? AND user_id = ?');
+    $stmt->execute([$id, $userId]);
+
+    flash('success', 'Knowledge chunk deleted.');
+    redirect_to('index.php?page=chatbot&tab=knowledge');
+}
+
 if ($page === 'session-auto-sleep' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();

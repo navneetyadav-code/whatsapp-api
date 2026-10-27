@@ -25,7 +25,7 @@ if ($rawPhone === '') {
 $phone = normalize_chat_phone($rawPhone, $userId);
 
 // Check current status
-$stmt = $pdo->prepare('SELECT id, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1');
+$stmt = $pdo->prepare('SELECT id, bot_paused, status FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1');
 $stmt->execute([$userId, $phone]);
 $conv = $stmt->fetch();
 
@@ -36,8 +36,16 @@ if ($conv) {
     } else {
         $newStatus = (int) $conv['bot_paused'] === 1 ? 0 : 1;
     }
-    $updateStmt = $pdo->prepare('UPDATE chat_conversations SET bot_paused = ? WHERE id = ?');
-    $updateStmt->execute([$newStatus, $conv['id']]);
+    
+    // If resuming bot (bot_paused = 0), reset escalated status back to open and acknowledge escalations
+    if ($newStatus === 0) {
+        $updateStmt = $pdo->prepare('UPDATE chat_conversations SET bot_paused = 0, status = "open", escalation_reason = NULL, escalated_at = NULL WHERE id = ?');
+        $updateStmt->execute([$conv['id']]);
+        $pdo->prepare('UPDATE chat_escalations SET status = "resolved", resolved_at = NOW(), resolved_by = ? WHERE conversation_id = ? AND user_id = ? AND status != "resolved"')->execute([$user['name'] ?? 'Agent', $conv['id'], $userId]);
+    } else {
+        $updateStmt = $pdo->prepare('UPDATE chat_conversations SET bot_paused = 1 WHERE id = ?');
+        $updateStmt->execute([$conv['id']]);
+    }
 } else {
     if (isset($data['bot_paused'])) {
         $newStatus = (int) $data['bot_paused'] === 1 ? 1 : 0;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * Native WhatsApp Live Chat Studio
  * Integrated WhatsApp Web style console with no outer page scroll, direct two-way messaging,
- * human takeover, and real-time status receipts.
+ * human takeover, hardware WebAudio buzzer, desktop push notifications, and real-time status receipts.
  */
 ?>
 
@@ -33,8 +33,12 @@ declare(strict_types=1);
                 <?php endif; ?>
             </div>
 
-            <!-- Action Buttons: + New Chat & Refresh -->
+            <!-- Action Buttons: Buzzer Toggle + New Chat & Refresh -->
             <div class="flex items-center gap-1 shrink-0">
+                <button id="btnBuzzerControl" type="button" class="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 transition-all active:scale-[0.98]" title="Buzzer & Desktop Push Notifications Control (Click to test sound or toggle mute)">
+                    <span id="buzzerIcon">🔔</span>
+                    <span id="buzzerLabel" class="hidden sm:inline">Buzzer</span>
+                </button>
                 <button id="btnNewChat" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all active:scale-[0.98]" title="Start a new chat with an Indian or international number">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
@@ -58,10 +62,11 @@ declare(strict_types=1);
             </div>
 
             <!-- Filter Tabs -->
-            <div class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-                <button type="button" data-filter="all" class="chat-filter-btn px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs">All</button>
-                <button type="button" data-filter="unread" class="chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all">Unread <span id="unreadFilterBadge" class="ml-0.5 text-[9px] font-mono <?= $totalChatUnread > 0 ? 'text-emerald-700 font-bold' : '' ?>"><?= $totalChatUnread > 0 ? "({$totalChatUnread})" : '' ?></span></button>
-                <button type="button" data-filter="closed" class="chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all">Closed</button>
+            <div class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 overflow-x-auto">
+                <button type="button" data-filter="all" class="chat-filter-btn px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0">All</button>
+                <button type="button" data-filter="escalated" class="chat-filter-btn px-2 py-0.5 rounded-md hover:bg-rose-100 text-rose-700 transition-all font-bold shrink-0">🚨 Escalated <span id="escalatedFilterBadge" class="ml-0.5 text-[9px] font-mono"></span></button>
+                <button type="button" data-filter="unread" class="chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all shrink-0">Unread <span id="unreadFilterBadge" class="ml-0.5 text-[9px] font-mono <?= $totalChatUnread > 0 ? 'text-emerald-700 font-bold' : '' ?>"><?= $totalChatUnread > 0 ? "({$totalChatUnread})" : '' ?></span></button>
+                <button type="button" data-filter="closed" class="chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all shrink-0">Closed</button>
             </div>
         </div>
 
@@ -99,6 +104,7 @@ declare(strict_types=1);
                         <div class="flex items-center gap-2">
                             <h2 id="chatActiveName" class="text-xs font-bold text-slate-900 truncate">Recipient</h2>
                             <span id="chatActiveBotBadge" class="px-1.5 py-0.2 rounded text-[10px] font-bold font-mono"></span>
+                            <span id="chatActiveEscalatedBadge" class="hidden px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">🚨 ESCALATED</span>
                         </div>
                         <p id="chatActivePhone" class="text-[11px] text-slate-400 font-mono font-medium truncate">+91 00000 00000</p>
                     </div>
@@ -106,6 +112,10 @@ declare(strict_types=1);
 
                 <!-- Action Buttons: Toggle Bot & Close Chat -->
                 <div class="flex items-center gap-2 shrink-0">
+                    <button id="btnManualEscalate" type="button" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 transition-all" title="Trigger human escalation alarm for this chat">
+                        <span>🚨</span>
+                        <span class="hidden sm:inline">Escalate</span>
+                    </button>
                     <button id="btnToggleBot" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-[0.98]" title="Pause bot to take over manually, or resume automated replies">
                         <span id="botToggleIcon">🤖</span>
                         <span id="botToggleLabel">Bot Active</span>
@@ -114,6 +124,18 @@ declare(strict_types=1);
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                         <span id="closeChatLabel">Close Chat</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Escalation Notice Banner (Shown dynamically when conversation is escalated) -->
+            <div id="chatEscalationBanner" class="hidden px-4 py-2.5 bg-rose-50 border-b border-rose-200 text-rose-900 text-xs flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2.5 h-2.5 rounded-full bg-rose-600 shrink-0 animate-ping"></span>
+                    <span class="truncate"><strong>🚨 Customer Escalation:</strong> <span id="escalationReasonText">Customer requested human support</span>. Automated bot paused.</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button id="btnAcknowledgeEscalation" type="button" class="px-2.5 py-1 bg-white border border-rose-300 text-rose-800 rounded-md text-[11px] font-bold hover:bg-rose-100 transition-colors shadow-2xs">Silence Buzzer</button>
+                    <button id="btnResolveEscalation" type="button" class="px-2.5 py-1 bg-rose-700 text-white rounded-md text-[11px] font-bold hover:bg-rose-800 transition-colors shadow-2xs">Takeover & Resolve</button>
                 </div>
             </div>
 

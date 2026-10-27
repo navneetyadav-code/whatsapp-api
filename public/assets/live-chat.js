@@ -1,6 +1,7 @@
 /**
  * WhatsGateway Native WhatsApp Live Chat Studio Engine
- * Full real-time two-way messaging, smart delta polling, human takeover, and optimistic dispatch.
+ * Full real-time two-way messaging, smart delta polling, human takeover,
+ * hardware WebAudio alarm buzzer, native desktop push notifications, and optimistic dispatch.
  */
 
 (function () {
@@ -22,16 +23,28 @@
         selectedFile: null,
         pollTimer: null,
         convTimer: null,
+        activeEscalationsCount: 0,
+        buzzerMuted: localStorage.getItem('whats_buzzer_muted') === '1',
     };
 
-    // 3. DOM Elements
+    // 3. Audio & Notification System State
+    let audioCtx = null;
+    let buzzerInterval = null;
+    const notifiedEscalationIds = new Set();
+
+    // 4. DOM Elements
     const dom = {
         conversationsContainer: document.getElementById('conversationsContainer'),
         chatSearchInput: document.getElementById('chatSearchInput'),
         chatSearchClear: document.getElementById('chatSearchClear'),
         unreadFilterBadge: document.getElementById('unreadFilterBadge'),
+        escalatedFilterBadge: document.getElementById('escalatedFilterBadge'),
         btnRefreshConversations: document.getElementById('btnRefreshConversations'),
         filterBtns: document.querySelectorAll('.chat-filter-btn'),
+
+        btnBuzzerControl: document.getElementById('btnBuzzerControl'),
+        buzzerIcon: document.getElementById('buzzerIcon'),
+        buzzerLabel: document.getElementById('buzzerLabel'),
 
         noChatSelected: document.getElementById('noChatSelected'),
         activeChatWrapper: document.getElementById('activeChatWrapper'),
@@ -39,11 +52,19 @@
         chatActiveName: document.getElementById('chatActiveName'),
         chatActivePhone: document.getElementById('chatActivePhone'),
         chatActiveBotBadge: document.getElementById('chatActiveBotBadge'),
+        chatActiveEscalatedBadge: document.getElementById('chatActiveEscalatedBadge'),
+        btnManualEscalate: document.getElementById('btnManualEscalate'),
         btnToggleBot: document.getElementById('btnToggleBot'),
         botToggleIcon: document.getElementById('botToggleIcon'),
         botToggleLabel: document.getElementById('botToggleLabel'),
         btnCloseChat: document.getElementById('btnCloseChat'),
         closeChatLabel: document.getElementById('closeChatLabel'),
+
+        chatEscalationBanner: document.getElementById('chatEscalationBanner'),
+        escalationReasonText: document.getElementById('escalationReasonText'),
+        btnAcknowledgeEscalation: document.getElementById('btnAcknowledgeEscalation'),
+        btnResolveEscalation: document.getElementById('btnResolveEscalation'),
+
         chatClosedBanner: document.getElementById('chatClosedBanner'),
         btnReopenBanner: document.getElementById('btnReopenBanner'),
 
@@ -117,10 +138,112 @@
         return 'WA';
     }
 
+    // =========================================================================
+    // WEBAUDIO BUZZER & DESKTOP PUSH NOTIFICATION SYSTEM
+    // =========================================================================
+
+    function initAudioContext() {
+        if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                audioCtx = new AudioContextClass();
+            }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    /**
+     * Synthesizes hardware alert buzzer: 880Hz -> 1320Hz oscillating tone with gain envelope
+     */
+    function playBuzzerTone() {
+        if (state.buzzerMuted) return;
+        try {
+            initAudioContext();
+            if (!audioCtx || audioCtx.state !== 'running') return;
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'square';
+            // Dual-tone frequency jump: 880Hz (A5) -> 1320Hz (E6)
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(1320, now + 0.16);
+
+            // Envelope: ramp up and smooth decay to prevent harsh audio clicks
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.exponentialRampToValueAtTime(0.35, now + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.40);
+        } catch (e) {
+            console.warn('[WebAudio Buzzer Error]:', e);
+        }
+    }
+
+    function startBuzzerLoop() {
+        if (buzzerInterval) return;
+        playBuzzerTone();
+        buzzerInterval = setInterval(() => {
+            playBuzzerTone();
+        }, 5500);
+    }
+
+    function stopBuzzerLoop() {
+        if (buzzerInterval) {
+            clearInterval(buzzerInterval);
+            buzzerInterval = null;
+        }
+    }
+
+    function updateBuzzerButtonUi() {
+        if (!dom.btnBuzzerControl) return;
+        if (state.buzzerMuted) {
+            dom.buzzerIcon.textContent = '🔕';
+            dom.buzzerLabel.textContent = 'Muted';
+            dom.btnBuzzerControl.className = 'inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-semibold border border-rose-200 transition-all';
+        } else {
+            dom.buzzerIcon.textContent = '🔔';
+            dom.buzzerLabel.textContent = 'Buzzer';
+            dom.btnBuzzerControl.className = 'inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 transition-all';
+        }
+    }
+
+    function requestDesktopNotifications() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().then(perm => {
+                console.log('[Push Notification Permission]:', perm);
+            });
+        }
+    }
+
+    function fireDesktopNotification(title, body, phone) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        try {
+            const notif = new Notification(title, {
+                body: body,
+                tag: 'escalation-' + phone,
+                requireInteraction: true
+            });
+            notif.onclick = function () {
+                window.focus();
+                if (phone) selectConversation(phone);
+                notif.close();
+            };
+        } catch (err) {
+            console.warn('[Desktop Notification Error]:', err);
+        }
+    }
+
     // Helper: SVG checkmark status icons (WhatsApp Web style)
     function getStatusSvg(status) {
         if (status === 'read') {
-            // Double check in Sky Blue #53bdeb
             return `<span class="inline-flex text-[#53bdeb]" title="Read / Seen">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 16 15" fill="none" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M1 8.5l3.5 3.5 7.5-7.5m-5 7.5l1.5 1.5 6.5-6.5"/>
@@ -128,7 +251,6 @@
             </span>`;
         }
         if (status === 'delivered') {
-            // Double check in Grey
             return `<span class="inline-flex text-slate-400" title="Delivered">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 16 15" fill="none" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M1 8.5l3.5 3.5 7.5-7.5m-5 7.5l1.5 1.5 6.5-6.5"/>
@@ -136,7 +258,6 @@
             </span>`;
         }
         if (status === 'sent') {
-            // Single check in Grey
             return `<span class="inline-flex text-slate-400" title="Sent">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 16 15" fill="none" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.5 8.5l4 4 8-8"/>
@@ -148,7 +269,6 @@
                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
             </span>`;
         }
-        // Pending / Queued clock icon
         return `<span class="inline-flex text-slate-400" title="Sending...">
             <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
         </span>`;
@@ -167,8 +287,48 @@
             if (!data.ok) throw new Error(data.error || 'Failed to load conversations');
 
             state.conversations = data.conversations || [];
+            state.activeEscalationsCount = Number(data.active_escalations_count || 0);
+
+            // Manage Buzzer Alarm & Desktop Notification Triggers
+            if (state.activeEscalationsCount > 0) {
+                startBuzzerLoop();
+                if (dom.escalatedFilterBadge) {
+                    dom.escalatedFilterBadge.textContent = `(${state.activeEscalationsCount})`;
+                }
+
+                // Check for newly escalated conversations to notify
+                for (const c of state.conversations) {
+                    if (c.status === 'escalated' && !notifiedEscalationIds.has(c.phone)) {
+                        notifiedEscalationIds.add(c.phone);
+                        const contactName = c.contact_name || c.formatted_phone || c.phone;
+                        const reason = c.escalation_reason || 'Customer requested human agent';
+                        fireDesktopNotification(
+                            '🚨 Urgent: WhatsApp Customer Escalation',
+                            `${contactName}: ${reason}. Automated bot paused.`,
+                            c.phone
+                        );
+                    }
+                }
+            } else {
+                stopBuzzerLoop();
+                if (dom.escalatedFilterBadge) {
+                    dom.escalatedFilterBadge.textContent = '';
+                }
+            }
+
             renderConversations();
             updateUnreadBadge();
+
+            // Refresh active chat UI in case status changed (e.g. escalated)
+            if (state.activePhone) {
+                const current = state.conversations.find(c => c.phone === state.activePhone);
+                if (current) {
+                    state.activeConversation = current;
+                    updateBotToggleUi(current.bot_paused);
+                    updateChatClosedUi(current);
+                    updateEscalationUi(current);
+                }
+            }
         } catch (err) {
             if (!silent) {
                 dom.conversationsContainer.innerHTML = `
@@ -187,6 +347,8 @@
             items = items.filter(c => c.unread_count > 0);
         } else if (state.currentFilter === 'closed') {
             items = items.filter(c => c.status === 'closed');
+        } else if (state.currentFilter === 'escalated') {
+            items = items.filter(c => c.status === 'escalated');
         }
 
         if (items.length === 0) {
@@ -206,23 +368,32 @@
             const initials = getInitials(c.contact_name, c.phone);
             const isBotPaused = c.bot_paused === 1;
             const isClosed = c.status === 'closed';
+            const isEscalated = c.status === 'escalated';
             const formatted = c.formatted_phone || formatPhone(c.phone);
 
+            let borderStyle = 'hover:bg-slate-50';
+            if (isEscalated) {
+                borderStyle = isSelected ? 'bg-rose-50/80 border-l-4 border-rose-600' : 'bg-rose-50/30 border-l-3 border-rose-500';
+            } else if (isSelected) {
+                borderStyle = 'bg-emerald-50/60 border-l-3 border-emerald-600';
+            }
+
             return `
-                <div class="conv-item p-3 transition-all cursor-pointer flex items-center gap-3 relative select-none ${isSelected ? 'bg-emerald-50/60 border-l-3 border-emerald-600' : 'hover:bg-slate-50'}" data-phone="${escapeHtml(c.phone)}" data-name="${escapeHtml(c.contact_name || '')}">
-                    <div class="w-10 h-10 rounded-full ${isSelected ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-white'} flex items-center justify-center font-bold text-xs font-mono shrink-0 shadow-2xs">
+                <div class="conv-item p-3 transition-all cursor-pointer flex items-center gap-3 relative select-none ${borderStyle}" data-phone="${escapeHtml(c.phone)}" data-name="${escapeHtml(c.contact_name || '')}">
+                    <div class="w-10 h-10 rounded-full ${isEscalated ? 'bg-rose-700 text-white animate-pulse' : (isSelected ? 'bg-emerald-700 text-white' : 'bg-slate-800 text-white')} flex items-center justify-center font-bold text-xs font-mono shrink-0 shadow-2xs">
                         ${escapeHtml(initials)}
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between mb-0.5">
-                            <h4 class="text-xs font-bold text-slate-900 truncate">${escapeHtml(c.display_name || formatted)}</h4>
+                            <h4 class="text-xs font-bold ${isEscalated ? 'text-rose-950 font-black' : 'text-slate-900'} truncate">${escapeHtml(c.display_name || formatted)}</h4>
                             <span class="text-[10px] text-slate-400 font-mono shrink-0 ml-1">${escapeHtml(c.time_ago)}</span>
                         </div>
                         <div class="flex items-center justify-between gap-1">
-                            <p class="text-[11px] text-slate-500 truncate font-medium flex-1">${escapeHtml(c.last_message || 'No messages')}</p>
+                            <p class="text-[11px] ${isEscalated ? 'text-rose-700 font-semibold' : 'text-slate-500'} truncate font-medium flex-1">${escapeHtml(c.last_message || 'No messages')}</p>
                             <div class="flex items-center gap-1 shrink-0">
+                                ${isEscalated ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-600 text-white shadow-2xs">🚨 ESCALATED</span>' : ''}
                                 ${isClosed ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Closed</span>' : ''}
-                                ${isBotPaused && !isClosed ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">⏸️ Takeover</span>' : ''}
+                                ${isBotPaused && !isClosed && !isEscalated ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">⏸️ Takeover</span>' : ''}
                                 ${c.unread_count > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[10px] font-bold font-mono shadow-2xs">${c.unread_count}</span>` : ''}
                             </div>
                         </div>
@@ -260,6 +431,9 @@
         state.activePhone = normalized;
         state.lastMessageId = 0;
 
+        // Unlock audio context on user gesture
+        initAudioContext();
+
         // Switch panels
         dom.noChatSelected.classList.add('hidden');
         dom.activeChatWrapper.classList.remove('hidden');
@@ -280,6 +454,7 @@
         dom.chatActiveAvatar.textContent = getInitials(displayName, normalized);
         updateBotToggleUi(conv ? conv.bot_paused : 0);
         updateChatClosedUi(conv);
+        updateEscalationUi(conv);
 
         // Highlight active item in list
         renderConversations();
@@ -300,373 +475,346 @@
         restartMessagePolling();
     }
 
-    async function fetchMessages(phone, isDelta = false) {
-        if (state.activePhone !== phone) return;
-
-        try {
-            const url = `${API_BASE}/messages.php?phone=${encodeURIComponent(phone)}${isDelta && state.lastMessageId > 0 ? `&after_id=${state.lastMessageId}` : ''}`;
-            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Failed to load messages');
-
-            if (data.conversation) {
-                state.activeConversation = data.conversation;
-                dom.chatActivePhone.textContent = data.conversation.formatted_phone || formatPhone(data.conversation.phone);
-                updateBotToggleUi(data.conversation.bot_paused);
-                updateChatClosedUi(data.conversation);
-                const currentConv = state.conversations.find(c => c.phone === phone);
-                if (currentConv && currentConv.unread_count > 0) {
-                    currentConv.unread_count = 0;
-                    renderConversations();
-                    updateUnreadBadge();
-                }
-            }
-
-            // Real-time status receipt updates for previous messages (sent -> delivered -> read)
-            if (data.statuses && typeof data.statuses === 'object') {
-                for (const [msgId, status] of Object.entries(data.statuses)) {
-                    const bubble = document.getElementById(`chat-msg-${msgId}`);
-                    if (bubble) updateMessageStatusIndicator(bubble, status);
-                }
-            }
-
-            const newMsgs = data.messages || [];
-
-            if (!isDelta) {
-                // Initial load
-                if (newMsgs.length === 0) {
-                    dom.messagesContainer.innerHTML = `
-                        <div class="h-full flex flex-col items-center justify-center text-center p-8 text-slate-400 select-none">
-                            <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-300 mb-2">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-                            </div>
-                            <p class="text-xs font-semibold text-slate-500 mb-0.5">No conversation history yet</p>
-                            <p class="text-[11px] text-slate-400">Type a message below to start chatting on WhatsApp.</p>
-                        </div>`;
-                } else {
-                    dom.messagesContainer.innerHTML = '';
-                    newMsgs.forEach(msg => {
-                        appendMessageBubble(msg);
-                        if (msg.id > state.lastMessageId) state.lastMessageId = msg.id;
-                    });
-                    scrollToBottom(false);
-                }
-            } else {
-                // Delta update
-                if (newMsgs.length > 0) {
-                    const shouldScroll = isNearBottom();
-                    newMsgs.forEach(msg => {
-                        appendMessageBubble(msg);
-                        if (msg.id > state.lastMessageId) state.lastMessageId = msg.id;
-                    });
-                    if (shouldScroll) scrollToBottom(true);
-                }
-            }
-        } catch (err) {
-            console.warn('Failed to sync messages:', err);
-        }
-    }
-
-    function appendMessageBubble(msg) {
-        // Prevent duplicate bubbles if optimistic insert already added it
-        const existing = document.getElementById(`chat-msg-${msg.id}`);
-        if (existing) {
-            updateMessageStatusIndicator(existing, msg.status);
-            return;
-        }
-
-        const isOutbound = Boolean(msg.is_outbound);
-        const bubble = document.createElement('div');
-        bubble.id = `chat-msg-${msg.id}`;
-        bubble.className = `flex flex-col ${isOutbound ? 'items-end ml-auto' : 'items-start mr-auto'} max-w-[85%] md:max-w-[70%] select-text`;
-
-        let mediaHtml = '';
-        if (msg.media_url) {
-            if (msg.message_type === 'image') {
-                mediaHtml = `<div class="mb-1.5 rounded-lg overflow-hidden border border-black/5 max-w-sm"><a href="${escapeHtml(msg.media_url)}" target="_blank"><img src="${escapeHtml(msg.media_url)}" alt="Image" class="max-h-60 w-auto object-cover rounded-lg hover:opacity-95 transition-opacity"></a></div>`;
-            } else if (msg.message_type === 'audio') {
-                mediaHtml = `<div class="mb-1.5"><audio controls src="${escapeHtml(msg.media_url)}" class="h-8 max-w-[260px]"></audio></div>`;
-            } else {
-                mediaHtml = `
-                    <a href="${escapeHtml(msg.media_url)}" target="_blank" download class="mb-1.5 p-2 rounded-lg bg-black/5 hover:bg-black/10 flex items-center gap-2 text-xs font-semibold transition-colors">
-                        <svg class="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <span class="truncate">Download Attachment</span>
-                    </a>`;
-            }
-        }
-
-        const roleLabel = msg.sender_type === 'bot' 
-            ? '<span class="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-100/80 px-1 rounded mr-1">BOT</span>' 
-            : '';
-
-        const bubbleBg = isOutbound
-            ? 'bg-[#D9FDD3] border border-[#bdebc2]/60 rounded-2xl rounded-tr-xs shadow-2xs'
-            : 'bg-white border border-slate-200/90 rounded-2xl rounded-tl-xs shadow-2xs';
-
-        const senderHeader = '';
-
-        bubble.innerHTML = `
-            <div class="${bubbleBg} px-3 py-1.5 text-xs text-slate-800 break-words leading-relaxed max-w-full">
-                ${senderHeader}
-                ${mediaHtml}
-                ${msg.body ? `<div>${escapeHtml(msg.body).replace(/\n/g, '<br>')}</div>` : ''}
-                <div class="flex items-center justify-end gap-1 mt-0.5 text-[10px] text-slate-400 font-mono select-none">
-                    ${roleLabel}
-                    <span>${escapeHtml(msg.time || '')}</span>
-                    ${isOutbound ? `<span class="msg-status-mark ml-0.5">${getStatusSvg(msg.status)}</span>` : ''}
-                </div>
-            </div>`;
-
-        dom.messagesContainer.appendChild(bubble);
-    }
-
-    function updateMessageStatusIndicator(bubbleEl, status) {
-        const mark = bubbleEl.querySelector('.msg-status-mark');
-        if (!mark) return;
-        mark.innerHTML = getStatusSvg(status);
-    }
-
-    function isNearBottom() {
-        const threshold = 120;
-        const pos = dom.messagesContainer.scrollTop + dom.messagesContainer.clientHeight;
-        const max = dom.messagesContainer.scrollHeight;
-        return max - pos <= threshold;
-    }
-
-    function scrollToBottom(smooth = true) {
-        dom.messagesContainer.scrollTo({
-            top: dom.messagesContainer.scrollHeight,
-            behavior: smooth ? 'smooth' : 'instant'
-        });
-    }
-
-    function updateBotToggleUi(isPaused) {
-        const paused = isPaused === 1;
-        if (paused) {
-            dom.chatActiveBotBadge.textContent = '⏸️ Bot Paused (Takeover)';
-            dom.chatActiveBotBadge.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-amber-50 text-amber-700 border border-amber-200';
-            dom.botToggleIcon.textContent = '▶️';
-            dom.botToggleLabel.textContent = 'Resume Bot';
-            dom.btnToggleBot.className = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-2xs';
-        } else {
-            dom.chatActiveBotBadge.textContent = '🤖 Bot Active';
-            dom.chatActiveBotBadge.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200';
+    function updateBotToggleUi(botPaused) {
+        const isPaused = Number(botPaused) === 1;
+        if (isPaused) {
+            dom.btnToggleBot.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-[0.98] border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 shadow-2xs';
             dom.botToggleIcon.textContent = '⏸️';
-            dom.botToggleLabel.textContent = 'Pause Bot (Takeover)';
-            dom.btnToggleBot.className = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-colors shadow-2xs';
+            dom.botToggleLabel.textContent = 'Human Takeover';
+            dom.btnToggleBot.title = 'Bot is paused. Click to resume automated AI replies.';
+            dom.chatActiveBotBadge.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-amber-100 text-amber-800 border border-amber-200';
+            dom.chatActiveBotBadge.textContent = 'Takeover';
+        } else {
+            dom.btnToggleBot.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-[0.98] border-emerald-200 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 shadow-2xs';
+            dom.botToggleIcon.textContent = '🤖';
+            dom.botToggleLabel.textContent = 'Bot Active';
+            dom.btnToggleBot.title = 'Bot is active. Click to pause bot and take over manually.';
+            dom.chatActiveBotBadge.className = 'px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-emerald-100 text-emerald-800 border border-emerald-200';
+            dom.chatActiveBotBadge.textContent = 'Bot Active';
         }
     }
 
     function updateChatClosedUi(conv) {
-        if (!dom.btnCloseChat) return;
         const isClosed = conv && conv.status === 'closed';
-
         if (isClosed) {
-            if (dom.chatClosedBanner) dom.chatClosedBanner.classList.remove('hidden');
-            if (dom.closeChatLabel) dom.closeChatLabel.textContent = 'Reopen Chat';
-            dom.btnCloseChat.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-[0.98] border-slate-300 text-slate-700 bg-slate-100 hover:bg-slate-200';
-            dom.btnCloseChat.title = 'Reopen this conversation';
+            dom.chatClosedBanner.classList.remove('hidden');
+            dom.btnCloseChat.classList.add('hidden');
         } else {
-            if (dom.chatClosedBanner) dom.chatClosedBanner.classList.add('hidden');
-            if (dom.closeChatLabel) dom.closeChatLabel.textContent = 'Close Chat';
-            dom.btnCloseChat.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-[0.98] border-rose-200 text-rose-700 bg-rose-50/70 hover:bg-rose-100';
-            dom.btnCloseChat.title = 'Close this chat and send 5-star customer feedback request';
+            dom.chatClosedBanner.classList.add('hidden');
+            dom.btnCloseChat.classList.remove('hidden');
         }
     }
 
-    async function handleCloseOrReopenChat(targetAction = null) {
-        if (!state.activePhone) return;
-
-        const isCurrentlyClosed = state.activeConversation && state.activeConversation.status === 'closed';
-        const action = targetAction || (isCurrentlyClosed ? 'reopen' : 'close');
-
-        if (action === 'close') {
-            const confirmed = confirm('Are you sure you want to close this chat? An automated 5-star feedback request will be sent to the customer on WhatsApp.');
-            if (!confirmed) return;
-        }
-
-        try {
-            const res = await fetch(`${API_BASE}/close.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    phone: state.activePhone,
-                    action: action,
-                }),
-            });
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Failed to update chat status');
-
-            if (state.activeConversation) {
-                state.activeConversation.status = data.status;
-                state.activeConversation.awaiting_feedback = data.awaiting_feedback || 0;
-            }
-
-            const item = state.conversations.find(c => c.phone === state.activePhone);
-            if (item) {
-                item.status = data.status;
-                item.awaiting_feedback = data.awaiting_feedback || 0;
-                if (data.status === 'closed') {
-                    item.last_message = 'Support chat closed. 5-star feedback requested.';
-                }
-            }
-
-            updateChatClosedUi(state.activeConversation);
-            renderConversations();
-            await fetchMessages(state.activePhone, false);
-        } catch (err) {
-            alert('Could not update chat status: ' + err.message);
+    function updateEscalationUi(conv) {
+        const isEscalated = conv && conv.status === 'escalated';
+        if (isEscalated) {
+            dom.chatEscalationBanner.classList.remove('hidden');
+            dom.chatActiveEscalatedBadge.classList.remove('hidden');
+            dom.escalationReasonText.textContent = conv.escalation_reason || 'Customer requested human agent';
+        } else {
+            dom.chatEscalationBanner.classList.add('hidden');
+            dom.chatActiveEscalatedBadge.classList.add('hidden');
         }
     }
-
-    // =========================================================================
-    // SEND MESSAGE
-    // =========================================================================
-
-    async function handleSendMessage() {
-        if (!state.activePhone || state.isSending) return;
-
-        const message = dom.chatMessageInput.value.trim();
-        const hasFile = Boolean(state.selectedFile);
-
-        if (!message && !hasFile) return;
-
-        state.isSending = true;
-        dom.btnSendMessage.disabled = true;
-        dom.btnSendMessage.innerHTML = `
-            <svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            <span>Sending...</span>`;
-
-        // Optimistic UI bubble
-        const tempId = `temp-${Date.now()}`;
-        const now = new Date();
-        const optimisticMsg = {
-            id: tempId,
-            sender_type: 'agent',
-            is_outbound: true,
-            message_type: hasFile ? 'document' : 'text',
-            body: message,
-            media_url: hasFile ? URL.createObjectURL(state.selectedFile) : null,
-            status: 'queued',
-            time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
-        };
-        appendMessageBubble(optimisticMsg);
-        scrollToBottom(true);
-
-        try {
-            let res;
-            if (hasFile) {
-                const formData = new FormData();
-                formData.append('phone', state.activePhone);
-                formData.append('message', message);
-                formData.append('file', state.selectedFile);
-                formData.append('auto_pause_bot', '1');
-
-                res = await fetch(`${API_BASE}/send.php`, {
-                    method: 'POST',
-                    body: formData,
-                });
-            } else {
-                res = await fetch(`${API_BASE}/send.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        phone: state.activePhone,
-                        message: message,
-                        auto_pause_bot: true,
-                    }),
-                });
-            }
-
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Failed to dispatch message');
-
-            // Replace optimistic bubble ID with real DB ID
-            const tempBubble = document.getElementById(`chat-msg-${tempId}`);
-            if (tempBubble && data.message) {
-                tempBubble.id = `chat-msg-${data.message.id}`;
-                updateMessageStatusIndicator(tempBubble, 'sent');
-                if (data.message.id > state.lastMessageId) {
-                    state.lastMessageId = data.message.id;
-                }
-            }
-
-            // Reset input box & attachment
-            dom.chatMessageInput.value = '';
-            dom.chatMessageInput.style.height = 'auto';
-            clearAttachment();
-
-            // Auto paused bot UI update
-            if (data.conversation) {
-                updateBotToggleUi(data.conversation.bot_paused);
-                updateChatClosedUi(data.conversation);
-            }
-
-            // Refresh conversations list to update preview snippet
-            fetchConversations(true);
-        } catch (err) {
-            alert('Failed to send WhatsApp message: ' + err.message);
-            const tempBubble = document.getElementById(`chat-msg-${tempId}`);
-            if (tempBubble) tempBubble.remove();
-        } finally {
-            state.isSending = false;
-            dom.btnSendMessage.disabled = false;
-            dom.btnSendMessage.innerHTML = `
-                <span>Send</span>
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
-            dom.chatMessageInput.focus();
-        }
-    }
-
-    // =========================================================================
-    // BOT TOGGLE
-    // =========================================================================
 
     async function handleToggleBot() {
         if (!state.activePhone) return;
-
         try {
             const res = await fetch(`${API_BASE}/toggle-bot.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: state.activePhone }),
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ phone: state.activePhone })
             });
             const data = await res.json();
             if (!data.ok) throw new Error(data.error || 'Failed to toggle bot');
 
             updateBotToggleUi(data.bot_paused);
+            const conv = state.conversations.find(c => c.phone === state.activePhone);
+            if (conv) {
+                conv.bot_paused = data.bot_paused;
+                if (data.bot_paused === 0) {
+                    conv.status = 'open';
+                    conv.escalation_reason = null;
+                }
+                updateEscalationUi(conv);
+                renderConversations();
+            }
+        } catch (err) {
+            alert('Could not toggle bot: ' + err.message);
+        }
+    }
+
+    async function handleAcknowledgeEscalation() {
+        if (!state.activePhone) return;
+        try {
+            const res = await fetch(`${API_BASE}/escalations.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ action: 'acknowledge', phone: state.activePhone })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Failed to acknowledge');
+
+            stopBuzzerLoop();
             fetchConversations(true);
         } catch (err) {
-            alert('Could not toggle bot status: ' + err.message);
+            alert('Error: ' + err.message);
+        }
+    }
+
+    async function handleResolveEscalation() {
+        if (!state.activePhone) return;
+        try {
+            const res = await fetch(`${API_BASE}/escalations.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ action: 'resolve', phone: state.activePhone })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Failed to resolve');
+
+            stopBuzzerLoop();
+            dom.chatEscalationBanner.classList.add('hidden');
+            dom.chatActiveEscalatedBadge.classList.add('hidden');
+            const conv = state.conversations.find(c => c.phone === state.activePhone);
+            if (conv) {
+                conv.status = 'open';
+                conv.escalation_reason = null;
+            }
+            fetchConversations(true);
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
+
+    async function handleManualEscalate() {
+        if (!state.activePhone) return;
+        const reason = prompt('Enter reason for escalating this conversation:', 'Agent requested priority attention');
+        if (reason === null) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/escalations.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ action: 'escalate_manually', phone: state.activePhone, reason: reason || 'manual_agent_escalation' })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Failed to escalate');
+
+            fetchConversations(true);
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    }
+
+    async function handleCloseOrReopenChat(action = 'close') {
+        if (!state.activePhone) return;
+        const confirmMsg = action === 'close'
+            ? 'Close this conversation? A 5-star customer rating feedback request will be dispatched automatically.'
+            : 'Reopen this conversation?';
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/close.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify({ phone: state.activePhone, action })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Failed to update conversation status');
+
+            const conv = state.conversations.find(c => c.phone === state.activePhone);
+            if (conv) {
+                conv.status = data.status;
+                updateChatClosedUi(conv);
+                renderConversations();
+            }
+            fetchMessages(state.activePhone, true);
+        } catch (err) {
+            alert('Failed: ' + err.message);
         }
     }
 
     // =========================================================================
-    // ATTACHMENTS & UTILITIES
+    // MESSAGES FEED & RENDERING
     // =========================================================================
+
+    async function fetchMessages(phone, isDelta = false) {
+        try {
+            const url = `${API_BASE}/messages.php?phone=${encodeURIComponent(phone)}&after_id=${isDelta ? state.lastMessageId : 0}`;
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Failed to load messages');
+
+            const messages = data.messages || [];
+
+            if (!isDelta) {
+                renderAllMessages(messages);
+                scrollToBottom();
+            } else if (messages.length > 0) {
+                appendDeltaMessages(messages);
+                scrollToBottom();
+            }
+
+            if (messages.length > 0) {
+                state.lastMessageId = Math.max(...messages.map(m => m.id));
+            }
+        } catch (err) {
+            console.warn('[LiveChat Messages Fetch Error]:', err.message);
+        }
+    }
+
+    function renderAllMessages(messages) {
+        if (!messages || messages.length === 0) {
+            dom.messagesContainer.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-12 select-none">
+                    <div class="w-10 h-10 rounded-full bg-white/80 border border-slate-200/60 flex items-center justify-center text-slate-400 mb-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    </div>
+                    <p class="font-semibold text-slate-600">No message history</p>
+                    <p class="text-[11px] text-slate-400">Type a message below to start the conversation.</p>
+                </div>`;
+            return;
+        }
+
+        const html = messages.map(msg => renderSingleMessageBubble(msg)).join('');
+        dom.messagesContainer.innerHTML = html;
+    }
+
+    function appendDeltaMessages(messages) {
+        messages.forEach(msg => {
+            const existing = document.getElementById(`msg-${msg.id}`);
+            if (!existing) {
+                const bubbleHtml = renderSingleMessageBubble(msg);
+                dom.messagesContainer.insertAdjacentHTML('beforeend', bubbleHtml);
+            }
+        });
+    }
+
+    function renderSingleMessageBubble(msg) {
+        const isOutbound = msg.sender_type === 'agent' || msg.sender_type === 'bot';
+        const isBot = msg.sender_type === 'bot';
+        const statusSvg = isOutbound ? getStatusSvg(msg.status) : '';
+
+        let mediaHtml = '';
+        if (msg.media_url) {
+            if (msg.message_type === 'image') {
+                mediaHtml = `<div class="mb-1.5"><a href="${escapeHtml(msg.media_url)}" target="_blank"><img src="${escapeHtml(msg.media_url)}" alt="Photo" class="rounded-lg max-h-60 max-w-full object-cover"></a></div>`;
+            } else if (msg.message_type === 'video') {
+                mediaHtml = `<div class="mb-1.5"><video controls src="${escapeHtml(msg.media_url)}" class="rounded-lg max-h-60 max-w-full"></video></div>`;
+            } else if (msg.message_type === 'audio') {
+                mediaHtml = `<div class="mb-1.5"><audio controls src="${escapeHtml(msg.media_url)}" class="h-8 max-w-[260px]"></audio></div>`;
+            } else {
+                const fileName = msg.media_url.split('/').pop() || 'Attachment';
+                mediaHtml = `
+                    <div class="mb-1.5">
+                        <a href="${escapeHtml(msg.media_url)}" target="_blank" class="inline-flex items-center gap-2 p-2 bg-black/5 rounded-lg text-xs font-mono font-medium hover:bg-black/10 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span class="truncate max-w-[180px]">${escapeHtml(fileName)}</span>
+                        </a>
+                    </div>`;
+            }
+        }
+
+        const bodyHtml = escapeHtml(msg.body).replace(/\n/g, '<br>');
+
+        return `
+            <div id="msg-${msg.id}" class="flex ${isOutbound ? 'justify-end' : 'justify-start'}">
+                <div class="max-w-[78%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-2xs relative select-text ${isOutbound ? (isBot ? 'bg-[#DCF8C6]/80 text-slate-900 border border-[#b8e49c]' : 'bg-[#DCF8C6] text-slate-900 border border-[#b8e49c]') : 'bg-white text-slate-900 border border-slate-200/70'}">
+                    ${isBot ? '<div class="text-[9px] font-bold text-emerald-800 font-mono uppercase tracking-wider mb-0.5">🤖 AI Assistant</div>' : ''}
+                    ${mediaHtml}
+                    ${bodyHtml ? `<p class="text-xs font-sans leading-relaxed break-words">${bodyHtml}</p>` : ''}
+                    <div class="flex items-center justify-end gap-1 mt-1 select-none">
+                        <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(msg.formatted_time || '')}</span>
+                        ${statusSvg}
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function scrollToBottom() {
+        dom.messagesContainer.scrollTop = dom.messagesContainer.scrollHeight;
+    }
+
+    // =========================================================================
+    // SENDING MESSAGES & DISPATCH
+    // =========================================================================
+
+    async function handleSendMessage() {
+        if (!state.activePhone || state.isSending) return;
+        const text = dom.chatMessageInput.value.trim();
+        const file = state.selectedFile;
+
+        if (!text && !file) return;
+
+        state.isSending = true;
+        dom.btnSendMessage.disabled = true;
+
+        // Optimistic UI representation
+        const optimisticId = 'opt-' + Date.now();
+        const tempBubbleHtml = `
+            <div id="${optimisticId}" class="flex justify-end opacity-70">
+                <div class="max-w-[78%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-2xs relative select-text bg-[#DCF8C6] text-slate-900 border border-[#b8e49c]">
+                    ${file ? `<div class="mb-1 text-[11px] font-mono text-slate-600">📎 Uploading ${escapeHtml(file.name)}...</div>` : ''}
+                    <p class="text-xs font-sans leading-relaxed break-words">${escapeHtml(text).replace(/\n/g, '<br>')}</p>
+                    <div class="flex items-center justify-end gap-1 mt-1">
+                        <span class="text-[10px] text-slate-400 font-mono">sending...</span>
+                        <svg class="w-3 h-3 animate-spin text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    </div>
+                </div>
+            </div>`;
+        dom.messagesContainer.insertAdjacentHTML('beforeend', tempBubbleHtml);
+        scrollToBottom();
+
+        // Clear input field immediately
+        dom.chatMessageInput.value = '';
+        dom.chatMessageInput.style.height = 'auto';
+        clearAttachment();
+
+        try {
+            const formData = new FormData();
+            formData.append('phone', state.activePhone);
+            if (text) formData.append('message', text);
+            if (file) formData.append('attachment', file);
+
+            const res = await fetch(`${API_BASE}/send.php`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'Failed to dispatch message');
+
+            // Remove optimistic placeholder and fetch fresh message
+            const optEl = document.getElementById(optimisticId);
+            if (optEl) optEl.remove();
+
+            await fetchMessages(state.activePhone, true);
+            fetchConversations(true);
+        } catch (err) {
+            alert('Failed to send message: ' + err.message);
+            const optEl = document.getElementById(optimisticId);
+            if (optEl) optEl.classList.add('bg-rose-100');
+        } finally {
+            state.isSending = false;
+            dom.btnSendMessage.disabled = false;
+            dom.chatMessageInput.focus();
+        }
+    }
+
+    function handleFileSelected(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        state.selectedFile = file;
+        dom.attachmentFileName.textContent = file.name;
+        dom.attachmentPreview.classList.remove('hidden');
+    }
 
     function clearAttachment() {
         state.selectedFile = null;
         dom.chatFileInput.value = '';
         dom.attachmentPreview.classList.add('hidden');
-        dom.attachmentFileName.textContent = '';
-    }
-
-    function handleFileSelected(e) {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-
-        // 20MB client check
-        if (file.size > 20 * 1024 * 1024) {
-            alert('File exceeds maximum upload size of 20MB.');
-            dom.chatFileInput.value = '';
-            return;
-        }
-
-        state.selectedFile = file;
-        dom.attachmentFileName.textContent = file.name;
-        dom.attachmentPreview.classList.remove('hidden');
     }
 
     // =========================================================================
@@ -676,8 +824,7 @@
     function restartMessagePolling() {
         if (state.pollTimer) clearInterval(state.pollTimer);
         state.pollTimer = setInterval(() => {
-            // Only poll if document is visible and an active conversation is selected
-            if (!document.hidden && state.activePhone) {
+            if (state.activePhone) {
                 fetchMessages(state.activePhone, true);
             }
         }, 2000);
@@ -685,11 +832,10 @@
 
     function startConversationPolling() {
         if (state.convTimer) clearInterval(state.convTimer);
+        // Poll every 3.5s; continue running in background for buzzer and notifications
         state.convTimer = setInterval(() => {
-            if (!document.hidden) {
-                fetchConversations(true);
-            }
-        }, 4000);
+            fetchConversations(true);
+        }, 3500);
     }
 
     // =========================================================================
@@ -721,8 +867,37 @@
     dom.chatFileInput.addEventListener('change', handleFileSelected);
     dom.btnRemoveAttachment.addEventListener('click', clearAttachment);
 
+    // Buzzer control button (toggle mute & test tone / permissions)
+    if (dom.btnBuzzerControl) {
+        dom.btnBuzzerControl.addEventListener('click', () => {
+            initAudioContext();
+            requestDesktopNotifications();
+
+            state.buzzerMuted = !state.buzzerMuted;
+            localStorage.setItem('whats_buzzer_muted', state.buzzerMuted ? '1' : '0');
+            updateBuzzerButtonUi();
+
+            if (!state.buzzerMuted) {
+                playBuzzerTone();
+            } else {
+                stopBuzzerLoop();
+            }
+        });
+    }
+
     // Bot toggle
     dom.btnToggleBot.addEventListener('click', handleToggleBot);
+
+    // Escalation actions
+    if (dom.btnAcknowledgeEscalation) {
+        dom.btnAcknowledgeEscalation.addEventListener('click', handleAcknowledgeEscalation);
+    }
+    if (dom.btnResolveEscalation) {
+        dom.btnResolveEscalation.addEventListener('click', handleResolveEscalation);
+    }
+    if (dom.btnManualEscalate) {
+        dom.btnManualEscalate.addEventListener('click', handleManualEscalate);
+    }
 
     // Close / Reopen Chat
     if (dom.btnCloseChat) {
@@ -731,8 +906,6 @@
     if (dom.btnReopenBanner) {
         dom.btnReopenBanner.addEventListener('click', () => handleCloseOrReopenChat('reopen'));
     }
-    dom.btnCloseChat.addEventListener('click', () => handleCloseOrReopenChat());
-    dom.btnReopenBanner.addEventListener('click', () => handleCloseOrReopenChat('reopen'));
 
     // Search input debounced
     let searchTimeout = null;
@@ -750,13 +923,13 @@
         fetchConversations(false);
     });
 
-    // Filter buttons (All / Unread)
+    // Filter buttons (All / Escalated / Unread / Closed)
     dom.filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             dom.filterBtns.forEach(b => {
-                b.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all';
+                b.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all font-semibold shrink-0';
             });
-            btn.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs';
+            btn.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0';
             state.currentFilter = btn.getAttribute('data-filter') || 'all';
             renderConversations();
         });
@@ -807,6 +980,7 @@
     // =========================================================================
     // INITIALIZATION
     // =========================================================================
+    updateBuzzerButtonUi();
     fetchConversations(false);
     startConversationPolling();
 
