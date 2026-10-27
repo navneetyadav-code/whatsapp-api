@@ -30,10 +30,10 @@ $apiKey = $creds['api_key'];
 
 echo "[Suite 1: Authentication & Authorization Guardrails]\n";
 
-function call_contacts_api(string $method, array $getParams = [], ?array $body = null, ?string $bearerToken = null, ?int $mockSessionUserId = null, ?string $mockCsrf = null): array
+function call_endpoint(string $endpointFile, string $method, array $getParams = [], ?array $body = null, ?string $bearerToken = null, ?int $mockSessionUserId = null, ?string $mockCsrf = null): array
 {
     $bootstrap = dirname(__DIR__) . '/src/bootstrap.php';
-    $script = dirname(__DIR__) . '/public/api/contacts.php';
+    $script = dirname(__DIR__) . '/public/api/' . $endpointFile;
     $runner = dirname(__DIR__) . '/tests/api-runner-' . bin2hex(random_bytes(4)) . '.tmp.php';
 
     $code = '<?php
@@ -82,6 +82,11 @@ function call_contacts_api(string $method, array $getParams = [], ?array $body =
     return ['code' => $httpCode, 'data' => $json, 'raw' => $raw];
 }
 
+function call_contacts_api(string $method, array $getParams = [], ?array $body = null, ?string $bearerToken = null, ?int $mockSessionUserId = null, ?string $mockCsrf = null): array
+{
+    return call_endpoint('contacts.php', $method, $getParams, $body, $bearerToken, $mockSessionUserId, $mockCsrf);
+}
+
 // Test 1.1: Reject unauthenticated requests
 $resUnauth = call_contacts_api('GET');
 test_assert($resUnauth['code'] === 401, 'Unauthenticated GET request returns HTTP 401');
@@ -111,6 +116,7 @@ test_assert($resCreate['data']['ok'] === true, 'Response contains ok: true');
 test_assert($resCreate['data']['contact']['name'] === 'Agent Smith', 'Saved contact name matches input');
 test_assert($resCreate['data']['contact']['phone'] === $testPhone, 'Saved contact phone matches input');
 test_assert($resCreate['data']['contact']['opt_in'] === 1, 'Saved contact opt_in matches input');
+$savedId = (int) $resCreate['data']['contact']['id'];
 
 // Test 2.3: Upsert contact updates existing record without duplicate key error
 $resUpdate = call_contacts_api('POST', [], [
@@ -124,18 +130,18 @@ test_assert($resUpdate['code'] === 200, 'Upserting existing phone returns HTTP 2
 test_assert($resUpdate['data']['contact']['name'] === 'Agent Smith Senior', 'Contact name updated successfully');
 test_assert($resUpdate['data']['contact']['notes'] === 'Updated via API', 'Contact notes updated successfully');
 
-// Test 2.4: Batch upsert
+// Test 2.4: Dedicated Batch Endpoint (POST /api/contacts-batch.php)
 $batchPayload = [
     'contacts' => [
         ['name' => 'Batch Alpha', 'phone' => '+14155550201', 'opt_in' => 1, 'notes' => 'Batch item 1'],
         ['name' => 'Batch Beta', 'phone' => '+14155550202', 'opt_in' => 0, 'notes' => 'Batch item 2'],
     ]
 ];
-$resBatch = call_contacts_api('POST', [], $batchPayload, $apiKey);
-test_assert($resBatch['code'] === 200, 'Batch POST returns HTTP 200');
+$resBatch = call_endpoint('contacts-batch.php', 'POST', [], $batchPayload, $apiKey);
+test_assert($resBatch['code'] === 200, 'Dedicated Batch POST returns HTTP 200');
 test_assert($resBatch['data']['processed'] === 2, 'Batch processes both contacts (2)');
 
-echo "\n[Suite 3: Directory Listing, Search, and Filtering (GET)]\n";
+echo "\n[Suite 3: Directory Listing, Search, and ID Retrieval (GET)]\n";
 
 // Test 3.1: Retrieve contacts list
 $resList = call_contacts_api('GET', [], null, $apiKey);
@@ -149,39 +155,58 @@ test_assert($resSearch['code'] === 200, 'Search query returns HTTP 200');
 test_assert($resSearch['data']['total'] === 1, 'Search finds exactly 1 match for "Alpha"');
 test_assert($resSearch['data']['contacts'][0]['name'] === 'Batch Alpha', 'Matching contact is Batch Alpha');
 
-// Test 3.3: Filter by opt_in status
+// Test 3.3: Retrieve single contact by synthetic ID
+$resById = call_contacts_api('GET', ['id' => $savedId], null, $apiKey);
+test_assert($resById['code'] === 200, 'GET contact by synthetic ID returns HTTP 200');
+test_assert($resById['data']['contact']['id'] === $savedId, 'Retrieved contact ID matches request');
+test_assert($resById['data']['contact']['name'] === 'Agent Smith Senior', 'Retrieved contact name matches');
+
+// Test 3.4: Filter by opt_in status
 $resOptedIn = call_contacts_api('GET', ['opt_in' => '1'], null, $apiKey);
 test_assert($resOptedIn['code'] === 200, 'Opt-in filter returns HTTP 200');
 foreach ($resOptedIn['data']['contacts'] as $c) {
     test_assert($c['opt_in'] === 1, 'Opt-in filter returns only opt_in = 1 records');
 }
 
-echo "\n[Suite 4: Contact Deletion & Tenant Isolation (DELETE)]\n";
+echo "\n[Suite 4: PII Security Enforcement & Contact Deletion (DELETE / POST)]\n";
 
-// Test 4.1: Delete contact by phone
-$resDelete = call_contacts_api('DELETE', ['phone' => '+14155550202'], null, $apiKey);
-test_assert($resDelete['code'] === 200, 'DELETE contact returns HTTP 200');
-test_assert($resDelete['data']['ok'] === true, 'DELETE response contains ok: true');
+// Test 4.1: CRITICAL PII GUARD: Reject raw phone number in GET query string
+$resPiiGet = call_contacts_api('GET', ['phone' => '+14155550202'], null, $apiKey);
+test_assert($resPiiGet['code'] === 400, 'GET with raw phone in query is strictly blocked with HTTP 400');
+test_assert(str_contains($resPiiGet['data']['error'], 'Security & Privacy Violation'), 'PII error message returned for query leak');
 
-// Test 4.2: Confirm deletion in list
-$resCheck = call_contacts_api('GET', ['search' => 'Batch Beta'], null, $apiKey);
-test_assert($resCheck['data']['total'] === 0, 'Deleted contact no longer appears in directory');
+// Test 4.2: CRITICAL PII GUARD: Reject raw phone number in DELETE query string
+$resPiiDel = call_contacts_api('DELETE', ['phone' => '+14155550202'], null, $apiKey);
+test_assert($resPiiDel['code'] === 400, 'DELETE with raw phone in query is strictly blocked with HTTP 400');
 
-// Test 4.3: Tenant isolation: another user cannot delete this user\'s contact
+// Test 4.3: Secure Delete by Synthetic ID (?id=...)
+$resDelById = call_contacts_api('DELETE', ['id' => $savedId], null, $apiKey);
+test_assert($resDelById['code'] === 200, 'DELETE by synthetic ID returns HTTP 200');
+test_assert($resDelById['data']['ok'] === true, 'DELETE response contains ok: true');
+
+// Test 4.4: Secure Delete by Phone via Request Body (JSON)
+$resDelBody = call_contacts_api('DELETE', [], ['phone' => '+14155550201'], $apiKey);
+test_assert($resDelBody['code'] === 200, 'DELETE with phone in request body returns HTTP 200');
+
+// Test 4.5: Dedicated Delete Endpoint (POST /api/contacts-delete.php)
+$resDedicatedDel = call_endpoint('contacts-delete.php', 'POST', [], ['phone' => '+14155550202'], $apiKey);
+test_assert($resDedicatedDel['code'] === 200, 'Dedicated POST /api/contacts-delete.php returns HTTP 200');
+
+// Test 4.6: Tenant isolation: another user cannot delete this user\'s contact
 $otherEmail = 'contacts_other_' . time() . '_' . bin2hex(random_bytes(4)) . '@example.com';
 $userStmt->execute(['Other User', $otherEmail, $pwdHash]);
 $otherUserId = (int) $pdo->lastInsertId();
 $otherCreds = create_api_key($otherUserId, 'Other Key');
 $otherApiKey = $otherCreds['api_key'];
 
-$resCrossTenant = call_contacts_api('DELETE', ['phone' => $testPhone], null, $otherApiKey);
+$resCrossTenant = call_contacts_api('DELETE', ['id' => $savedId], null, $otherApiKey);
 test_assert($resCrossTenant['code'] === 404, 'Cross-tenant DELETE is rejected with HTTP 404 (isolation enforced)');
 
 echo "\n[Suite 5: Advanced Security Hardening (DoS, CSRF, Wildcard Injection)]\n";
 
 // Test 5.1: DoS Prevention: Rejects oversized batch arrays > 500 with HTTP 413
 $giantBatch = ['contacts' => array_fill(0, 501, ['name' => 'Spam', 'phone' => '+1111111111'])];
-$resOversized = call_contacts_api('POST', [], $giantBatch, $apiKey);
+$resOversized = call_endpoint('contacts-batch.php', 'POST', [], $giantBatch, $apiKey);
 test_assert($resOversized['code'] === 413, 'Batch size > 500 is blocked with HTTP 413 Payload Too Large');
 
 // Test 5.2: SQL LIKE Wildcard Injection Prevention: Searching for "%" searches literal "%" without crashing

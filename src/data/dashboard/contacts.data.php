@@ -1,8 +1,7 @@
 <?php
+
 declare(strict_types=1);
 
-$contactsStmt = $pdo->prepare('SELECT * FROM contacts WHERE user_id = ? ORDER BY id DESC LIMIT 50');
-$contactsStmt->execute([$user['id']]);
-$contacts = $contactsStmt->fetchAll();
-
-$optedInCount = count(opted_in_contacts((int) $user['id']));
+$result = ContactService::list((int) $user['id'], '', null, 50, 0);
+$contacts = $result['contacts'];
+$optedInCount = $result['opted_in_count'];
