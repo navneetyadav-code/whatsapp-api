@@ -198,14 +198,20 @@ function unsuppress_recipient(int $userId, string $phone): bool
     }
 }
 
-function create_campaign(int $userId, string $name, string $template): int
+function create_campaign(int $userId, string $name, string $template, ?string $availableAt = null, ?array $attachment = null): int
 {
     $contacts = opted_in_contacts($userId);
-    return create_campaign_for_contacts($userId, $name, $template, $contacts);
+    return create_campaign_for_contacts($userId, $name, $template, $contacts, $availableAt, $attachment);
 }
 
-function create_campaign_for_contacts(int $userId, string $name, string $template, array $contacts): int
-{
+function create_campaign_for_contacts(
+    int $userId,
+    string $name,
+    string $template,
+    array $contacts,
+    ?string $availableAt = null,
+    ?array $attachment = null
+): int {
     if ($userId <= 0) {
         throw new InvalidArgumentException('Invalid user ID.');
     }
@@ -217,15 +223,23 @@ function create_campaign_for_contacts(int $userId, string $name, string $templat
     $pdo = Database::pdo();
     $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare(
-            'INSERT INTO campaigns (user_id, name, message_template, target_count) VALUES (?, ?, ?, ?)'
-        );
-        $stmt->execute([$userId, trim($name) ?: 'Untitled campaign', $template, count($contacts)]);
+        try {
+            $stmt = $pdo->prepare(
+                'INSERT INTO campaigns (user_id, name, message_template, target_count, scheduled_at) VALUES (?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([$userId, trim($name) ?: 'Untitled campaign', $template, count($contacts), $availableAt ?: null]);
+        } catch (\Throwable $e) {
+            $stmt = $pdo->prepare(
+                'INSERT INTO campaigns (user_id, name, message_template, target_count) VALUES (?, ?, ?, ?)'
+            );
+            $stmt->execute([$userId, trim($name) ?: 'Untitled campaign', $template, count($contacts)]);
+        }
         $campaignId = (int) $pdo->lastInsertId();
 
         $queued = 0;
         $batchSize = 250;
         $chunks = array_chunk($contacts, $batchSize);
+        $messageType = !empty($attachment['type']) ? (string) $attachment['type'] : 'text';
 
         foreach ($chunks as $chunk) {
             foreach ($chunk as $contact) {
@@ -240,21 +254,42 @@ function create_campaign_for_contacts(int $userId, string $name, string $templat
                 }
 
                 $body = apply_contact_template($template, $contact);
-                $queue = $pdo->prepare(
-                    'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
-                     VALUES (?, NULL, ?, "text", ?, ?, 1)'
-                );
-                $queue->execute([
-                    $userId,
-                    $recipientPhone,
-                    $body,
-                    json_encode([
-                        'source' => 'campaign',
-                        'campaign_id' => $campaignId,
-                        'contact_id' => (int) ($contact['id'] ?? 0),
-                        'type' => 'text',
-                    ], JSON_UNESCAPED_SLASHES),
-                ]);
+                $payloadData = [
+                    'source' => 'campaign',
+                    'campaign_id' => $campaignId,
+                    'contact_id' => (int) ($contact['id'] ?? 0),
+                    'type' => $messageType,
+                ];
+                if (!empty($attachment)) {
+                    $payloadData['attachment'] = $attachment;
+                }
+
+                if ($availableAt) {
+                    $queue = $pdo->prepare(
+                        'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority, available_at)
+                         VALUES (?, NULL, ?, ?, ?, ?, 1, ?)'
+                    );
+                    $queue->execute([
+                        $userId,
+                        $recipientPhone,
+                        $messageType,
+                        $body,
+                        json_encode($payloadData, JSON_UNESCAPED_SLASHES),
+                        $availableAt,
+                    ]);
+                } else {
+                    $queue = $pdo->prepare(
+                        'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
+                         VALUES (?, NULL, ?, ?, ?, ?, 1)'
+                    );
+                    $queue->execute([
+                        $userId,
+                        $recipientPhone,
+                        $messageType,
+                        $body,
+                        json_encode($payloadData, JSON_UNESCAPED_SLASHES),
+                    ]);
+                }
                 $queued++;
             }
         }
