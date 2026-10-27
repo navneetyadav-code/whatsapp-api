@@ -156,7 +156,7 @@
                         <label class="text-[12px] font-semibold text-slate-700">Message Content</label>
                         <span class="text-[11px] text-slate-400 font-mono">WYSIWYG &amp; Live WA Preview</span>
                     </div>
-                    <textarea name="message" data-presets='["{name}", "{phone}"]' rows="5" class="wa-editor block w-full px-3.5 py-3 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all shadow-subtle placeholder:text-slate-300 font-sans leading-relaxed" placeholder="Type your WhatsApp message here..." required></textarea>
+                    <textarea name="message" data-presets='["{name}", "{phone}"]' rows="5" class="wa-editor block w-full px-3.5 py-3 text-[15px] sm:text-[16px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all shadow-subtle placeholder:text-slate-300 font-sans leading-relaxed" placeholder="Type your WhatsApp message here..." required></textarea>
                 </div>
 
                 <!-- Footer Actions -->

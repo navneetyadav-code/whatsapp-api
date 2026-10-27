@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import WaStudio from '../public/assets/wa-studio.js';
@@ -166,5 +167,35 @@ test('WaStudio Phase 3: Live WhatsApp Chat Bubble Simulator', async (t) => {
         assert.ok(!result.includes('<script>'), 'Must not execute or render raw script');
         assert.ok(result.includes('&lt;script&gt;'), 'Must entity escape script tags');
         assert.ok(result.includes('<strong>safe text</strong>'), 'Must parse safe markdown');
+    });
+});
+
+
+test('WaStudio Typography & Active Format Highlight Inspection', async (t) => {
+
+    const source = fs.readFileSync('public/assets/wa-studio.js', 'utf8');
+
+    await t.test('Message Content Font Size: Configured for large 15px/16px readability', () => {
+        assert.ok(source.includes('text-[15px] sm:text-[16px]'), 'Visual editor and bubble must have 15px/16px class');
+        assert.ok(source.includes('font-size: 15px !important;'), 'CSS must specify 15px base size');
+        assert.ok(source.includes('font-size: 16px !important;'), 'CSS must specify 16px responsive desktop size');
+    });
+
+    await t.test('Bold Typography: Configured with intense weight 800 and text shadow', () => {
+        assert.ok(source.includes('font-weight: 800 !important;'), 'Bold elements must have 800 weight');
+        assert.ok(source.includes('text-shadow: 0.2px 0 0 #020617 !important;'), 'Bold elements must reinforce weight via text-shadow');
+    });
+
+    await t.test('Active Formatter Highlighting: Toolbar button receives distinct border AND background', () => {
+        assert.ok(source.includes('.wa-studio-toolbar button.wa-format-btn.is-active'), 'Must define .is-active class rule');
+        assert.ok(source.includes('background: #dcfce7 !important;'), 'Active button must have rich emerald background');
+        assert.ok(source.includes('border: 1.5px solid #059669 !important;'), 'Active button must have prominent emerald border');
+        assert.ok(source.includes("item.btn.classList.add('is-active', 'active');"), 'Active state must apply is-active class to button');
+    });
+
+    await t.test('Event Listeners: updateActiveFormats bound to input, focus, selectionchange, keyup', () => {
+        assert.ok(source.includes("visualEditor.addEventListener('input', updateActiveFormats);"), 'Must listen to input events');
+        assert.ok(source.includes("visualEditor.addEventListener('focus', updateActiveFormats);"), 'Must listen to focus events');
+        assert.ok(source.includes("document.addEventListener('selectionchange', updateActiveFormats);"), 'Must listen to selectionchange');
     });
 });

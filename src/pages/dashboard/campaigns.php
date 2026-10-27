@@ -59,7 +59,7 @@
                     <label class="text-[12px] font-semibold text-slate-700">Message Template</label>
                     <span class="text-[11px] font-mono text-slate-400">Tokens: {name}, {phone}</span>
                 </div>
-                <textarea name="message_template" rows="4" class="wa-editor block w-full px-3 py-2 text-[12px] border border-slate-200 rounded-lg bg-white shadow-subtle focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans" data-presets='["{name}", "{phone}"]' placeholder="Hi {name}, this is an update from WhatsGateway." required></textarea>
+                <textarea name="message_template" rows="4" class="wa-editor block w-full px-3 py-2 text-[15px] sm:text-[16px] border border-slate-200 rounded-lg bg-white shadow-subtle focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans" data-presets='["{name}", "{phone}"]' placeholder="Hi {name}, this is an update from WhatsGateway." required></textarea>
             </div>
 
             <div>
