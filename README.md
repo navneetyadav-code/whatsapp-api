@@ -22,14 +22,14 @@
 <p align="center">
   <a href="https://www.php.net/"><img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4.svg?style=flat-square&logo=php&logoColor=white" alt="PHP 8.2+"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-18%2B%20%7C%2020%2B-339933.svg?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 18+"></a>
-  <a href="https://github.com/WhiskeySockets/Baileys"><img src="https://img.shields.io/badge/Engine-Baileys%20v6.6-25D366.svg?style=flat-square&logo=whatsapp&logoColor=white" alt="Baileys"></a>
+  <a href="https://github.com/WhiskeySockets/Baileys"><img src="https://img.shields.io/badge/Engine-Baileys%20v7-25D366.svg?style=flat-square&logo=whatsapp&logoColor=white" alt="Baileys"></a>
   <a href="https://www.mysql.com/"><img src="https://img.shields.io/badge/Database-MySQL%20%7C%20TiDB-4479A1.svg?style=flat-square&logo=mysql&logoColor=white" alt="MySQL/TiDB"></a>
   <a href="Dockerfile"><img src="https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat-square&logo=docker&logoColor=white" alt="Docker Ready"></a>
   <a href="https://whatsapp-api-xepo.onrender.com"><img src="https://img.shields.io/badge/Live%20Demo-Online-success?style=flat-square&logo=render" alt="Live Demo"></a>
 </p>
 
-> **WhatsGateway** is a production-grade, self-hosted WhatsApp REST API Gateway and Web Management Dashboard built with **PHP 8.2+**, **Node.js (@whiskeysockets/baileys)**, and **MySQL / TiDB**.  
-> Send unlimited text messages, rich media (PDFs, images, documents, audio, video, voice notes), automate conversational auto-replies, track delivery queues, and receive real-time webhooks — **100% free with zero Meta Cloud API fees, zero per-conversation costs, and no credit card required.**
+> **WhatsGateway** is a free, open-source, self-hosted WhatsApp REST API Gateway and Web Management Dashboard built with **PHP 8.2+**, **Node.js (@whiskeysockets/baileys)**, and **MySQL / TiDB**.  
+> Send text messages, rich media (PDFs, images, documents, audio, video, voice notes), automate conversational auto-replies, track delivery queues, and receive real-time webhooks — **100% free with zero Meta Cloud API fees, zero per-conversation costs, and no credit card required.**
 
 ---
 
@@ -52,7 +52,7 @@ If you find this project valuable, please consider giving it a **Star (⭐)**! I
 9. [Running the Application (Local & Production)](#9-running-the-application-local--production)
 10. [Comprehensive API Endpoint Reference](#10-comprehensive-api-endpoint-reference)
 11. [Request & Response Examples](#11-request--response-examples)
-12. [Authentication, Authorization & Security](#12-authentication-authorization--security)
+12. [Authentication, Authorization & Security Safeguards](#12-authentication-authorization--security-safeguards)
 13. [Error Handling & Status Codes](#13-error-handling--status-codes)
 14. [Testing & Quality Verification](#14-testing--quality-verification)
 15. [Deployment Guide (Docker, Cloud, VPS)](#15-deployment-guide-docker-cloud-vps)
@@ -92,14 +92,14 @@ Commercial WhatsApp Business API providers (such as Twilio, MessageBird, or Meta
 
 ## 2. Key Features & Capabilities
 
-- 🔑 **Single-Key REST Authentication:** Authenticate requests using a single token (`X-API-Key: wa_live_...` or `Authorization: Bearer wa_live_...` or query parameter `access_token`).
+- 🔑 **Single-Key REST Authentication:** Authenticate requests using a single Bearer token (`wa_live_...`). No secondary secret key is needed or generated. Send via `X-API-Key: wa_live_...`, `Authorization: Bearer wa_live_...`, or request body / query parameter.
 - 📁 **Universal Media Engine:** Ingests media via direct HTTP/HTTPS URLs (with SSRF protection), Base64 data strings/Data URIs, or standard `multipart/form-data` uploads up to 20MB. Supports Images (JPG, PNG, GIF, WEBP), Documents (PDF, DOCX, XLSX, TXT, CSV), Videos (MP4, MOV), and Audio (MP3, OGG, WAV, M4A) including push-to-talk voice notes (`ptt: true`).
 - 🤖 **Chatbot Automation:** Incoming messages are evaluated in real time against customizable trigger rules (`exact`, `contains`, `starts_with`, or `catch_all`) to automatically dispatch instant replies.
 - 📬 **Asynchronous Delivery Queue:** Decouples API client latency from WhatsApp WebSocket delivery. Enqueued items are processed with automatic backoff retries, dead-letter tracking, and queue monitoring.
 - 🛡️ **Humanized Anti-Ban Delivery:** Emulates human chat behavior by generating randomized presence indicators (`available`, `composing`, `recording`) and delay intervals before message transmission.
 - 🔔 **HMAC-Signed Webhooks:** Dispatches instantaneous HTTP POST notifications to your server on `message.sent` and `message.failed` events, signed with `X-WA-Hub-Signature` (HMAC-SHA256).
 - 👥 **Contacts & Broadcast Campaigns:** Built-in address book supporting single contact creation, CSV bulk imports, Google Contacts (People API) synchronization, vCard (`.vcf`) exports, and personalized template broadcasts (`{name}`, `{phone}`).
-- 🔐 **Enterprise Security:** API keys are stored exclusively as SHA-256 hashes with configurable per-minute, per-hour, and per-day rate limits and CIDR/IP allowlists. Brute-force login attempts are throttled, and uploaded file directories are locked down against arbitrary script execution.
+- 🔐 **Security Safeguards & Access Controls:** API keys are stored hashed (SHA-256) with configurable per-minute, per-hour, and per-day rate limits and IP allowlists. Failed login attempts are throttled to mitigate brute-force attacks, remote media/webhook URLs undergo SSRF DNS validation, and uploaded file directories are locked down against script execution.
 - 🔁 **Self-Service Password Recovery:** 6-digit OTP password reset workflow delivered via SMTP email and/or WhatsApp message.
 - 🌐 **Social Authentication:** Optional Google OAuth2 single sign-on.
 
@@ -109,7 +109,7 @@ Commercial WhatsApp Business API providers (such as Twilio, MessageBird, or Meta
 
 ### Backend Components
 - **API & Web Tier:** PHP 8.1+ / 8.2+ with extensions: `pdo_mysql`, `curl`, `mbstring`, `openssl`, `fileinfo`, `json`.
-- **Worker Daemon:** Node.js 18.x or 20.x (ES Modules) running `@whiskeysockets/baileys` (^6.6.0), `express` (^4.19.2), `mysql2` (^3.9.1), `pino` (^8.19.0), and `qrcode` (^1.5.3).
+- **Worker Daemon:** Node.js 18.x or 20.x LTS (ES Modules) running `@whiskeysockets/baileys` (`7.0.0-rc13`), `express` (`5.2.1`), `mysql2` (`3.22.4`), `pino` (`10.3.1`), and `qrcode` (`1.5.4`).
 - **Database:** MySQL 8.0+, MariaDB 10.4+, or TiDB Cloud Serverless (SSL-encrypted on port 4000).
 - **Web Server:** Apache 2.4+ with `mod_rewrite` and `mod_headers` (or Nginx reverse proxy).
 
@@ -119,7 +119,7 @@ Dedicated, zero-dependency examples in five programming languages are located in
 - **Node.js:** `node quickstart/nodejs/send.js` (native `fetch`, zero npm dependencies).
 - **PHP:** `php quickstart/php/send.php` (strict types, native cURL wrapper class).
 - **Go:** `go run quickstart/go/main.go` (standard library `net/http`).
-- **Java:** `java quickstart/java/SendWhatsApp.java` (Java 11+ `java.net.http.HttpClient`).
+- **Java:** `java quickstart/java/SendWhatsApp.java` (Compatible with Java 8, 11, 17, and 21+ using standard `java.net.HttpURLConnection`, zero external JAR dependencies).
 
 ---
 
@@ -174,26 +174,30 @@ flowchart LR
 ### Directory Structure
 
 ```text
-whatsap_api/
-├── .codex-screenshots/           # UI screenshots and validation artifacts
+whatsapp-api/
 ├── .github/                      # Issue templates, PR templates, and CI workflow (ci.yml)
-├── api_key/                      # Generated credentials exports
 ├── config/
 │   └── app.php                   # Central application configuration loader & .env parser
 ├── docker/
 │   ├── entrypoint.sh             # Docker startup script, env exporter & Apache config
 │   └── supervisord.conf          # Supervisor dual-process manager (Apache + Node.js)
 ├── examples/                     # Ready-to-use snippets (curl, go, javascript, php, python)
-├── prod/ / produ/                # Production database schemas & SSL root certificates (isrgrootx1.pem)
+├── migrations/
+│   └── 001_initial_schema.sql    # Idempotent 17-table schema initialization
+├── prod/                         # Production database schemas & SSL root certificates
 ├── public/                       # Web server public root (DocumentRoot)
 │   ├── .htaccess                 # Apache rewrites (clean URLs & Meta API compatibility)
 │   ├── index.php                 # Main front controller & router
+│   ├── media.php                 # Protected media delivery with signed URLs & session auth
 │   ├── robots.php / robots.txt   # Search crawler instructions
 │   ├── session.php               # AJAX session management & real-time queue endpoints
 │   ├── sitemap.php               # XML Sitemap
 │   ├── test-page.php             # Developer test page wrapper
 │   ├── api/
-│   │   ├── health.php            # Public health-check endpoint
+│   │   ├── contacts.php          # Contact directory listing, search, single upsert & ID deletion
+│   │   ├── contacts-batch.php    # Atomic batch contact ingestion (up to 500 records)
+│   │   ├── contacts-delete.php   # Dedicated secure contact deletion by phone in request body
+│   │   ├── health.php            # Gateway, database & worker readiness health check
 │   │   ├── messages.php          # Meta Cloud API endpoint alias (requires send.php)
 │   │   └── send.php              # Core REST messaging endpoint
 │   ├── assets/                   # CSS, JS (dashboard.js), templates, and branding
@@ -204,18 +208,26 @@ whatsap_api/
 │   ├── nodejs/                   # Node.js quickstart program
 │   ├── php/                      # PHP quickstart program
 │   └── python/                   # Python quickstart program
+├── scripts/
+│   ├── create-initial-admin.php  # Headless initial admin provisioning script
+│   └── migrate.php               # Non-destructive CLI migration runner (17 application tables)
 ├── src/                          # Application source code
 │   ├── bootstrap.php             # Session initializer, error handlers, and lib imports
+│   ├── data/dashboard/           # Lazy data loaders for modular dashboard sections
 │   ├── lib/
-│   │   ├── ApiCredentials.php    # API key generation, hashing, rate limiting, and auth
+│   │   ├── ApiCredentials.php    # Single API key generation, SHA-256 hashing, rate limiting
 │   │   ├── Auth.php              # User authentication, registration, session management
+│   │   ├── ContactService.php    # Recipient directory logic, validation & PII guardrails
 │   │   ├── Database.php          # PDO connection factory with automatic TiDB/SSL support
 │   │   ├── MessageQueue.php      # Message enqueue, campaign dispatch, retry, and metrics
+│   │   ├── Security.php          # RFC 6238 TOTP 2FA math, backup codes, secret hygiene
 │   │   ├── Support.php           # SSRF validator, media downloader, MIME detector, emailer
 │   │   └── WorkerClient.php      # HTTP client communicating with Node.js worker
-│   └── pages/                    # Web views & components (dashboard, docs, auth, chatbot, etc.)
+│   └── pages/                    # Web views & dashboard components
+│       └── dashboard/            # Modular dashboard section views
 ├── test/
 │   └── index.php                 # Interactive developer test console
+├── tests/                        # Comprehensive PHP & Node.js unit and security test suite
 ├── worker/                       # Background Baileys worker daemon
 │   ├── package.json              # Node.js dependencies
 │   ├── server.mjs                # Baileys client, queue loop, chatbot matcher, webhooks
@@ -226,10 +238,11 @@ whatsap_api/
 ├── .htaccess                     # Root directory protection & redirect rules
 ├── app.php                       # Alias returning config/app.php
 ├── database.sql                  # Canonical MySQL schema dump
+├── docker-compose.yml            # Multi-container orchestration (App + MySQL)
 ├── Dockerfile                    # Container definition (PHP 8.2 + Apache + Node.js 20)
 ├── index.php                     # Root redirector forwarding to public/
 ├── send_whatsapp.py              # Interactive Python terminal sender tool
-├── setup.php                     # Automated browser-based setup wizard
+├── setup.php                     # CLI setup & initialization utility
 └── start-worker.bat              # Windows background worker daemon controller
 ```
 
@@ -272,7 +285,7 @@ whatsap_api/
    Set your local parameters in `.env`:
    ```ini
    APP_ENV=local
-   APP_NAME="WhatsApp API Hub"
+   APP_NAME="WhatsGateway"
    APP_PUBLIC_URL=http://localhost/wa/public
    APP_BASE_PATH=/wa/public
 
@@ -340,19 +353,20 @@ whatsap_api/
 
 ---
 
-### Option C: Automated Local Setup Wizard
+### Option C: Automated Local Setup & Database Migrations
 
-For fresh local setups (e.g. XAMPP), run the automated setup wizard in your terminal:
+For a fresh install, run the CLI setup utility:
 ```bash
 php setup.php
 ```
-The wizard will:
-1. Test your database server connection.
-2. Create the database and import `database.sql` (legacy wizard path for a fresh install only; it is destructive and must not be used with existing data). For deployments with an existing database, run `php scripts/migrate.php` instead.
-3. Create an initial administrator account.
-4. Generate the `.env` configuration file with a secure random `WORKER_TOKEN`.
-5. Execute `npm install` inside the `worker/` directory automatically.
-6. **Automatically delete itself** once setup completes to prevent unauthorized re-initialization. (Pass `--no-delete` if you want to keep it).
+The CLI wizard tests MySQL connectivity, creates the database, imports schema definitions, prompts for initial administrator credentials, and generates `.env`.
+
+> ⚠️ **Note:** `setup.php` is strictly a CLI utility (`PHP_SAPI === 'cli'`). Direct HTTP requests via browser (e.g. `http://localhost/wa/setup.php`) are blocked by `.htaccess` and return `403 Forbidden` to prevent remote execution attacks.
+
+For existing environments or standard deployments, initialize or update database tables directly via the non-destructive migration runner:
+```bash
+php scripts/migrate.php
+```
 
 ---
 
@@ -363,80 +377,84 @@ All application configurations are managed in `.env` at the root directory and l
 | Variable | Default Value | Description |
 | :--- | :--- | :--- |
 | `APP_ENV` | `local` | Environment mode (`local` or `production`). Production enforces non-default tokens. |
-| `APP_NAME` | `WhatsApp API Hub` | Application display name. |
+| `APP_NAME` | `WhatsGateway` | Application display name. |
 | `APP_PUBLIC_URL` | `http://localhost/wa/public` | Canonical public URL used for redirects, webhooks, and sitemaps. |
 | `APP_BASE_PATH` | `/wa/public` | Subfolder base path (leave blank when using root domain in production). |
-| `APP_SESSION_NAME` | `wa_api_hub` | PHP session cookie name. |
+| `APP_SESSION_NAME` | `whatsgateway_session` | PHP session cookie name. |
 | `APP_SECURE_COOKIES` | `false` (auto in prod) | Force HTTPS-only cookie attributes (`Secure; HttpOnly; SameSite=Lax`). |
-| `ENABLE_REGISTRATION` | `true` | Set to `false` in production to prevent unauthorized public registrations. |
+| `ENABLE_REGISTRATION` | `false` | Set to `true` in local development to allow self-registration from the web UI. |
 | `ENABLE_TEST_PAGE` | `true` (dev only) | Enables developer interactive tester at `/test-page.php`. |
+| `DISABLE_PASSWORD_LOGIN` | `false` | Disables standard password login (e.g., when strictly using Google OAuth). |
+| `ALLOW_NEW_DEVICES` | `false` | Controls whether non-owner accounts can initiate new WhatsApp device pairing. |
+| `ADMIN_EMAIL` | `admin@example.com` | Comma-separated list of administrative dashboard owners. |
+| `ALLOW_QUERY_AUTH` | `false` | Allows passing API key in query string (`?access_token=...`). Keep `false` to avoid access log leakage. |
 | `DEFAULT_COUNTRY_CODE` | `91` | Default country code prefix applied to numbers without a leading `+`. |
 | `DB_HOST` | `127.0.0.1` | MySQL / TiDB server hostname. |
 | `DB_PORT` | `3306` | Database port (3306 for MySQL, 4000 for TiDB Cloud). |
 | `DB_NAME` | `whatsapp_api` | Database name. |
 | `DB_USER` | `root` | Database username. |
 | `DB_PASSWORD` | `""` | Database password. |
-| `DB_SSL` | `false` | Enable TLS/SSL. It is always enabled for TiDB Cloud hostnames or port 4000, with certificate verification. |
-| `DB_SSL_CA` | system CA bundle | Optional filesystem path to a trusted CA bundle; never disables certificate verification. |
+| `DB_SSL` | `false` | Enable TLS/SSL. Always enabled for TiDB Cloud hostnames or port 4000. |
+| `DB_SSL_CA` | system CA bundle | Optional filesystem path to a trusted CA bundle. |
 | `DB_DSN` | *(computed)* | Optional MySQL PDO DSN override; its database must remain `whatsapp_api`. |
-| `WORKER_URL` | `http://127.0.0.1:<WORKER_PORT>` (default port `3107`) | Internal HTTP endpoint used by PHP to call the Node worker. The Render Docker entrypoint forces this to the co-located worker loopback URL. |
-| `WORKER_PORT` | `3107` | Port for the background worker microservice. PHP derives its default `WORKER_URL` from this value. |
-| `WORKER_TOKEN` | *(required in prod)* | Random shared secret of at least 32 characters passed in `X-Worker-Token`; generate it and set it in Render Environment Variables. |
+| `WORKER_URL` | `http://127.0.0.1:3107` | Internal HTTP endpoint used by PHP to call the Node worker. |
+| `WORKER_PORT` | `3107` | Port for the background worker microservice (defaults to `3107`). |
+| `WORKER_TOKEN` | *(required in prod)* | Shared secret of at least 32 characters passed in `X-Worker-Token`. |
 | `WA_SESSION_DIR` | *(platform default)* | Directory where Baileys multi-file authentication keys are stored. |
 | `SEND_DELAY_MS` | `2500` | Base delay between message dispatches in milliseconds. |
 | `QUEUE_POLL_MS` | `3000` | Polling frequency for claiming queued messages from the database. |
 | `LOG_LEVEL` | `warn` | Pino worker log verbosity (`debug`, `info`, `warn`, `error`). |
 | `LOGIN_MAX_ATTEMPTS` | `5` | Maximum failed login attempts allowed before IP lockout. |
 | `LOGIN_LOCKOUT_MINUTES`| `15` | Lockout duration in minutes after exceeding max failed login attempts. |
-| `OTP_VIA_EMAIL` | `true` | Deliver password reset OTPs via SMTP email. |
+| `OTP_VIA_EMAIL` | `false` | Deliver password reset OTPs via SMTP/Brevo email. |
 | `OTP_VIA_PHONE` | `true` | Deliver password reset OTPs via WhatsApp using system API key. |
 | `SYSTEM_API_KEY` | `""` | Dedicated API key used for internal system notifications (e.g. OTP delivery). |
+| `SYSTEM_API_SECRET` | `""` | Optional secret for system key if legacy dual validation is configured. |
 | `SMTP_HOST` | `""` | SMTP mail server hostname (e.g. `smtp.gmail.com`). |
 | `SMTP_PORT` | `587` | SMTP port (typically 587 for STARTTLS). |
 | `SMTP_USER` | `""` | SMTP username / email address. |
 | `SMTP_PASS` | `""` | SMTP password or App Password. |
 | `SMTP_FROM` | `noreply@localhost` | Outgoing email sender address. |
-| `SMTP_FROM_NAME` | `WhatsApp API Hub` | Outgoing email sender name. |
+| `SMTP_FROM_NAME` | `WhatsGateway` | Outgoing email sender name. |
+| `BREVO_API_KEY` | `""` | Brevo REST API key for HTTPS transactional emails. |
+| `RESEND_API_KEY` | `""` | Resend REST API key for transactional emails. |
 | `GOOGLE_CLIENT_ID` | `""` | Google OAuth2 Client ID (for login and Google Contacts sync). |
 | `GOOGLE_CLIENT_SECRET` | `""` | Google OAuth2 Client Secret. |
+| `INITIAL_ADMIN_EMAIL` | `""` | Auto-provisions initial owner account on first container startup. |
+| `INITIAL_ADMIN_PASSWORD` | `""` | Initial owner account password (minimum 12 characters). |
+| `INITIAL_ADMIN_NAME` | `Administrator` | Initial owner account display name. |
 
 ---
 
 ## 8. Database Setup, Migrations & Initialization
 
-The current application schema is defined by the non-destructive, repeatable [`001_initial_schema.sql`](migrations/001_initial_schema.sql) migration. It is based on the actual table definitions in [`database.sql`](database.sql), but contains no `DROP`, `TRUNCATE`, or seed-data statements. The application uses 13 tables: `users`, `api_keys`, `api_request_logs`, `campaigns`, `chatbot_rules`, `contacts`, `login_attempts`, `message_logs`, `message_queue`, `password_resets`, `webhooks`, `webhook_deliveries`, and `whatsapp_sessions`. The migration repairs missing indexes and foreign keys, validates existing columns, and records `001_initial_schema` in `schema_migrations`. It never deletes or resets existing rows. Existing tables with incompatible columns or conflicting data stop initialization and require a reviewed follow-up migration.
+The database schema is managed via the non-destructive, repeatable [`001_initial_schema.sql`](migrations/001_initial_schema.sql) migration. It contains no `DROP`, `TRUNCATE`, or destructive seed-data statements.
 
-Run the initializer manually with `php scripts/migrate.php`. Docker startup runs the same command before Supervisor starts Apache or the queue worker. If it fails, the container exits with a sanitized error and the worker does not start. Health checks require both a live database connection and all 13 application tables.
-
-### Key Tables Overview
-
-```mermaid
-erDiagram
-    users ||--o{ api_keys : "owns"
-    users ||--o{ api_request_logs : "generates"
-    users ||--o{ message_queue : "enqueues"
-    users ||--o{ message_logs : "records"
-    users ||--|| whatsapp_sessions : "maintains"
-    users ||--|| webhooks : "configures"
-    users ||--o{ webhook_deliveries : "triggers"
-    users ||--o{ contacts : "manages"
-    users ||--o{ campaigns : "schedules"
-    users ||--o{ chatbot_rules : "defines"
-```
+The application uses **17 application tables** (plus `schema_migrations` for version tracking):
 
 1. **`users`:** User accounts, hashed passwords (`password_hash`), contact phone numbers, timestamps.
-2. **`api_keys`:** API key records storing `key_hash` (SHA-256), `key_prefix`, `secret_hash`, `status` (`active`/`disabled`), `ip_allowlist`, and rate limits (`rate_per_minute`, `rate_per_hour`, `rate_per_day`, `allow_humanize`).
-3. **`api_request_logs`:** Audit log capturing endpoint, IP address, HTTP status code, generated request ID, and error messages.
-4. **`message_queue`:** Asynchronous FIFO queue containing `recipient`, `normalized_recipient`, `message_type` (`text`, `image`, `document`, `video`), `body`, JSON `payload`, `status` (`queued`, `processing`, `sent`, `failed`, `cancelled`), `attempts`, `available_at`, `locked_at`, and `locked_by`.
-5. **`message_logs`:** Historic log of dispatched messages and provider delivery responses.
-6. **`whatsapp_sessions`:** Baileys connection state (`idle`, `connecting`, `qr`, `connected`, `disconnected`, `error`), device phone number, push name, sleep status, and timestamps.
-7. **`webhooks`:** Webhook subscription containing HTTPS `target_url`, HMAC `secret`, and `enabled` flag.
-8. **`webhook_deliveries`:** Audit history of outbound webhook HTTP dispatches, status codes, and retry attempts.
-9. **`contacts`:** Opted-in recipient directory with normalized phone numbers and import notes.
-10. **`campaigns`:** Bulk broadcast records with template message and target counts.
-11. **`chatbot_rules`:** Keyword-based auto-reply rules (`match_type`: `exact`, `contains`, `starts_with`, `catch_all`).
-12. **`login_attempts`:** Tracks failed login attempts per email and IP for security lockouts.
-13. **`password_resets`:** Temporary OTP codes with 15-minute expiration windows.
+2. **`api_keys`:** Single API key records storing `key_hash` (SHA-256), `key_prefix`, `status` (`active`/`disabled`), `ip_allowlist`, and rate limits (`rate_per_minute`, `rate_per_hour`, `rate_per_day`, `allow_humanize`).
+3. **`api_request_logs`:** Audit log capturing endpoint, IP address, HTTP status code, request ID, and error messages.
+4. **`campaigns`:** Bulk broadcast records with template message, scheduling, media attachments, and target counts.
+5. **`chatbot_rules`:** Keyword-based auto-reply rules (`match_type`: `exact`, `contains`, `starts_with`, `catch_all`).
+6. **`contacts`:** Opted-in recipient directory with normalized phone numbers, consent flags (`opt_in`), and import notes.
+7. **`login_attempts`:** Tracks failed login attempts per email and IP for security lockouts.
+8. **`message_logs`:** Historic log of dispatched messages, timestamps, and provider delivery responses.
+9. **`message_queue`:** Asynchronous FIFO queue containing `recipient`, `normalized_recipient`, `message_type` (`text`, `image`, `document`, `video`), `body`, JSON `payload`, `status` (`queued`, `processing`, `sent`, `failed`, `cancelled`), `attempts`, `priority`, `available_at`, `locked_at`, and `locked_by`.
+10. **`password_resets`:** Temporary OTP codes with 15-minute expiration windows.
+11. **`webhooks`:** Webhook subscription containing HTTPS `target_url`, HMAC `secret`, and `enabled` flag.
+12. **`webhook_deliveries`:** Audit history of outbound webhook HTTP dispatches, status codes, and retry attempts.
+13. **`whatsapp_sessions`:** Baileys connection state (`idle`, `connecting`, `qr`, `connected`, `disconnected`, `error`), device phone number, push name, auto-sleep status, and timestamps.
+14. **`user_security`:** Two-Factor Authentication (RFC 6238 TOTP), hashed recovery codes, lockout counters, and security preferences.
+15. **`media_assets`:** Uploaded media file metadata, SHA-256 checksums, and reference counting to prevent premature disk cleanup across broadcast campaigns.
+16. **`inbound_messages`:** Normalized record of incoming customer messages with processing status.
+17. **`webhook_queue`:** Asynchronous delivery and retry queue for outbound HTTP webhooks.
+
+Run migrations anytime via:
+```bash
+php scripts/migrate.php
+```
+Docker container startup automatically runs this migration before Supervisor launches Apache or the worker. Health checks confirm the database connection and verify that all 17 tables are ready.
 
 ---
 
@@ -466,19 +484,36 @@ pm2 start server.mjs --name "whatsapp-worker" --watch false
 pm2 logs whatsapp-worker
 ```
 
-### Docker Container Execution
+### 1-Command Setup with Docker Compose (Recommended)
+
+Spin up MySQL, PHP 8.2 Apache, and the Node.js Baileys worker in seconds:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/navneetyadav-code/whatsapp-api.git
+cd whatsapp-api
+
+# 2. Launch the full stack (App + MySQL + Worker)
+docker compose up -d
+
+# 3. Access your dashboard at http://localhost:8080
+```
+
+> 💡 **Note on `WORKER_TOKEN`:** When running with `APP_ENV=production`, ensure `WORKER_TOKEN` is set to a secret of at least 32 characters in your environment or in `docker-compose.yml` to satisfy the application's runtime token requirement.
+
+### Standalone Docker Container Execution
 
 ```bash
 # Build Docker image
-docker build -t whatsapp-api-hub .
+docker build -t whatsgateway .
 
 # Run container with environment configuration
 docker run -d \
   -p 80:80 \
-  --name whatsapp-api \
+  --name whatsgateway \
   --env-file .env \
   -v wa_sessions:/var/www/html/whatsapp-api-data/sessions \
-  whatsapp-api-hub
+  whatsgateway
 ```
 
 ---
@@ -620,14 +655,20 @@ Manage your recipient directory, opt-in compliance, and bulk audience records vi
 #### `GET /api/health.php`
 - **Method:** `GET`
 - **Authentication:** None (Public)
-- **Purpose:** Verifies operational readiness of the PHP gateway and the background Node.js worker microservice.
+- **Purpose:** Verifies operational readiness of the PHP gateway, database connectivity, table integrity, and background Node.js worker microservice.
 - **Success Response (`200 OK`):**
   ```json
   {
     "ok": true,
     "status": "healthy",
-    "timestamp": "2026-10-15T12:00:00+00:00",
+    "timestamp": "2026-10-27T12:00:00+00:00",
     "service": "whatsapp-api-hub",
+    "database": {
+      "ok": true,
+      "connected": true,
+      "schema_ready": true,
+      "missing_tables": []
+    },
     "worker": {
       "ok": true,
       "status_code": 200,
@@ -641,8 +682,14 @@ Manage your recipient directory, opt-in compliance, and bulk audience records vi
   {
     "ok": false,
     "status": "degraded",
-    "timestamp": "2026-10-15T12:00:00+00:00",
+    "timestamp": "2026-10-27T12:00:00+00:00",
     "service": "whatsapp-api-hub",
+    "database": {
+      "ok": true,
+      "connected": true,
+      "schema_ready": true,
+      "missing_tables": []
+    },
     "worker": {
       "ok": false,
       "status_code": 0,
@@ -665,7 +712,6 @@ Used by the web dashboard and AJAX clients to control the WhatsApp connection li
 | `?action=logout` | `POST` | Unlinks device, purges on-disk session credentials, and resets status to `idle`. |
 | `?action=sleep` | `POST` | Suspends socket connection to conserve host RAM while preserving auth. |
 | `?action=wake` | `POST` | Wakes up a suspended device and re-establishes the WhatsApp WebSocket. |
-| `?action=send-test` | `POST` | Enqueues a test message from the dashboard (`{"to": "...", "message": "..."}`). |
 | `?action=queue-status` | `GET` | Returns paginated message queue status and delivery metrics for the user. |
 
 ---
@@ -687,6 +733,7 @@ All form POST submissions require `csrf_token` validation:
 | `/message` | `GET` | Auth | Dashboard message composer with file attachment support. |
 | `/queue` | `GET` | Auth | Real-time queue visualizer with retry and cancellation controls. |
 | `/api-keys` | `GET` | Auth | API credentials management, IP allowlists, rate limit editor. |
+| `/security` | `GET` / `POST` | Auth | Two-Factor Authentication (TOTP 2FA), recovery codes & password change. |
 | `/contacts` | `GET` | Auth | Address book, CSV import, vCard export (`/contacts-export-vcf`). |
 | `/campaigns` | `GET` | Auth | Broadcast campaigns targeting opted-in contacts with templating. |
 | `/chatbot` | `GET` | Auth | Chatbot automation rule builder (`exact`, `contains`, `catch_all`). |
@@ -697,7 +744,7 @@ All form POST submissions require `csrf_token` validation:
 
 ---
 
-### 10.5 Internal Worker Microservice Endpoints (`worker/server.mjs`)
+### 10.6 Internal Worker Microservice Endpoints (`worker/server.mjs`)
 
 Listening internally on `http://127.0.0.1:3107`. Requires `X-Worker-Token` header on all non-health routes:
 
@@ -708,6 +755,7 @@ Listening internally on `http://127.0.0.1:3107`. Requires `X-Worker-Token` heade
 | `/sessions/:userId/status` | `GET` | Returns current Baileys state, QR string, and device details. |
 | `/sessions/:userId/start` | `POST` | Launches Baileys socket for specific tenant user. |
 | `/sessions/:userId/logout` | `POST` | Unlinks session and deletes auth files in `sessions/user_<userId>`. |
+| `/sessions/:userId/auto-sleep` | `POST` | Configures idle auto-sleep timeout and toggle for specific tenant. |
 | `/sessions/:userId/sleep` | `POST` | Closes active socket and marks session sleeping in database. |
 | `/sessions/:userId/wake` | `POST` | Resumes connection and re-opens WhatsApp WebSocket. |
 | `/sessions/:userId/send` | `POST` | Direct synchronous message dispatch. |
@@ -725,9 +773,10 @@ curl -X POST "http://localhost/wa/public/api/send.php" \
   -H "X-API-Key: wa_live_YOUR_API_KEY_HERE" \
   -d '{
     "to": "919876543210",
-    "message": "Hello from WhatsApp API Hub! 🚀\nYour order *#84920* has been shipped.",
+    "message": "Hello from WhatsGateway! 🚀\nYour order *#84920* has been shipped.",
     "humanize": true
   }'
+```
 ```
 
 #### Success Response (`200 OK`):
@@ -862,12 +911,26 @@ curl -X POST "http://localhost/wa/public/api/send.php" \
 
 ---
 
-## 12. Authentication, Authorization & Security
+## 12. Authentication, Authorization & Security Safeguards
 
-### Cryptographic API Key Management
-- When an API key is generated via `/credentials`, the user is shown the plain key (`wa_live_...`) and secret (`was_...`) once.
-- The database **never stores plaintext keys**. Only the SHA-256 hash (`hash('sha256', $apiKey)`) and a public key prefix (`substr($apiKey, 0, 22)`) are persisted.
-- Secrets are hashed using PHP `password_hash()` with `PASSWORD_DEFAULT` (Bcrypt/Argon2id).
+### Single-Key Authentication Architecture
+WhatsGateway uses a unified **Single API Key** architecture:
+- **One Token to Manage:** When you generate an API key in the dashboard under **API Keys**, a single Bearer token (`wa_live_...`) is generated and displayed once. There is no separate secret key to configure or track.
+- **Hashed Storage:** The database **never stores plaintext API keys**. Only the SHA-256 hash (`hash('sha256', $apiKey)`) and a public key prefix (`substr($apiKey, 0, 22)`) are persisted for lookup and verification.
+- **Accepted Authentication Methods:**
+  - `X-API-Key: wa_live_YOUR_KEY` header (Recommended)
+  - `Authorization: Bearer wa_live_YOUR_KEY` header
+  - JSON / POST body: `{"api_key": "wa_live_YOUR_KEY", ...}`
+  - URL Query parameter: `?access_token=wa_live_YOUR_KEY` (Requires `ALLOW_QUERY_AUTH=true` in `.env` to avoid exposing tokens in web server access logs).
+- **Backward Compatibility:** Legacy dual-key credentials (`key:secret` or `X-API-Secret` headers) from earlier versions remain supported in the request parser for backward compatibility, but are deprecated; new keys only require the single `wa_live_...` token.
+
+### Security Safeguards & Practical Considerations
+> ⚠️ **Practical Reality Check:**
+> No web software is 100% impenetrable. Running a self-hosted gateway that emulates WhatsApp Web WebSocket traffic requires pragmatic operational security:
+> - **Server Isolation & Reverse Proxy:** Run WhatsGateway behind a hardened reverse proxy (Caddy, Nginx, Apache, or Cloudflare) with HTTPS/TLS termination.
+> - **Worker Port Isolation:** The Node.js Baileys worker listens on port `3107` and is intended strictly for local loopback communication with PHP (`127.0.0.1:3107`). Never expose port `3107` to the public internet without firewall restrictions.
+> - **Session Directory Protection:** WhatsApp cryptographic Noise protocol keys are stored in `whatsapp-api-data/sessions/user_<userId>`. Protect this directory with restrictive file permissions (`chmod 700`) and never commit session keys or `.env` to public repositories.
+> - **Anti-Ban Practices:** WhatsApp actively monitors automated burst patterns. Enable humanized presence (`"humanize": true`), configure rate limits, and send only to opted-in recipients.
 
 ### SSRF Protection (Server-Side Request Forgery)
 All remote media URLs and webhook target URLs undergo DNS inspection via `assert_safe_media_url()` and `assertSafeWebhookUrl()`:
@@ -985,7 +1048,7 @@ The repository includes a production [`Dockerfile`](Dockerfile) configured with 
    - `APP_ENV=production`, `APP_PUBLIC_URL=https://your-service.onrender.com`, `APP_BASE_PATH=`
    - `WORKER_TOKEN` generated with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, `ENABLE_REGISTRATION=false`. Paste the generated value directly into Render Environment Variables; do not commit it or send it in chat.
 3. Deploy. Startup applies the migration before the queue worker. For a manual run on a compatible Render service shell, execute `php /var/www/html/scripts/migrate.php`; Render also documents one-off jobs for tasks such as database migrations. Do not use `database.sql`, `clean_tidb_import.sql`, or `schema_export.sql` against the existing database because they contain destructive dump statements.
-4. The container forces `WORKER_URL` to `http://127.0.0.1:${WORKER_PORT}` because Apache and the Node worker run in the same container; `WORKER_PORT` defaults to `3107`. Loopback cURL requests explicitly bypass inherited HTTP proxy settings. The worker's `GET /health` route is unauthenticated but reports ready only after it connects to the `whatsapp_api` database and confirms all 13 required tables; a not-ready result is HTTP 503 JSON with `error.code=database_not_ready`. Other worker routes require `X-Worker-Token`; PHP includes it without logging or returning it. Verify `https://<service-host>/api/health.php` returns HTTP 200 with `database.ok`, `database.schema_ready`, and `worker.ok` all `true`. On a failed worker probe, the PHP error log records only the sanitized target, peer IP, HTTP status, content type, a redacted response excerpt, and a short failure category. Then check Render logs for `Database schema is ready: 13 application tables in whatsapp_api.` and confirm queue processing no longer logs `ER_NO_SUCH_TABLE`.
+4. The container forces `WORKER_URL` to `http://127.0.0.1:${WORKER_PORT}` because Apache and the Node worker run in the same container; `WORKER_PORT` defaults to `3107`. Loopback cURL requests explicitly bypass inherited HTTP proxy settings. The worker's `GET /health` route is unauthenticated but reports ready only after it connects to the `whatsapp_api` database and confirms all 17 required tables; a not-ready result is HTTP 503 JSON with `error.code=database_not_ready`. Other worker routes require `X-Worker-Token`; PHP includes it without logging or returning it. Verify `https://<service-host>/api/health.php` returns HTTP 200 with `database.ok`, `database.schema_ready`, and `worker.ok` all `true`. On a failed worker probe, the PHP error log records only the sanitized target, peer IP, HTTP status, content type, a redacted response excerpt, and a short failure category. Then check Render logs for `Database schema is ready: 17 application tables in whatsapp_api.` and confirm queue processing no longer logs `ER_NO_SUCH_TABLE`.
 
 ### First private dashboard account
 
@@ -1094,7 +1157,7 @@ WhatsGateway includes an intelligent anti-ban engine:
 <details>
 <summary><strong>Q7: Can I deploy WhatsGateway with Docker?</strong></summary>
 
-Yes! The repository includes a production-ready [`Dockerfile`](Dockerfile) with multi-process Supervisor orchestration, running Apache (PHP 8.2) and the Node.js Baileys worker in tandem with automatic database migrations. It runs seamlessly on local Docker, Render, Railway, Fly.io, AWS, or any Linux VPS.
+Yes! The repository includes a containerized [`Dockerfile`](Dockerfile) with multi-process Supervisor orchestration, running Apache (PHP 8.2) and the Node.js Baileys worker in tandem with automatic database migrations. It runs seamlessly on local Docker, Render, Railway, Fly.io, AWS, or any Linux VPS.
 </details>
 
 <details>
