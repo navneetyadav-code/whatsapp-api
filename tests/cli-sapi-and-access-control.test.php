@@ -72,4 +72,9 @@ test_assert(
     'worker/server.mjs must use optional chaining req.body?.to in direct send handler'
 );
 
+test_assert(
+    str_contains($workerSource, "String(req.body?.message || '').trim()"),
+    'worker/server.mjs must use optional chaining req.body?.message in direct send handler'
+);
+
 echo "All CLI SAPI & Access Control security unit tests passed successfully!\n";

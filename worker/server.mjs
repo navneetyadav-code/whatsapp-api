@@ -2079,7 +2079,7 @@ app.post('/sessions/:userId/logout', async (req, res) => {
 app.post('/sessions/:userId/auto-sleep', async (req, res) => {
   const userId = req.params.userId;
   const session = getSession(userId);
-  const enabled = req.body?.auto_sleep_enabled !== undefined ? Boolean(req.body.auto_sleep_enabled) : true;
+  const enabled = req.body?.auto_sleep_enabled !== undefined ? Boolean(req.body?.auto_sleep_enabled) : true;
   const rawTimeout = Number(req.body?.auto_sleep_timeout_seconds) || 60;
   const timeoutSeconds = Math.max(15, Math.min(86400, rawTimeout));
 
@@ -2138,7 +2138,7 @@ app.post('/sessions/:userId/wake', async (req, res) => {
 app.post('/sessions/:userId/send', async (req, res) => {
   const session = getSession(req.params.userId);
   const recipient = normalizeRecipient(req.body?.to);
-  const message = String(req.body.message || '').trim();
+  const message = String(req.body?.message || '').trim();
 
   if (!recipient.jid || !message) {
     res.status(422).json({
