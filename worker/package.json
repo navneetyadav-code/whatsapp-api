@@ -9,7 +9,7 @@
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "express": "5.2.1",
-    "mysql2": "3.22.4",
+    "mysql2": "^3.24.6",
     "pino": "10.3.1",
     "qrcode": "1.5.4"
   }
