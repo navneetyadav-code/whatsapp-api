@@ -227,7 +227,7 @@
 
             return `
                 <div class="flex justify-end w-full animate-fadeIn select-text">
-                    <div class="relative max-w-[92%] sm:max-w-[82%] bg-[#d9fdd3] text-slate-900 shadow-sm border border-emerald-200/60 rounded-xl rounded-tr-none px-3 pt-2 pb-1.5 text-[13px] leading-relaxed break-words font-sans">
+                    <div class="relative max-w-[92%] sm:max-w-[82%] bg-[#d9fdd3] text-slate-900 shadow-sm border border-emerald-200/60 rounded-xl rounded-tr-none px-3.5 pt-2.5 pb-2 text-[15px] sm:text-[16px] leading-relaxed break-words font-sans">
                         <div class="wa-bubble-content">${formatted}</div>
                         <div class="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-500/80 font-sans select-none float-right ml-3">
                             <span>${timeStr}</span>
@@ -249,7 +249,7 @@
             const style = document.createElement('style');
             style.id = 'wa-studio-minimalist-css';
             style.textContent = `
-                /* Absolute reset for WaStudio toolbar buttons and emoji cells (kills app.css boxes) */
+                /* Base reset for buttons inside wa-studio to neutralize app.css */
                 .wa-studio-container button,
                 .wa-studio-toolbar button,
                 .wa-emoji-popover button,
@@ -257,32 +257,81 @@
                     min-height: unset !important;
                     padding: 0 !important;
                     margin: 0 !important;
-                    border: none !important;
                     outline: none !important;
-                    background: transparent !important;
                     box-shadow: none !important;
-                    color: inherit !important;
                     font: inherit !important;
-                    font-weight: normal !important;
                     transform: none !important;
                     display: inline-flex !important;
                     align-items: center !important;
                     justify-content: center !important;
                     cursor: pointer !important;
                 }
-                .wa-studio-container button:hover,
-                .wa-emoji-popover button:hover {
-                    transform: none !important;
-                    box-shadow: none !important;
+                
+                /* Inactive format buttons in toolbar: borderless and transparent */
+                .wa-studio-toolbar button.wa-format-btn,
+                .wa-studio-toolbar button.wa-emoji-trigger {
+                    width: 28px !important;
+                    height: 28px !important;
+                    border-radius: 6px !important;
+                    border: 1.5px solid transparent !important;
+                    background: transparent !important;
+                    color: #64748b !important;
+                    transition: all 0.15s ease-in-out !important;
                 }
+                .wa-studio-toolbar button.wa-format-btn:hover,
+                .wa-studio-toolbar button.wa-emoji-trigger:hover {
+                    background: #f1f5f9 !important;
+                    border-color: #cbd5e1 !important;
+                    color: #0f172a !important;
+                }
+                
+                /* PROMINENT ACTIVE HIGHLIGHT: Clear emerald Background AND Border */
+                .wa-studio-toolbar button.wa-format-btn.is-active,
+                .wa-studio-toolbar button.wa-format-btn.active {
+                    background: #dcfce7 !important; /* Rich emerald-100 background */
+                    border: 1.5px solid #059669 !important; /* Crisp emerald-600 border */
+                    color: #064e3b !important; /* Deep contrast emerald-900 icon */
+                    box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25) !important;
+                }
+                .wa-studio-toolbar button.wa-emoji-trigger.is-active {
+                    background: #fef3c7 !important; /* Amber-100 */
+                    border: 1.5px solid #d97706 !important; /* Amber-600 border */
+                    color: #92400e !important;
+                    box-shadow: 0 1px 3px rgba(217, 119, 6, 0.25) !important;
+                }
+                
+                /* Increased Readability for Visual Editor Text */
+                .wa-visual-editor {
+                    font-size: 15px !important;
+                    line-height: 1.65 !important;
+                    color: #0f172a !important;
+                    letter-spacing: -0.01em !important;
+                }
+                @media (min-width: 640px) {
+                    .wa-visual-editor {
+                        font-size: 16px !important;
+                    }
+                }
+                
                 .wa-visual-editor:empty:before {
                     content: attr(data-placeholder);
                     color: #94a3b8;
                     pointer-events: none;
                     display: block;
+                    font-size: inherit;
                 }
-                .wa-visual-editor b, .wa-visual-editor strong {
-                    font-weight: 700 !important;
+                
+                /* Unmistakably Extra Bold Text */
+                .wa-visual-editor b,
+                .wa-visual-editor strong,
+                .wa-visual-editor [style*="font-weight: bold"],
+                .wa-visual-editor [style*="font-weight: 700"],
+                .wa-visual-editor [style*="font-weight: 800"],
+                .wa-bubble-content b,
+                .wa-bubble-content strong {
+                    font-weight: 800 !important;
+                    color: #020617 !important;
+                    text-shadow: 0.2px 0 0 #020617 !important;
                 }
                 .wa-visual-editor i, .wa-visual-editor em {
                     font-style: italic !important;
@@ -290,6 +339,7 @@
                 .wa-visual-editor s, .wa-visual-editor del, .wa-visual-editor strike {
                     text-decoration: line-through !important;
                 }
+                
                 /* Custom slim scrollbar for emoji popover */
                 .wa-emoji-scroll::-webkit-scrollbar {
                     width: 4px;
@@ -353,7 +403,7 @@
             formats.forEach(f => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'wa-tool-btn w-7 h-7 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 active:scale-95 transition-all text-xs border-0 bg-transparent';
+                btn.className = 'wa-tool-btn wa-format-btn w-7 h-7 rounded text-slate-500 hover:text-slate-900 active:scale-95 transition-all text-xs';
                 btn.innerHTML = f.icon;
                 btn.title = f.title + ' (' + f.shortcut + ')';
                 btn.setAttribute('aria-label', f.title);
@@ -398,7 +448,7 @@
             // Borderless Minimal Emoji Trigger Button
             const emojiBtn = document.createElement('button');
             emojiBtn.type = 'button';
-            emojiBtn.className = 'wa-emoji-trigger w-7 h-7 rounded text-slate-500 hover:text-amber-500 hover:bg-amber-50 active:scale-95 transition-all border-0 bg-transparent';
+            emojiBtn.className = 'wa-emoji-trigger w-7 h-7 rounded text-slate-500 hover:text-amber-500 active:scale-95 transition-all';
             emojiBtn.innerHTML = ICONS.smile;
             emojiBtn.title = 'Add emoji';
             emojiBtn.setAttribute('aria-label', 'Open emoji picker');
@@ -583,7 +633,7 @@
             composePane.className = 'wa-compose-pane block';
 
             const visualEditor = document.createElement('div');
-            visualEditor.className = 'wa-visual-editor w-full p-3.5 text-[13px] text-slate-800 min-h-[110px] max-h-[360px] overflow-y-auto focus:outline-none font-sans leading-relaxed select-text';
+            visualEditor.className = 'wa-visual-editor w-full p-4 text-[15px] sm:text-[16px] text-slate-900 min-h-[125px] max-h-[400px] overflow-y-auto focus:outline-none font-sans leading-relaxed select-text';
             visualEditor.setAttribute('contenteditable', 'true');
             visualEditor.setAttribute('spellcheck', 'true');
             visualEditor.setAttribute('data-placeholder', textarea.placeholder || 'Type your WhatsApp message here...');
@@ -632,8 +682,7 @@
                 const anchorNode = sel.anchorNode;
                 if (!anchorNode || !visualEditor.contains(anchorNode)) {
                     formatBtnElements.forEach(item => {
-                        item.btn.classList.remove('bg-emerald-100', 'text-emerald-800', 'font-bold');
-                        item.btn.classList.add('text-slate-500');
+                        item.btn.classList.remove('is-active', 'active');
                     });
                     return;
                 }
@@ -647,8 +696,21 @@
                 let isCode = false, isQuote = false;
                 let curr = anchorNode;
                 while (curr && curr !== visualEditor) {
+                    if (curr.nodeName === 'B' || curr.nodeName === 'STRONG' || 
+                        (curr.style && (curr.style.fontWeight === 'bold' || parseInt(curr.style.fontWeight, 10) >= 700))) {
+                        isBold = true;
+                    }
+                    if (curr.nodeName === 'I' || curr.nodeName === 'EM' || 
+                        (curr.style && curr.style.fontStyle === 'italic')) {
+                        isItalic = true;
+                    }
+                    if (curr.nodeName === 'S' || curr.nodeName === 'DEL' || curr.nodeName === 'STRIKE' || 
+                        (curr.style && curr.style.textDecoration && curr.style.textDecoration.includes('line-through'))) {
+                        isStrike = true;
+                    }
                     if (curr.nodeName === 'CODE' || curr.nodeName === 'PRE') isCode = true;
                     if (curr.nodeName === 'BLOCKQUOTE') isQuote = true;
+                    if (curr.nodeName === 'UL' || curr.nodeName === 'LI') isList = true;
                     curr = curr.parentNode;
                 }
 
@@ -662,11 +724,9 @@
                     else if (item.cmd === 'quote') active = isQuote;
 
                     if (active) {
-                        item.btn.classList.add('bg-emerald-100', 'text-emerald-800', 'font-bold');
-                        item.btn.classList.remove('text-slate-500');
+                        item.btn.classList.add('is-active', 'active');
                     } else {
-                        item.btn.classList.remove('bg-emerald-100', 'text-emerald-800', 'font-bold');
-                        item.btn.classList.add('text-slate-500');
+                        item.btn.classList.remove('is-active', 'active');
                     }
                 });
             };
@@ -675,6 +735,8 @@
             visualEditor.addEventListener('keyup', updateActiveFormats);
             visualEditor.addEventListener('mouseup', updateActiveFormats);
             visualEditor.addEventListener('touchend', updateActiveFormats);
+            visualEditor.addEventListener('input', updateActiveFormats);
+            visualEditor.addEventListener('focus', updateActiveFormats);
 
             // 6. Minimal Footer Status Bar
             const footer = document.createElement('div');
