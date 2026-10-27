@@ -36,14 +36,14 @@ $title = $pageLabels[$page ?? ($_GET['page'] ?? 'dashboard')] ?? 'Overview';
     </div>
 
     <div class="flex items-center gap-2.5 sm:gap-3">
-        <!-- Command Search Box with Keyboard Shortcut -->
+        <!-- Command Search -->
         <div class="hidden md:flex relative group">
-            <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                <svg class="h-3.5 w-3.5 text-slate-400 group-focus-within:text-brand-wa_med transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-3.5 w-3.5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
             </div>
-            <input id="navbarSearchInput" type="text" class="block w-60 pl-8 pr-12 py-1.5 border border-slate-200/90 rounded-lg text-slate-800 placeholder:text-slate-400 bg-slate-50/70 hover:bg-slate-100/60 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500/30 focus:border-emerald-600 sm:text-[12px] font-medium transition-all shadow-subtle" placeholder="Search commands...">
-            <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                <kbd class="inline-flex items-center bg-white border border-slate-200 rounded px-1.5 text-[10px] font-mono font-semibold text-slate-400 shadow-sm">⌘K</kbd>
+            <input id="navbarSearchInput" type="text" aria-label="Search commands" class="block w-64 pl-9 pr-16 py-2 border border-transparent rounded-xl text-[12px] font-medium text-slate-800 placeholder:text-slate-400 bg-slate-100/80 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500/40 transition-all" placeholder="Search...">
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span class="text-[10px] font-medium tracking-wide text-slate-400">Ctrl K</span>
             </div>
         </div>
 
