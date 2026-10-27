@@ -1,10 +1,12 @@
 <?php
 $pageLabels = [
     'dashboard' => 'Overview',
+    'live-chat' => 'Live Chat',
     'device' => 'Device Management',
     'api-keys' => 'API Keys',
     'queue' => 'Message Queue',
     'contacts' => 'Contacts',
+    'feedback' => 'Customer Feedback',
     'message' => 'New Message',
     'chatbot' => 'Chatbots',
     'webhooks' => 'Webhooks',

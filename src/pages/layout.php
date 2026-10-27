@@ -172,8 +172,8 @@ if ($userForLayout) {
         <?php require __DIR__ . '/components/navbar.php'; ?>
         
         <!-- Scrollable Workspace -->
-        <div id="workspaceContent" class="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#FBFBFC] p-4 md:p-6 lg:p-7 overscroll-contain">
-            <div class="max-w-6xl mx-auto space-y-6">
+        <div id="workspaceContent" class="flex-1 <?= $currentPage === 'live-chat' ? 'overflow-hidden p-2 md:p-3 flex flex-col' : 'overflow-y-auto overflow-x-hidden custom-scrollbar p-4 md:p-6 lg:p-7' ?> bg-[#FBFBFC] overscroll-contain">
+            <div class="<?= $currentPage === 'live-chat' ? 'h-full flex flex-col min-h-0' : 'max-w-6xl mx-auto space-y-6' ?>">
                 <?php foreach (flashes() as $flash): ?>
                     <div class="p-3.5 mb-4 text-[13px] font-medium rounded-lg border flex items-center justify-between <?= $flash['type'] === 'success' ? 'bg-emerald-50/80 border-emerald-200/80 text-emerald-800' : 'bg-red-50/80 border-red-200/80 text-red-800' ?>">
                         <div class="flex items-center gap-2">

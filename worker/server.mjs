@@ -6,7 +6,7 @@ import mysql from 'mysql2/promise';
 import crypto from 'crypto';
 import dns from 'dns/promises';
 import net from 'net';
-import { existsSync, mkdirSync, readFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
 import { rm } from 'fs/promises';
 import { dirname, join, resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
@@ -499,6 +499,114 @@ function normalizeRecipient(value) {
   return { jid: `${digits}@s.whatsapp.net`, normalizedTo: digits, isGroup: false };
 }
 
+
+async function resolveJidToPhone(userId, jid, session = null) {
+  if (!jid) return '';
+  const rawJid = String(jid).trim();
+
+  // 1. Group chat
+  if (rawJid.endsWith('@g.us')) {
+    return rawJid;
+  }
+
+  // 2. Standard WhatsApp User JID (@s.whatsapp.net)
+  if (rawJid.endsWith('@s.whatsapp.net')) {
+    let digits = rawJid.split('@')[0].split(':')[0].replace(/\D/g, '');
+    if (digits.length === 10 && DEFAULT_COUNTRY_CODE) {
+      digits = `${DEFAULT_COUNTRY_CODE}${digits}`;
+    }
+    return digits;
+  }
+
+  // 3. WhatsApp Linked Device Identifier (@lid)
+  if (rawJid.endsWith('@lid')) {
+    const lidUser = rawJid.split('@')[0].split(':')[0].replace(/\D/g, '');
+    let resolvedPn = null;
+
+    // 3a. In-memory / Baileys LID mapping cache lookup
+    try {
+      if (session?.sock?.signalRepository?.lidMapping?.getPNForLID) {
+        resolvedPn = await session.sock.signalRepository.lidMapping.getPNForLID(rawJid);
+      }
+    } catch (_) {}
+
+    // 3b. Read disk reverse mapping: lid-mapping-${lidUser}_reverse.json
+    if (!resolvedPn) {
+      try {
+        const authDir = join(SESSION_DIR, `user_${userId}`);
+        const reverseFile = join(authDir, `lid-mapping-${lidUser}_reverse.json`);
+        if (existsSync(reverseFile)) {
+          const raw = readFileSync(reverseFile, 'utf8').trim();
+          resolvedPn = JSON.parse(raw);
+        }
+      } catch (_) {}
+    }
+
+    // 3c. Scan forward mapping files in session directory
+    if (!resolvedPn) {
+      try {
+        const authDir = join(SESSION_DIR, `user_${userId}`);
+        if (existsSync(authDir)) {
+          const files = readdirSync(authDir);
+          for (const f of files) {
+            if (f.startsWith('lid-mapping-') && !f.endsWith('_reverse.json') && f.endsWith('.json')) {
+              const content = readFileSync(join(authDir, f), 'utf8');
+              if (content.includes(lidUser)) {
+                const m = f.match(/^lid-mapping-(\d+)\.json$/);
+                if (m && m[1]) {
+                  resolvedPn = m[1];
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (resolvedPn) {
+      let digits = String(resolvedPn).split('@')[0].split(':')[0].replace(/\D/g, '');
+      if (digits.length === 10 && DEFAULT_COUNTRY_CODE) {
+        digits = `${DEFAULT_COUNTRY_CODE}${digits}`;
+      }
+      return digits;
+    }
+
+    // Fallback: digits from the lid
+    return lidUser;
+  }
+
+  // 4. Raw digits or general phone input (also handles raw LID digits like 28343109968029)
+  let digits = rawJid.split('@')[0].replace(/\D/g, '');
+  if (digits.length > 12) {
+    try {
+      const authDir = join(SESSION_DIR, `user_${userId}`);
+      const reverseFile = join(authDir, `lid-mapping-${digits}_reverse.json`);
+      if (existsSync(reverseFile)) {
+        const raw = readFileSync(reverseFile, 'utf8').trim();
+        const resolved = JSON.parse(raw);
+        if (resolved) {
+          let pn = String(resolved).split('@')[0].split(':')[0].replace(/\D/g, '');
+          if (pn.length === 10 && DEFAULT_COUNTRY_CODE) {
+            pn = `${DEFAULT_COUNTRY_CODE}${pn}`;
+          }
+          return pn;
+        }
+      }
+    } catch (_) {}
+  }
+  if (digits.startsWith('00')) {
+    digits = digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith('0') && DEFAULT_COUNTRY_CODE) {
+    digits = `${DEFAULT_COUNTRY_CODE}${digits.slice(1)}`;
+  }
+  if (digits.length === 10 && DEFAULT_COUNTRY_CODE) {
+    digits = `${DEFAULT_COUNTRY_CODE}${digits}`;
+  }
+  return digits;
+}
+
 function isPrivateIp(ip) {
   let cleanIp = String(ip || '').trim().toLowerCase();
   if (cleanIp.startsWith('[') && cleanIp.endsWith(']')) {
@@ -842,6 +950,31 @@ async function handleMessageStatusUpdate(userId, providerMessageId, newStatus, t
   if (!providerMessageId) return;
   const occurredAt = timestamp ? new Date(Number(timestamp) * 1000).toISOString() : new Date().toISOString();
 
+  // Sync status to native chat_messages table
+  try {
+    const [res] = await db.execute(
+      'UPDATE chat_messages SET status = ? WHERE wa_message_id = ? AND user_id = ?',
+      [newStatus, providerMessageId, userId]
+    );
+    if (res.affectedRows === 0) {
+      const [qRows] = await db.execute(
+        'SELECT payload FROM message_queue WHERE provider_message_id = ? AND user_id = ? LIMIT 1',
+        [providerMessageId, userId]
+      );
+      if (qRows && qRows[0]?.payload) {
+        const p = typeof qRows[0].payload === 'string' ? JSON.parse(qRows[0].payload) : qRows[0].payload;
+        if (p?.chat_message_id) {
+          await db.execute(
+            'UPDATE chat_messages SET status = ?, wa_message_id = ? WHERE id = ? AND user_id = ?',
+            [newStatus, providerMessageId, p.chat_message_id, userId]
+          );
+        }
+      }
+    }
+  } catch (err) {
+    // Non-fatal
+  }
+
   // 1. Fetch message belonging to this exact tenant
   const [rows] = await db.execute(
     'SELECT id, user_id, recipient, normalized_recipient, status, delivered_at, read_at FROM message_queue WHERE provider_message_id = ? AND user_id = ? LIMIT 1',
@@ -917,11 +1050,11 @@ async function handleMessageStatusUpdate(userId, providerMessageId, newStatus, t
   }
 }
 
-function normalizeInboundMessage(userId, msg, session = {}) {
+function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone = null) {
   const remoteJid = String(msg.key?.remoteJid || '');
   const messageId = String(msg.key?.id || '');
   const isGroup = remoteJid.endsWith('@g.us');
-  const senderNumber = remoteJid.replace(/@.*$/, '');
+  const senderNumber = resolvedSenderPhone || remoteJid.replace(/@.*$/, '');
   const participant = msg.key?.participant || null;
   const senderName = msg.pushName || null;
   const timestamp = Number(msg.messageTimestamp) || Math.floor(Date.now() / 1000);
@@ -1040,10 +1173,175 @@ function normalizeInboundMessage(userId, msg, session = {}) {
         session.lastActivityAt = Date.now();
 
         for (const msg of m.messages) {
-          if (!msg.message || msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue;
+          if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
 
-          // 1. Normalize the incoming message
-          const norm = normalizeInboundMessage(userId, msg, session);
+          // 0. Sync outgoing messages sent from the physical phone app
+          if (msg.key.fromMe) {
+            const recipientPhone = await resolveJidToPhone(userId, msg.key.remoteJid, session);
+            if (recipientPhone && msg.key.id) {
+              try {
+                const normOut = normalizeInboundMessage(userId, msg, session, recipientPhone);
+                const bodyOut = normOut.body || (normOut.messageType !== 'text' ? `[${normOut.messageType}]` : '');
+
+                await db.execute(
+                  `INSERT INTO chat_conversations (user_id, phone, last_message, last_message_at)
+                   VALUES (?, ?, ?, NOW())
+                   ON DUPLICATE KEY UPDATE
+                     last_message = VALUES(last_message),
+                     last_message_at = NOW()`,
+                  [userId, recipientPhone, bodyOut]
+                );
+                const [cRows] = await db.execute(
+                  'SELECT id FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
+                  [userId, recipientPhone]
+                );
+                if (cRows && cRows.length > 0) {
+                  const convId = cRows[0].id;
+                  const [exists] = await db.execute(
+                    'SELECT id FROM chat_messages WHERE conversation_id = ? AND wa_message_id = ? LIMIT 1',
+                    [convId, msg.key.id]
+                  );
+                  if (!exists || exists.length === 0) {
+                    await db.execute(
+                      `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, wa_message_id, status)
+                       VALUES (?, ?, 'agent', ?, ?, ?, ?, 'sent')`,
+                      [userId, convId, session.pushName || 'Agent', normOut.messageType || 'text', bodyOut, msg.key.id]
+                    );
+                  }
+                }
+              } catch (phoneSyncErr) {
+                logger.warn({ phoneSyncErr: phoneSyncErr.message }, 'Failed to record outgoing chat message from phone');
+              }
+            }
+            continue;
+          }
+
+          // 1. Resolve canonical phone number (handling WhatsApp @lid reverse mapping)
+          const senderPhone = await resolveJidToPhone(userId, msg.key.remoteJid, session);
+          const norm = normalizeInboundMessage(userId, msg, session, senderPhone);
+          const senderName = norm.senderName || msg.pushName || null;
+          const messagePreview = norm.body || (norm.messageType !== 'text' ? `[${norm.messageType}]` : '');
+          let isBotPaused = 0;
+          let feedbackHandled = false;
+
+          if (senderPhone) {
+            try {
+              // Check if conversation exists to see if awaiting_feedback is active
+              const [preConvRows] = await db.execute(
+                'SELECT id, status, awaiting_feedback, bot_paused, contact_name FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
+                [userId, senderPhone]
+              );
+              const preConv = preConvRows && preConvRows.length > 0 ? preConvRows[0] : null;
+
+              // Check if contact is responding with 5-star rating feedback
+              if (preConv && Number(preConv.awaiting_feedback) === 1) {
+                const rawBody = (norm.body || '').trim();
+                let parsedRating = null;
+
+                // 1. Star emoji count (⭐ or ★)
+                const starMatches = rawBody.match(/⭐|★/g);
+                if (starMatches && starMatches.length >= 1 && starMatches.length <= 5) {
+                  parsedRating = starMatches.length;
+                }
+
+                // 2. Numeric rating 1-5 (e.g. "5", "5/5", "4 stars", "rating: 5", "5 - good")
+                if (!parsedRating) {
+                  const numMatch = rawBody.match(/(?:^|\b|\s)([1-5])(?:\s*(?:\/5|stars?|★|⭐)?)(?:\b|\s|$)/i);
+                  if (numMatch) {
+                    parsedRating = parseInt(numMatch[1], 10);
+                  }
+                }
+
+                // 3. Word representations
+                if (!parsedRating) {
+                  const wordMatch = rawBody.toLowerCase().match(/\b(one|two|three|four|five)\b/);
+                  if (wordMatch) {
+                    const wordMap = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+                    parsedRating = wordMap[wordMatch[1]];
+                  }
+                }
+
+                if (parsedRating) {
+                  feedbackHandled = true;
+                  const finalContactName = senderName || preConv.contact_name || null;
+                  await db.execute(
+                    `INSERT INTO chat_feedback (user_id, conversation_id, phone, contact_name, rating, message, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                    [userId, preConv.id, senderPhone, finalContactName, parsedRating, rawBody]
+                  );
+
+                  // Update conversation status: feedback recorded
+                  await db.execute(
+                    `UPDATE chat_conversations
+                     SET awaiting_feedback = 0,
+                         last_message = ?,
+                         last_message_at = NOW(),
+                         unread_count = unread_count + 1
+                     WHERE id = ?`,
+                    [`Feedback received: ${parsedRating}/5 ⭐`, preConv.id]
+                  );
+
+                  // Send customer thank-you note via WhatsApp socket
+                  const starsDisplay = '⭐'.repeat(parsedRating);
+                  const thanksText = `Thank you for your rating of ${parsedRating}/5 ${starsDisplay}! 🙏 We appreciate your feedback and look forward to serving you again.`;
+                  try {
+                    await session.socket.sendMessage(msg.key.remoteJid, { text: thanksText });
+                    await db.execute(
+                      `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
+                       VALUES (?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
+                      [userId, preConv.id, thanksText]
+                    );
+                  } catch (replyErr) {
+                    logger.warn({ replyErr: replyErr.message }, 'Failed to dispatch feedback thank-you reply');
+                  }
+                }
+              }
+
+              // Standard conversation upsert (reopens closed conversation on customer message)
+              if (!feedbackHandled) {
+                await db.execute(
+                  `INSERT INTO chat_conversations (user_id, phone, contact_name, last_message, last_message_at, unread_count, status, closed_at, awaiting_feedback)
+                   VALUES (?, ?, ?, ?, NOW(), 1, 'open', NULL, 0)
+                   ON DUPLICATE KEY UPDATE
+                     contact_name = COALESCE(VALUES(contact_name), contact_name),
+                     last_message = VALUES(last_message),
+                     last_message_at = NOW(),
+                     unread_count = unread_count + 1,
+                     status = 'open',
+                     closed_at = NULL,
+                     awaiting_feedback = 0`,
+                  [userId, senderPhone, senderName, messagePreview]
+                );
+              }
+
+              const [convRows] = await db.execute(
+                'SELECT id, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
+                [userId, senderPhone]
+              );
+              if (convRows && convRows.length > 0) {
+                const conversationId = convRows[0].id;
+                isBotPaused = Number(convRows[0].bot_paused || 0);
+
+                const mediaUrl = norm.payload?.media_url || norm.payload?.file_url || null;
+                await db.execute(
+                  `INSERT INTO chat_messages
+                   (user_id, conversation_id, sender_type, sender_name, message_type, body, media_url, wa_message_id, status)
+                   VALUES (?, ?, 'contact', ?, ?, ?, ?, ?, 'delivered')`,
+                  [
+                    userId,
+                    conversationId,
+                    senderName,
+                    norm.messageType || 'text',
+                    norm.body || '',
+                    mediaUrl,
+                    norm.messageId
+                  ]
+                );
+              }
+            } catch (convErr) {
+              logger.warn({ convErr: convErr.message, userId }, 'Failed to record native chat message');
+            }
+          }
 
           // 2. Persist inbound message to database before acknowledging
           try {
@@ -1091,7 +1389,7 @@ function normalizeInboundMessage(userId, msg, session = {}) {
           const OPT_IN_KEYWORDS = ['start', 'unstop', 'subscribe', 'commencer'];
 
           if (OPT_OUT_KEYWORDS.includes(rawText)) {
-            const senderDigits = norm.remoteJid ? norm.remoteJid.split('@')[0].replace(/\D/g, '') : '';
+            const senderDigits = senderPhone;
             if (senderDigits) {
               try {
                 await db.execute(
@@ -1119,7 +1417,7 @@ function normalizeInboundMessage(userId, msg, session = {}) {
           }
 
           if (OPT_IN_KEYWORDS.includes(rawText)) {
-            const senderDigits = norm.remoteJid ? norm.remoteJid.split('@')[0].replace(/\D/g, '') : '';
+            const senderDigits = senderPhone;
             if (senderDigits) {
               try {
                 await db.execute(
@@ -1139,6 +1437,13 @@ function normalizeInboundMessage(userId, msg, session = {}) {
           }
 
           // 6. Chatbot rule processing for text messages with loop protection
+          if (feedbackHandled) {
+            continue; // Do not trigger chatbot auto-replies on feedback submissions
+          }
+          if (isBotPaused === 1) {
+            logger.info({ userId, senderPhone }, 'Skipping chatbot auto-reply: bot is paused by human agent for this conversation');
+            continue;
+          }
           const text = norm.body || '';
           if (!text.trim()) continue;
 
@@ -1501,7 +1806,8 @@ async function sendQueuedMessage(message) {
     }
   }
 
-  const recipient = normalizeRecipient(message.recipient);
+  const targetRecipient = await resolveJidToPhone(message.user_id, message.recipient, session);
+  const recipient = normalizeRecipient(targetRecipient || message.recipient);
   if (!recipient.jid) {
     await markMessageFailed(message, 'Invalid recipient. Use an international number or a 10-digit Indian mobile number.', recipient.normalizedTo);
     return;
@@ -1847,6 +2153,17 @@ async function markMessageSent(message, result, normalizedTo) {
     provider_message_id: result?.key?.id || null
   });
 
+  // Link WhatsApp provider message ID to native chat_messages for live delivery & read receipts
+  try {
+    const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+    if (payload?.chat_message_id && result?.key?.id) {
+      await db.execute(
+        'UPDATE chat_messages SET wa_message_id = ?, status = "sent" WHERE id = ? AND user_id = ?',
+        [result.key.id, payload.chat_message_id, message.user_id]
+      );
+    }
+  } catch (_) {}
+
   // Ephemeral media cleanup with reference lifecycle management
   try {
     const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
@@ -2102,7 +2419,8 @@ app.post('/sessions/:userId/wake', async (req, res) => {
 
 app.post('/sessions/:userId/send', async (req, res) => {
   const session = getSession(req.params.userId);
-  const recipient = normalizeRecipient(req.body.to);
+  const targetRecipient = await resolveJidToPhone(req.params.userId, req.body.to, session);
+  const recipient = normalizeRecipient(targetRecipient || req.body.to);
   const message = String(req.body.message || '').trim();
 
   if (!recipient.jid || !message) {

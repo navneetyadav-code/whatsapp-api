@@ -9,8 +9,9 @@ declare(strict_types=1);
  *
  * Modular Subviews:
  * - overview:  src/pages/dashboard/overview.php
+ * - live-chat: src/pages/dashboard/live-chat.php
  * - message:   src/pages/dashboard/message.php
- * - device:    src/pages/dashboard/device.php (name="auto_sleep_enabled", name="auto_sleep_timeout_seconds", min="15", max="86400", Inbound & Chatbot, anti-ban guarantee, Operational Independence)
+ * - device:    src/pages/dashboard/device.php
  * - queue:     src/pages/dashboard/queue.php
  * - api-keys:  src/pages/dashboard/api-keys.php
  * - contacts:  src/pages/dashboard/contacts.php
@@ -27,11 +28,13 @@ $pdo = Database::pdo();
 // Section registry mapping route keys to data loaders and isolated view partials
 $sections = [
     'dashboard' => ['data' => 'overview.data.php',  'view' => 'overview.php'],
+    'live-chat' => ['data' => 'live-chat.data.php', 'view' => 'live-chat.php'],
     'message'   => ['data' => 'message.data.php',   'view' => 'message.php'],
     'device'    => ['data' => 'device.data.php',    'view' => 'device.php'],
     'queue'     => ['data' => 'queue.data.php',     'view' => 'queue.php'],
     'api-keys'  => ['data' => 'api-keys.data.php',  'view' => 'api-keys.php'],
     'contacts'  => ['data' => 'contacts.data.php',  'view' => 'contacts.php'],
+    'feedback'  => ['data' => 'feedback.data.php',  'view' => 'feedback.php'],
     'campaigns' => ['data' => 'campaigns.data.php', 'view' => 'campaigns.php'],
     'webhooks'  => ['data' => 'webhooks.data.php',  'view' => 'webhooks.php'],
     'audit'     => ['data' => 'audit.data.php',     'view' => 'audit.php'],
@@ -59,7 +62,7 @@ if (!function_exists('page_header')) {
     }
 }
 ?>
-<section class="dashboard" data-session-page="1">
+<section class="dashboard <?= $section === 'live-chat' ? 'h-full flex flex-col min-h-0' : '' ?>" data-session-page="1">
     <?php require __DIR__ . '/dashboard/' . $sections[$section]['view']; ?>
 </section>
 <script src="<?= e(base_url('assets/wa-studio.js')) ?>?v=<?= time() ?>"></script>

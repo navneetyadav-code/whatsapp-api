@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
 }
 
 $publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home', 'api', 'send', 'messages', 'api-contacts', 'contacts-api', 'api-contacts-batch', 'contacts-batch', 'api-contacts-delete', 'contacts-delete'];
-$dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot', 'security'];
+$dashboardPages = ['dashboard', 'live-chat', 'message', 'device', 'api-keys', 'queue', 'contacts', 'feedback', 'webhooks', 'campaigns', 'audit', 'chatbot', 'security'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
