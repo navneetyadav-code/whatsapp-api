@@ -9,6 +9,9 @@ $seoDesc = 'Comprehensive developer integration guide for WhatsGateway. REST API
 $baseEndpoint = public_url('api/send.php');
 $metaEndpoint = public_url('api/messages.php');
 $healthEndpoint = public_url('api/health.php');
+$contactsEndpoint = public_url('api/contacts.php');
+$contactsBatchEndpoint = public_url('api/contacts-batch.php');
+$contactsDeleteEndpoint = public_url('api/contacts-delete.php');
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full scroll-smooth">
@@ -213,6 +216,19 @@ $healthEndpoint = public_url('api/health.php');
 
                 <!-- Category 3 -->
                 <div>
+                    <h5 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono mb-2">Contacts API Suite</h5>
+                    <ul class="space-y-1">
+                        <li><a href="#contacts-api" class="doc-link block px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium flex items-center justify-between"><span>Core Contacts API</span><span class="text-[10px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.5 rounded font-bold">REST</span></a></li>
+                        <li><a href="#contacts-list" class="doc-link block px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium flex items-center justify-between"><span>List & Search</span><span class="text-[10px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.5 rounded font-bold">GET</span></a></li>
+                        <li><a href="#contacts-upsert" class="doc-link block px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium flex items-center justify-between"><span>Upsert Contact</span><span class="text-[10px] bg-emerald-50 text-emerald-700 font-mono px-1.5 py-0.5 rounded font-bold">POST</span></a></li>
+                        <li><a href="#contacts-batch" class="doc-link block px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium flex items-center justify-between"><span>Batch Import</span><span class="text-[10px] bg-purple-50 text-purple-700 font-mono px-1.5 py-0.5 rounded font-bold">BATCH</span></a></li>
+                        <li><a href="#contacts-delete" class="doc-link block px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium flex items-center justify-between"><span>Delete Contact</span><span class="text-[10px] bg-rose-50 text-rose-700 font-mono px-1.5 py-0.5 rounded font-bold">DELETE</span></a></li>
+                        <li><a href="#contacts-privacy-notice" class="doc-link block px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium text-emerald-700 font-semibold">Strict PII Guardrail</a></li>
+                    </ul>
+                </div>
+
+                <!-- Category 4 -->
+                <div>
                     <h5 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono mb-2">Advanced Delivery</h5>
                     <ul class="space-y-1">
                         <li><a href="#anti-ban" class="doc-link block px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium">Anti-Ban & Presence</a></li>
@@ -221,7 +237,7 @@ $healthEndpoint = public_url('api/health.php');
                     </ul>
                 </div>
 
-                <!-- Category 4 -->
+                <!-- Category 5 -->
                 <div>
                     <h5 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono mb-2">Webhooks</h5>
                     <ul class="space-y-1">
@@ -231,7 +247,7 @@ $healthEndpoint = public_url('api/health.php');
                     </ul>
                 </div>
 
-                <!-- Category 5 -->
+                <!-- Category 6 -->
                 <div>
                     <h5 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono mb-2">Code Quickstarts</h5>
                     <ul class="space-y-1">
@@ -244,7 +260,7 @@ $healthEndpoint = public_url('api/health.php');
                     </ul>
                 </div>
 
-                <!-- Category 6 -->
+                <!-- Category 7 -->
                 <div>
                     <h5 class="text-[11px] font-bold uppercase tracking-wider text-slate-400 font-mono mb-2">Reference</h5>
                     <ul class="space-y-1">
@@ -410,7 +426,7 @@ $healthEndpoint = public_url('api/health.php');
                     <span class="px-2.5 py-1 text-xs font-bold text-white bg-slate-900 rounded-md font-mono">POST</span>
                     <span class="font-mono text-sm font-bold text-slate-900">/api/send.php</span>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">Send Message (Clean REST Format)</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">6. Send Message (Clean REST Format)</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-5">
                     Dispatches a text message, document, image, audio, or video file to any international WhatsApp recipient.
                 </p>
@@ -536,7 +552,7 @@ $healthEndpoint = public_url('api/health.php');
                     <span class="px-2.5 py-1 text-xs font-bold text-white bg-blue-600 rounded-md font-mono">POST</span>
                     <span class="font-mono text-sm font-bold text-slate-900">/api/messages.php</span>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">Meta WhatsApp Cloud API (Drop-In Compatibility)</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">7. Meta WhatsApp Cloud API (Drop-In Compatibility)</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-4">
                     If your existing codebase was built for the official Meta WhatsApp Cloud API (Graph API v17+), you can point your HTTP client directly at WhatsGateway without altering your request payload structure.
                 </p>
@@ -647,7 +663,7 @@ $healthEndpoint = public_url('api/health.php');
                     <span class="px-2.5 py-1 text-xs font-bold text-slate-900 bg-slate-100 rounded-md font-mono">GET</span>
                     <span class="font-mono text-sm font-bold text-slate-900">/api/health.php</span>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">Gateway & Worker Health Check</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">10. Gateway & Worker Health Check</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-4">
                     Monitor uptime and connectivity for automated uptime pings (UptimeRobot, Datadog, Prometheus):
                 </p>
@@ -668,9 +684,259 @@ $healthEndpoint = public_url('api/health.php');
                 </div>
             </section>
 
-            <!-- SECTION 11: ANTI-BAN BEST PRACTICES -->
+                                    <!-- SECTION 11: CONTACTS DIRECTORY API SUITE -->
+            <section id="contacts-api" class="doc-section mb-14">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="px-2.5 py-1 text-xs font-bold text-white bg-emerald-700 rounded-md font-mono">MODULAR REST SUITE</span>
+                    <span class="font-mono text-sm font-bold text-slate-900">/api/contacts.php</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">11. Contacts & Audience Directory REST API Suite</h2>
+                <p class="text-sm text-slate-600 leading-relaxed mb-4">
+                    Architected with clean separation of concerns powered by a dedicated backend service layer (<code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono text-xs">ContactService</code>). The suite provides dedicated, isolated endpoints for directory search, single upserts, atomic high-volume batch ingestion, and privacy-hardened deletions.
+                </p>
+
+                <!-- Strict PII Security Guardrail Box -->
+                <div id="contacts-privacy-notice" class="p-5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-xs sm:text-sm text-emerald-950 space-y-2.5 mb-8">
+                    <div class="font-bold text-emerald-900 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-emerald-700 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <span>OWASP & GDPR Enforcement: Active PII Query Parameter Blocking</span>
+                    </div>
+                    <p class="text-xs leading-relaxed text-emerald-900">
+                        In compliance with OWASP API Security and global privacy regulations (GDPR, CCPA), <strong>WhatsGateway actively blocks raw phone numbers from URL query strings</strong> (e.g. <code class="bg-white px-1.5 py-0.5 rounded font-mono text-rose-800">?phone=+1234567890</code>) with an immediate <code class="bg-white px-1 py-0.5 rounded font-mono font-bold text-rose-800">HTTP 400 Bad Request</code>.
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1.5 text-xs text-emerald-900/90">
+                        <li><strong>Prevents Plaintext Access Log Leakage:</strong> Web servers (Apache, Nginx, Caddy), Cloudflare CDN edges, and cloud load balancers record full URL query strings into unencrypted <code class="bg-white px-1 py-0.5 rounded font-mono">access.log</code> files. Blocking phone numbers in queries ensures zero PII leaks into log files.</li>
+                        <li><strong>Standard REST Identifier:</strong> Contacts are queried and deleted using their opaque synthetic integer <code class="bg-white px-1 py-0.5 rounded font-mono">id</code> (<code class="bg-white px-1.5 py-0.5 rounded font-mono text-emerald-800">?id=142</code>).</li>
+                        <li><strong>Encrypted Payload for Phone Operations:</strong> When operating directly on phone numbers, payloads are strictly transmitted inside the <strong>TLS-encrypted JSON request body</strong> via our dedicated deletion endpoint (<code class="bg-white px-1.5 py-0.5 rounded font-mono text-emerald-800">/api/contacts-delete.php</code>).</li>
+                    </ul>
+                </div>
+
+                <!-- SUBSECTION 1: LIST & SEARCH -->
+                <div id="contacts-list" class="mb-10">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="px-2.5 py-1 text-xs font-bold text-white bg-slate-900 rounded-md font-mono">GET</span>
+                        <span class="font-mono text-sm font-bold text-slate-900">/api/contacts.php</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight mb-2">List & Search Directory</h3>
+                    <p class="text-xs text-slate-600 mb-4">Query your contact directory with real-time text matching, opt-in status filtering, and paginated limit/offset boundaries.</p>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white mb-4">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 border-b border-slate-200 text-slate-700 font-mono">
+                                <tr>
+                                    <th class="p-3 font-bold">Parameter</th>
+                                    <th class="p-3 font-bold">Type</th>
+                                    <th class="p-3 font-bold">Default</th>
+                                    <th class="p-3 font-bold">Description</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-600">
+                                <tr>
+                                    <td class="p-3 font-mono font-bold text-slate-900">id</td>
+                                    <td class="p-3 font-mono text-slate-500">integer</td>
+                                    <td class="p-3 font-mono text-slate-400">none</td>
+                                    <td class="p-3">Optional. When provided, returns the single contact matching this synthetic ID.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-mono font-bold text-slate-900">search / q</td>
+                                    <td class="p-3 font-mono text-slate-500">string</td>
+                                    <td class="p-3 font-mono text-slate-400">none</td>
+                                    <td class="p-3">Substring search across name, phone, or notes. Safely escapes SQL wildcards (% and _) to prevent pattern injection. Max 100 chars.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-mono font-bold text-slate-900">opt_in</td>
+                                    <td class="p-3 font-mono text-slate-500">integer</td>
+                                    <td class="p-3 font-mono text-slate-400">all</td>
+                                    <td class="p-3">Filter by consent: <code class="bg-slate-100 px-1 py-0.5 rounded">1</code> for consented opted-in recipients only; <code class="bg-slate-100 px-1 py-0.5 rounded">0</code> for opted-out.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-mono font-bold text-slate-900">limit</td>
+                                    <td class="p-3 font-mono text-slate-500">integer</td>
+                                    <td class="p-3 font-mono text-slate-400">50</td>
+                                    <td class="p-3">Max records returned per page (bounded between 1 and 250).</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-mono font-bold text-slate-900">offset</td>
+                                    <td class="p-3 font-mono text-slate-500">integer</td>
+                                    <td class="p-3 font-mono text-slate-400">0</td>
+                                    <td class="p-3">Pagination record offset.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-700">cURL Request</span>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-get-curl">Copy</button>
+                            </div>
+                            <pre id="contacts-get-curl" class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>curl -X GET "<?= e($contactsEndpoint) ?>?search=Acme&opt_in=1&limit=25" \
+  -H "X-API-Key: YOUR_API_KEY_HERE"</code></pre>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-700">Response (HTTP 200 OK)</span>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-get-res">Copy</button>
+                            </div>
+                            <pre id="contacts-get-res" class="bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>{
+  "ok": true,
+  "total": 1,
+  "opted_in_count": 85,
+  "limit": 25,
+  "offset": 0,
+  "contacts": [
+    {
+      "id": 142,
+      "user_id": 1,
+      "name": "Acme Logistics",
+      "phone": "+919876543210",
+      "normalized_phone": "919876543210",
+      "opt_in": 1,
+      "notes": "VIP Shipping Client",
+      "created_at": "2026-10-27 10:30:00",
+      "updated_at": "2026-10-27 10:30:00"
+    }
+  ]
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBSECTION 2: CREATE / UPSERT SINGLE -->
+                <div id="contacts-upsert" class="mb-10">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 rounded-md font-mono">POST</span>
+                        <span class="font-mono text-sm font-bold text-slate-900">/api/contacts.php</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight mb-2">Create or Upsert Contact</h3>
+                    <p class="text-xs text-slate-600 mb-4">
+                        Add or update a single contact record. If a contact already exists with the same phone number under your tenant account, their details are updated idempotently.
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-700">Request Body (JSON)</span>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-single-curl">Copy</button>
+                            </div>
+                            <pre id="contacts-single-curl" class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>curl -X POST "<?= e($contactsEndpoint) ?>" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -d '{
+    "phone": "+919876543210",
+    "name": "Sarah Connor",
+    "opt_in": true,
+    "notes": "Verified Customer"
+  }'</code></pre>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-700">Response (HTTP 200 OK)</span>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-single-res">Copy</button>
+                            </div>
+                            <pre id="contacts-single-res" class="bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>{
+  "ok": true,
+  "message": "Contact saved successfully.",
+  "contact": {
+    "id": 143,
+    "user_id": 1,
+    "name": "Sarah Connor",
+    "phone": "+919876543210",
+    "normalized_phone": "919876543210",
+    "opt_in": 1,
+    "notes": "Verified Customer"
+  }
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBSECTION 3: DEDICATED BATCH INGESTION -->
+                <div id="contacts-batch" class="mb-10">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="px-2.5 py-1 text-xs font-bold text-white bg-purple-700 rounded-md font-mono">POST</span>
+                        <span class="font-mono text-sm font-bold text-slate-900">/api/contacts-batch.php</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight mb-2">Dedicated High-Density Batch Ingestion</h3>
+                    <p class="text-xs text-slate-600 mb-4">
+                        Ingest up to 500 contact records in a single high-throughput HTTP request. The operation is processed inside an atomic database transaction. If the payload exceeds 500 contacts, it is cleanly rejected with <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">413 Payload Too Large</code> to protect server memory.
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-700">Batch Ingestion Request</span>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-batch-curl">Copy</button>
+                            </div>
+                            <pre id="contacts-batch-curl" class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>curl -X POST "<?= e($contactsBatchEndpoint) ?>" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -d '{
+    "contacts": [
+      { "phone": "+15551234567", "name": "John Doe", "opt_in": true },
+      { "phone": "+447911123456", "name": "Jane Smith", "opt_in": true, "notes": "UK Branch" }
+    ]
+  }'</code></pre>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-bold text-slate-700">Batch Response (HTTP 200 OK)</span>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-batch-res">Copy</button>
+                            </div>
+                            <pre id="contacts-batch-res" class="bg-slate-900 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code>{
+  "ok": true,
+  "message": "Successfully processed 2 contact(s).",
+  "processed": 2,
+  "contacts": [ ... ],
+  "errors": null
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBSECTION 4: CONTACT DELETION -->
+                <div id="contacts-delete" class="mb-4">
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight mb-2">Secure Contact Deletion</h3>
+                    <p class="text-xs text-slate-600 mb-4">
+                        To guarantee zero PII leakage into web server logs, WhatsGateway provides two privacy-hardened deletion options:
+                    </p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white font-mono">DELETE</span>
+                                    <span class="text-xs font-bold text-slate-900">Standard REST by ID</span>
+                                </div>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-del-id">Copy</button>
+                            </div>
+                            <pre id="contacts-del-id" class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code># Delete using synthetic ID (No PII in query):
+curl -X DELETE "<?= e($contactsEndpoint) ?>?id=142" \
+  -H "X-API-Key: YOUR_API_KEY_HERE"</code></pre>
+                            <p class="text-[11px] text-slate-500 mt-1">Recommended for standard REST consumers. Synthetic IDs are non-sensitive integers.</p>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-white font-mono">POST</span>
+                                    <span class="text-xs font-bold text-slate-900">Dedicated by Phone (Body Encrypted)</span>
+                                </div>
+                                <button class="copy-btn text-[11px] font-semibold text-emerald-700 hover:text-emerald-800" data-clipboard="contacts-del-dedicated">Copy</button>
+                            </div>
+                            <pre id="contacts-del-dedicated" class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs overflow-x-auto shadow-inner leading-relaxed"><code># Dedicated Secure Phone Deletion:
+curl -X POST "<?= e($contactsDeleteEndpoint) ?>" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY_HERE" \
+  -d '{"phone": "+919876543210"}'</code></pre>
+                            <p class="text-[11px] text-slate-500 mt-1">Phone number is strictly TLS-encrypted in request body. Never written to web server access logs.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+<!-- SECTION 12: ANTI-BAN BEST PRACTICES -->
             <section id="anti-ban" class="doc-section mb-14">
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">11. Anti-Ban Architecture & Humanize Delays</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">12. Anti-Ban Architecture & Humanize Delays</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-4">
                     WhatsApp monitors sudden high-frequency bursts of unsolicited traffic. WhatsGateway embeds multiple safeguards to keep your linked numbers healthy:
                 </p>
@@ -688,9 +954,9 @@ $healthEndpoint = public_url('api/health.php');
                 </div>
             </section>
 
-            <!-- SECTION 12: WEBHOOKS & HMAC SIGNATURES -->
+            <!-- SECTION 13: WEBHOOKS & HMAC SIGNATURES -->
             <section id="webhooks" class="doc-section mb-14">
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">12. Webhooks & Real-Time Delivery Notifications</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">13. Webhooks & Real-Time Delivery Notifications</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-4">
                     Configure your HTTPS webhook endpoint in the Dashboard under <strong>Webhooks</strong>. Whenever a message transitions states or your phone link updates, WhatsGateway executes an asynchronous HTTP POST callback:
                 </p>
@@ -753,9 +1019,9 @@ def verify_webhook(raw_body_bytes, signature_header, secret_key):
                 </div>
             </section>
 
-            <!-- SECTION 13: GOOGLE CONTACTS & LIMITED USE -->
+            <!-- SECTION 14: GOOGLE CONTACTS & LIMITED USE -->
             <section id="google-contacts" class="doc-section mb-14">
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">13. Google Contacts Integration & Limited Use</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">14. Google Contacts Integration & Limited Use</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-4">
                     WhatsGateway supports one-click address book synchronization powered by Google People API OAuth 2.0 PKCE:
                 </p>
@@ -775,9 +1041,9 @@ def verify_webhook(raw_body_bytes, signature_header, secret_key):
                 </div>
             </section>
 
-            <!-- SECTION 14: CODE QUICKSTARTS -->
+            <!-- SECTION 15: CODE QUICKSTARTS -->
             <section id="quickstart-curl" class="doc-section mb-14">
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">14. Multi-Language Quickstart Code</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-2">15. Multi-Language Quickstart Code</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-6">
                     Production-grade implementations in popular programming languages:
                 </p>
@@ -908,9 +1174,9 @@ func main() {
                 </div>
             </section>
 
-            <!-- SECTION 15: INTERACTIVE CLI TOOL -->
+            <!-- SECTION 16: INTERACTIVE CLI TOOL -->
             <section id="quickstart-cli" class="doc-section mb-14">
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">15. Interactive Terminal CLI Tool</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">16. Interactive Terminal CLI Tool</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-4">
                     Send messages directly from your developer terminal without writing code using our included interactive Python CLI tool:
                 </p>
@@ -922,9 +1188,9 @@ func main() {
                 </div>
             </section>
 
-            <!-- SECTION 16: HTTP ERROR DICTIONARY -->
+            <!-- SECTION 17: HTTP ERROR DICTIONARY -->
             <section id="status-codes" class="doc-section mb-14">
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">16. HTTP Status Codes & Error Dictionary</h2>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mb-3">17. HTTP Status Codes & Error Dictionary</h2>
                 <p class="text-sm text-slate-600 leading-relaxed mb-4">
                     All HTTP error responses return a standardized JSON envelope with both generic and Meta-compatible error structures:
                 </p>
@@ -1013,10 +1279,16 @@ func main() {
                 <li><a href="#media-uploads" class="toc-link hover:text-slate-900 transition-colors block">8. Media Uploads</a></li>
                 <li><a href="#ptt-audio" class="toc-link hover:text-slate-900 transition-colors block">9. Voice Notes (PTT)</a></li>
                 <li><a href="#health-check" class="toc-link hover:text-slate-900 transition-colors block">10. Health Check</a></li>
-                <li><a href="#anti-ban" class="toc-link hover:text-slate-900 transition-colors block">11. Anti-Ban Pacing</a></li>
-                <li><a href="#webhooks" class="toc-link hover:text-slate-900 transition-colors block">12. Webhooks & HMAC</a></li>
-                <li><a href="#google-contacts" class="toc-link hover:text-slate-900 transition-colors block">13. Google Contacts</a></li>
-                <li><a href="#quickstart-curl" class="toc-link hover:text-slate-900 transition-colors block">14. Code Quickstarts</a></li>
+                <li><a href="#contacts-api" class="toc-link hover:text-slate-900 transition-colors block font-semibold text-slate-800">11. Contacts API Suite</a></li>
+                <li><a href="#contacts-list" class="toc-link hover:text-slate-900 transition-colors block pl-2">&mdash; List & Search</a></li>
+                <li><a href="#contacts-upsert" class="toc-link hover:text-slate-900 transition-colors block pl-2">&mdash; Upsert Contact</a></li>
+                <li><a href="#contacts-batch" class="toc-link hover:text-slate-900 transition-colors block pl-2">&mdash; Batch Ingestion</a></li>
+                <li><a href="#contacts-delete" class="toc-link hover:text-slate-900 transition-colors block pl-2">&mdash; Secure Deletion</a></li>
+                <li><a href="#contacts-privacy-notice" class="toc-link hover:text-slate-900 transition-colors block pl-2 text-emerald-700">&mdash; PII Guardrail</a></li>
+                <li><a href="#anti-ban" class="toc-link hover:text-slate-900 transition-colors block">12. Anti-Ban Pacing</a></li>
+                <li><a href="#webhooks" class="toc-link hover:text-slate-900 transition-colors block">13. Webhooks & HMAC</a></li>
+                <li><a href="#google-contacts" class="toc-link hover:text-slate-900 transition-colors block">14. Google Contacts</a></li>
+                <li><a href="#quickstart-curl" class="toc-link hover:text-slate-900 transition-colors block">15. Code Quickstarts</a></li>
                 <li><a href="#status-codes" class="toc-link hover:text-slate-900 transition-colors block">16. Error Dictionary</a></li>
             </ul>
 

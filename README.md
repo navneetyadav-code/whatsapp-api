@@ -503,7 +503,102 @@ All inbound messaging endpoints point to the same handler (`public/api/send.php`
 
 ---
 
-### 10.2 System Health Check Endpoint
+### 10.2 Contacts & Audience Directory REST API Suite
+
+Manage your recipient directory, opt-in compliance, and bulk audience records via a modular, service-isolated architecture (`ContactService`).
+
+> 🛡️ **OWASP & GDPR Privacy Guardrail: Active PII Query String Rejection**  
+> To guarantee that sensitive phone numbers are **never** logged in plaintext web server access logs (Apache/Nginx `access.log`, Cloudflare edge logs, load balancer traces), **the gateway actively blocks raw phone numbers from URL query strings** (e.g., `?phone=+...`) with an immediate `HTTP 400 Bad Request`.  
+> * Use synthetic integer IDs (`?id=142`) for URL-based REST operations.  
+> * For operations targeting phone numbers, transmit payloads inside the **encrypted JSON request body**.
+
+#### 1. Directory Listing & Search: `GET /api/contacts.php`
+- **Method:** `GET`
+- **Authentication:** `X-API-Key: wa_live_...` or `Authorization: Bearer wa_live_...`
+- **Parameters (Query String):**
+  - `id`: (Optional) Retrieve a single contact record by its synthetic ID.
+  - `search` / `q`: Substring search across name, phone, or notes (wildcard-escaped; max 100 chars).
+  - `opt_in`: `1` (consented contacts only) or `0` (opted-out contacts).
+  - `limit`: Integer (1 to 250, default 50).
+  - `offset`: Pagination offset (default 0).
+- **Response Schema (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "total": 1,
+    "opted_in_count": 85,
+    "limit": 50,
+    "offset": 0,
+    "contacts": [
+      {
+        "id": 142,
+        "user_id": 1,
+        "name": "Acme Logistics",
+        "phone": "+919876543210",
+        "normalized_phone": "919876543210",
+        "opt_in": 1,
+        "notes": "VIP Shipping Client",
+        "created_at": "2026-10-27 10:30:00",
+        "updated_at": "2026-10-27 10:30:00"
+      }
+    ]
+  }
+  ```
+
+#### 2. Create or Upsert Contact: `POST /api/contacts.php`
+- **Method:** `POST`
+- **Headers:** `Content-Type: application/json`
+- **Payload:**
+  ```json
+  {
+    "phone": "+919876543210",
+    "name": "Acme Logistics",
+    "opt_in": true,
+    "notes": "Verified partner"
+  }
+  ```
+- **Behavior:** Idempotently updates name, opt-in status, and notes on duplicate phone under tenant account.
+
+#### 3. Dedicated Batch Ingestion: `POST /api/contacts-batch.php`
+- **Method:** `POST`
+- **Headers:** `Content-Type: application/json`
+- **Payload (up to 500 records per transaction):**
+  ```json
+  {
+    "contacts": [
+      { "phone": "+15551234567", "name": "John Doe", "opt_in": true },
+      { "phone": "+447911123456", "name": "Jane Smith", "opt_in": true, "notes": "UK Branch" }
+    ]
+  }
+  ```
+- **Guards:** Wrapped in an atomic database transaction. Batches exceeding 500 records return `413 Payload Too Large`.
+
+#### 4. REST Deletion by ID: `DELETE /api/contacts.php?id={id}`
+- **Method:** `DELETE`
+- **Query Parameter:** `id` (synthetic contact ID, e.g. `?id=142`).
+- **Response (`200 OK`):**
+  ```json
+  {
+    "ok": true,
+    "message": "Contact deleted successfully.",
+    "deleted_count": 1
+  }
+  ```
+
+#### 5. Dedicated Secure Deletion by Phone: `POST /api/contacts-delete.php`
+- **Method:** `POST` (or `DELETE` with JSON body)
+- **Headers:** `Content-Type: application/json`
+- **Payload:**
+  ```json
+  {
+    "phone": "+919876543210"
+  }
+  ```
+- **Security:** Phone number is end-to-end encrypted in the HTTPS request body and never exposed in web server access logs.
+
+---
+
+### 10.3 System Health Check Endpoint
 
 #### `GET /api/health.php`
 - **Method:** `GET`
@@ -542,7 +637,7 @@ All inbound messaging endpoints point to the same handler (`public/api/send.php`
 
 ---
 
-### 10.3 Session Management Endpoints (`public/session.php`)
+### 10.4 Session Management Endpoints (`public/session.php`)
 
 Used by the web dashboard and AJAX clients to control the WhatsApp connection lifecycle. Requires an authenticated user session cookie; POST actions require `csrf_token`.
 
@@ -558,7 +653,7 @@ Used by the web dashboard and AJAX clients to control the WhatsApp connection li
 
 ---
 
-### 10.4 Web Application Routes & Form Actions (`public/index.php`)
+### 10.5 Web Application Routes & Form Actions (`public/index.php`)
 
 All form POST submissions require `csrf_token` validation:
 

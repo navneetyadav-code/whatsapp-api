@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
     redirect_to($cleanTarget);
 }
 
-$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home', 'api', 'send', 'messages', 'api-contacts', 'contacts-api'];
+$publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home', 'api', 'send', 'messages', 'api-contacts', 'contacts-api', 'api-contacts-batch', 'contacts-batch', 'api-contacts-delete', 'contacts-delete'];
 $dashboardPages = ['dashboard', 'message', 'device', 'api-keys', 'queue', 'contacts', 'webhooks', 'campaigns', 'audit', 'chatbot', 'security'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -510,6 +510,16 @@ if ($page === 'api' || $page === 'messages' || $page === 'send') {
 
 if ($page === 'api-contacts' || $page === 'contacts-api') {
     require __DIR__ . '/api/contacts.php';
+    exit;
+}
+
+if ($page === 'api-contacts-batch' || $page === 'contacts-batch') {
+    require __DIR__ . '/api/contacts-batch.php';
+    exit;
+}
+
+if ($page === 'api-contacts-delete' || $page === 'contacts-delete') {
+    require __DIR__ . '/api/contacts-delete.php';
     exit;
 }
 
