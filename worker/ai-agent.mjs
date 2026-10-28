@@ -1,3 +1,4 @@
+import { ChatMemoryEngine } from './chat-memory.mjs';
 /**
  * Enterprise Multi-Provider AI Agent & Zero-Cloud Vector RAG Engine
  * ----------------------------------------------------------------
@@ -248,7 +249,8 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
     contextBlock = `\n\n--- OFFICIAL COMPANY KNOWLEDGE BASE ---\n` +
       retrievedChunks.map((c, i) => `[Source ${i + 1}: ${c.title}]\n${c.content}`).join('\n\n') +
       `\n---------------------------------------\n` +
-      `Instruction: Base your answers strictly on the knowledge base above. If the customer's question is not covered in the knowledge base, politely state that you do not have that information and offer to connect them to a team member. Keep your tone concise, warm, professional, and well-formatted for WhatsApp.`;
+      `Instruction: Base your answers strictly on the knowledge base above. If the customer's question is not covered in the knowledge base, politely state that you do not have that information and offer to connect them to a human team member.
+Language & Tone Instruction: Detect the customer's language and mirror their style naturally. If the customer speaks English, reply in professional English. If the customer speaks Hindi or natural Hinglish (e.g. 'bhai price batao', 'kaam kab tak hoga'), respond in friendly, conversational Hinglish ('Haanji bhai! Assistgroup par...'). Format for WhatsApp using bold (*text*), clean bullet points, and appropriate emojis without walls of text.`;
   }
 
   const fullSystem = (systemPersona || 'You are a helpful customer support assistant on WhatsApp.') + contextBlock;
@@ -261,21 +263,14 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
 /**
  * Call Google Gemini API
  */
-async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500) {
+async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = []) {
   const modelName = model || 'gemini-3.6-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-  const promptText = systemPrompt
-    ? `[System Instructions]\n${systemPrompt}\n\n[Customer Message]\n${userMessage}`
-    : userMessage;
+  const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
   const payload = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: promptText }]
-      }
-    ],
+    contents,
     generationConfig: {
       temperature: Number(temperature) || 0.4,
       maxOutputTokens: Math.max(Number(maxTokens) || 500, 300)
@@ -305,17 +300,16 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 /**
  * Call Groq API (OpenAI compatible)
  */
-async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500) {
+async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = []) {
   const modelName = model || 'openai/gpt-oss-20b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
 
+  const messages = ChatMemoryEngine.buildOpenAiMessages(systemPrompt, conversationHistory, userMessage);
+
   const payload = {
     model: modelName,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage }
-    ],
-    temperature: Number(temperature),
+    messages,
+    temperature: Number(temperature) || 0.4,
     max_tokens: Math.max(Number(maxTokens) || 500, 350)
   };
 
@@ -345,16 +339,15 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
 /**
  * Call OpenRouter API (OpenAI compatible fallback)
  */
-async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500) {
+async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = []) {
   const modelName = model || 'meta-llama/llama-3.3-70b-instruct:free';
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
+  const messages = ChatMemoryEngine.buildOpenAiMessages(systemPrompt, conversationHistory, userMessage);
+
   const payload = {
     model: modelName,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage }
-    ],
+    messages,
     temperature: Number(temperature),
     max_tokens: Number(maxTokens)
   };
@@ -387,7 +380,7 @@ async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperat
 /**
  * Execute Multi-Provider Generation Cascade
  */
-export async function generateAiReply(settings, systemPrompt, customerMessage) {
+export async function generateAiReply(settings, systemPrompt, customerMessage, conversationHistory = []) {
   const priority = settings.provider_priority || 'gemini';
   const providers = [];
 
@@ -409,7 +402,8 @@ export async function generateAiReply(settings, systemPrompt, customerMessage) {
           systemPrompt,
           customerMessage,
           settings.temperature,
-          settings.max_tokens
+          settings.max_tokens,
+          conversationHistory
         );
       }
       if (prov === 'groq' && settings.groq_api_key) {
@@ -419,7 +413,8 @@ export async function generateAiReply(settings, systemPrompt, customerMessage) {
           systemPrompt,
           customerMessage,
           settings.temperature,
-          settings.max_tokens
+          settings.max_tokens,
+          conversationHistory
         );
       }
       if (prov === 'openrouter' && settings.openrouter_api_key) {
@@ -429,7 +424,8 @@ export async function generateAiReply(settings, systemPrompt, customerMessage) {
           systemPrompt,
           customerMessage,
           settings.temperature,
-          settings.max_tokens
+          settings.max_tokens,
+          conversationHistory
         );
       }
     } catch (err) {

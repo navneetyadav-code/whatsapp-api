@@ -19,7 +19,7 @@ $limit = min(200, max(1, (int) ($_GET['limit'] ?? 50)));
 
 // 1. Fetch conversation
 $convStmt = $pdo->prepare(
-    'SELECT id, phone, contact_name, last_message, last_message_at, unread_count, bot_paused, is_pinned, status, closed_at, awaiting_feedback
+    'SELECT id, phone, contact_name, last_message, last_message_at, unread_count, bot_paused, is_pinned, status, closed_at, awaiting_feedback, session_uuid, resolution_remark, is_auto_closed
      FROM chat_conversations
      WHERE user_id = ? AND phone = ?
      LIMIT 1'
@@ -44,7 +44,7 @@ if ((int) $conv['unread_count'] > 0) {
 }
 
 // 3. Fetch chronological messages
-$msgSql = 'SELECT id, conversation_id, sender_type, sender_name, message_type, body, media_url, wa_message_id, status, created_at
+$msgSql = 'SELECT id, conversation_id, sender_type, sender_name, message_type, body, media_url, wa_message_id, status, session_uuid, created_at
            FROM chat_messages
            WHERE conversation_id = ?';
 $params = [$convId];
@@ -73,6 +73,7 @@ foreach ($rows as $row) {
         'body' => (string) ($row['body'] ?? ''),
         'media_url' => $row['media_url'] ? (string) $row['media_url'] : null,
         'status' => (string) $row['status'],
+        'session_uuid' => $row['session_uuid'] ? (string) $row['session_uuid'] : null,
         'created_at' => (string) $row['created_at'],
         'time' => $ts ? date('g:i A', $ts) : '',
     ];
@@ -106,6 +107,9 @@ json_response([
         'status' => (string) ($conv['status'] ?? 'open'),
         'closed_at' => $conv['closed_at'] ? (string) $conv['closed_at'] : null,
         'awaiting_feedback' => (int) ($conv['awaiting_feedback'] ?? 0),
+        'session_uuid' => $conv['session_uuid'] ? (string) $conv['session_uuid'] : null,
+        'resolution_remark' => $conv['resolution_remark'] ? (string) $conv['resolution_remark'] : null,
+        'is_auto_closed' => (int) ($conv['is_auto_closed'] ?? 0),
     ],
     'messages' => $messages,
     'statuses' => $statuses,

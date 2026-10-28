@@ -12,7 +12,7 @@ $search = trim((string) ($_GET['q'] ?? ''));
 $limit = min(200, max(1, (int) ($_GET['limit'] ?? 50)));
 
 $statusFilter = trim((string) ($_GET['status'] ?? ''));
-$sql = 'SELECT id, phone, contact_name, last_message, last_message_at, unread_count, bot_paused, is_pinned, status, closed_at, awaiting_feedback, escalated_at, escalation_reason, created_at, updated_at
+$sql = 'SELECT id, phone, contact_name, last_message, last_message_at, unread_count, bot_paused, is_pinned, status, closed_at, awaiting_feedback, escalated_at, escalation_reason, session_uuid, resolution_remark, is_auto_closed, created_at, updated_at
         FROM chat_conversations
         WHERE user_id = ?';
 $params = [$userId];
@@ -63,6 +63,9 @@ foreach ($rows as $row) {
         'awaiting_feedback' => (int) ($row['awaiting_feedback'] ?? 0),
         'escalated_at' => $row['escalated_at'] ? (string) $row['escalated_at'] : null,
         'escalation_reason' => $row['escalation_reason'] ? (string) $row['escalation_reason'] : null,
+        'session_uuid' => $row['session_uuid'] ? (string) $row['session_uuid'] : null,
+        'resolution_remark' => $row['resolution_remark'] ? (string) $row['resolution_remark'] : null,
+        'is_auto_closed' => (int) ($row['is_auto_closed'] ?? 0),
     ];
 }
 

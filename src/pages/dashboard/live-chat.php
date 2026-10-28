@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * Native WhatsApp Live Chat Studio
  * Integrated WhatsApp Web style console with no outer page scroll, direct two-way messaging,
- * human takeover, hardware WebAudio buzzer, desktop push notifications, and real-time status receipts.
+ * human takeover, hardware WebAudio buzzer, desktop push notifications, session ticket lifecycle, and real-time status receipts.
  */
 ?>
 
@@ -105,6 +105,7 @@ declare(strict_types=1);
                             <h2 id="chatActiveName" class="text-xs font-bold text-slate-900 truncate">Recipient</h2>
                             <span id="chatActiveBotBadge" class="px-1.5 py-0.2 rounded text-[10px] font-bold font-mono"></span>
                             <span id="chatActiveEscalatedBadge" class="hidden px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">🚨 ESCALATED</span>
+                            <span id="chatActiveSessionBadge" class="hidden px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200" title="Active Ticket / Session ID"></span>
                         </div>
                         <p id="chatActivePhone" class="text-[11px] text-slate-400 font-mono font-medium truncate">+91 00000 00000</p>
                     </div>
@@ -141,11 +142,18 @@ declare(strict_types=1);
 
             <!-- Closed Chat Notice Banner (Shown dynamically when conversation is marked closed) -->
             <div id="chatClosedBanner" class="hidden px-4 py-2 bg-amber-50/90 border-b border-amber-200/80 text-amber-900 text-xs flex items-center justify-between shrink-0">
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                    <span><strong>Chat Closed:</strong> Feedback rating requested. Any customer reply will reopen or log to <a href="<?= e(base_url('index.php?page=feedback')) ?>" class="underline font-bold hover:text-amber-950">Feedback</a>.</span>
+                <div class="flex items-center gap-2 min-w-0">
+                    <span id="chatClosedDot" class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                    <span id="chatClosedBannerText" class="truncate"><strong>Chat Closed:</strong> Feedback rating requested. Any customer reply will reopen or log to <a href="<?= e(base_url('index.php?page=feedback')) ?>" class="underline font-bold hover:text-amber-950">Feedback</a>.</span>
                 </div>
                 <button id="btnReopenBanner" type="button" class="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline ml-2 shrink-0">Reopen</button>
+            </div>
+
+            <!-- Auto-Resolution AI Remark Bar (Shown when is_auto_closed = 1) -->
+            <div id="chatResolutionRemarkBar" class="hidden px-4 py-1.5 bg-emerald-50/90 border-b border-emerald-200 text-emerald-900 text-[11px] flex items-center gap-2 shrink-0">
+                <span class="text-xs">💡</span>
+                <span class="font-bold shrink-0">AI Resolution Remark:</span>
+                <span id="chatResolutionRemarkText" class="truncate font-medium text-emerald-800">Issue satisfied and closed.</span>
             </div>
 
             <!-- Messages Stream (Independent Scroll, WhatsApp Style Wallpaper) -->
