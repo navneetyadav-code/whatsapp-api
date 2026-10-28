@@ -18,6 +18,7 @@
     let buzzerInterval = null;
     let isBuzzerMuted = localStorage.getItem('whats_buzzer_muted') === '1';
     let isBuzzerRunning = false;
+    let isAlertSilenced = false;
     let activeEscalations = [];
     let notifiedEscalationPhones = new Set();
     let lastKnownUnreadTotal = -1;
@@ -197,6 +198,7 @@
     // =========================================================================
 
     function startBuzzer(escalationsList = []) {
+        if (isAlertSilenced) return;
         isBuzzerRunning = true;
         if (!buzzerInterval) {
             playBuzzerTone();
@@ -358,20 +360,18 @@
 
     // Acknowledge all active escalations to silence the alarm
     async function acknowledgeAllEscalations() {
+        isAlertSilenced = true;
+        stopBuzzer();
+        activeEscalations = [];
         try {
             const res = await fetch(`${apiBase}/escalations.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ action: 'acknowledge' })
             });
-            const data = await res.json();
-            if (data.ok) {
-                stopBuzzer();
-                activeEscalations = [];
-            }
+            await res.json();
         } catch (err) {
             console.warn('[WhatsAlerts Acknowledge Error]:', err);
-            stopBuzzer();
         }
     }
 
@@ -394,10 +394,15 @@
             const activeEscCount = Number(data.active_escalations_count || 0);
 
             // 1. Check Escalations
-            const escalatedConvs = conversations.filter(c => c.status === 'escalated');
-            if (activeEscCount > 0 || escalatedConvs.length > 0) {
-                startBuzzer(escalatedConvs);
+            // BUZZER TRIGGER: Strictly trigger buzzer loop ONLY when activeEscCount > 0 AND not silenced
+            if (activeEscCount > 0) {
+                if (!isAlertSilenced) {
+                    const escalatedConvs = conversations.filter(c => c.status === 'escalated');
+                    startBuzzer(escalatedConvs);
+                }
             } else {
+                // When there are 0 active escalations, reset silence flag so future escalations will alert
+                isAlertSilenced = false;
                 if (isBuzzerRunning) {
                     stopBuzzer();
                 }
@@ -530,21 +535,30 @@
         playBuzzerTone,
         playMessageChime,
         startBuzzer,
-        stopBuzzer,
+        stopBuzzer: function () {
+            isAlertSilenced = true;
+            stopBuzzer();
+        },
         toggleMute,
         isMuted: () => isBuzzerMuted,
         isRunning: () => isBuzzerRunning,
+        isSilenced: () => isAlertSilenced,
         requestDesktopNotifications,
         fireDesktopNotification,
         acknowledgeAll: acknowledgeAllEscalations,
+        silence: function () {
+            acknowledgeAllEscalations();
+        },
         syncEscalations: function (activeCount, conversations) {
-            if (activeCount > 0) {
+            if (activeCount > 0 && !isAlertSilenced) {
                 const escalated = (conversations || []).filter(c => c.status === 'escalated');
                 startBuzzer(escalated);
-            } else {
+            } else if (activeCount === 0) {
+                isAlertSilenced = false;
                 stopBuzzer();
             }
         }
     };
 
 })(window, document);
+

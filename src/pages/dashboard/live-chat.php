@@ -35,10 +35,6 @@ declare(strict_types=1);
 
             <!-- Action Buttons: Buzzer Toggle + New Chat & Refresh -->
             <div class="flex items-center gap-1 shrink-0">
-                <button id="btnBuzzerControl" type="button" class="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 transition-all active:scale-[0.98]" title="Buzzer & Desktop Push Notifications Control (Click to test sound or toggle mute)">
-                    <span id="buzzerIcon">🔔</span>
-                    <span id="buzzerLabel" class="hidden sm:inline">Buzzer</span>
-                </button>
                 <button id="btnNewChat" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all active:scale-[0.98]" title="Start a new chat with an Indian or international number">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
@@ -113,10 +109,6 @@ declare(strict_types=1);
 
                 <!-- Action Buttons: Toggle Bot & Close Chat -->
                 <div class="flex items-center gap-2 shrink-0">
-                    <button id="btnManualEscalate" type="button" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 transition-all" title="Trigger human escalation alarm for this chat">
-                        <span>🚨</span>
-                        <span class="hidden sm:inline">Escalate</span>
-                    </button>
                     <button id="btnToggleBot" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-[0.98]" title="Pause bot to take over manually, or resume automated replies">
                         <span id="botToggleIcon">🤖</span>
                         <span id="botToggleLabel">Bot Active</span>
@@ -135,8 +127,10 @@ declare(strict_types=1);
                     <span class="truncate"><strong>🚨 Customer Escalation:</strong> <span id="escalationReasonText">Customer requested human support</span>. Automated bot paused.</span>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <button id="btnAcknowledgeEscalation" type="button" class="px-2.5 py-1 bg-white border border-rose-300 text-rose-800 rounded-md text-[11px] font-bold hover:bg-rose-100 transition-colors shadow-2xs">Silence Buzzer</button>
-                    <button id="btnResolveEscalation" type="button" class="px-2.5 py-1 bg-rose-700 text-white rounded-md text-[11px] font-bold hover:bg-rose-800 transition-colors shadow-2xs">Takeover & Resolve</button>
+                    <button id="btnResolveEscalation" type="button" class="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs active:scale-[0.98]">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        <span>Resolve & Take Over</span>
+                    </button>
                 </div>
             </div>
 
@@ -157,37 +151,36 @@ declare(strict_types=1);
             </div>
 
             <!-- Messages Stream (Independent Scroll, WhatsApp Style Wallpaper) -->
-            <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar min-h-0 bg-[#EFEAE2]/30" style="background-image: radial-gradient(#cbd5e1 0.75px, transparent 0.75px); background-size: 16px 16px;">
+            <div id="messagesContainer" class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-1 custom-scrollbar min-h-0 bg-[#efeae2]/40" style="background-image: radial-gradient(rgba(0,0,0,0.035) 1px, transparent 0); background-size: 16px 16px;">
                 <!-- Messages populated dynamically -->
             </div>
 
             <!-- Message Input & Attachment Bar (Fixed at bottom) -->
-            <div class="p-2.5 border-t border-slate-200/80 bg-white shrink-0">
+            <div class="p-2 sm:p-2.5 border-t border-slate-200/80 bg-[#f0f2f5] shrink-0">
                 <form id="chatSendForm" class="flex items-end gap-2" onsubmit="return false;">
                     
                     <!-- File input trigger -->
                     <input type="file" id="chatFileInput" class="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt">
-                    <button type="button" id="btnAttachFile" class="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors shrink-0" title="Attach file or photo">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                    <button type="button" id="btnAttachFile" class="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 rounded-full transition-colors shrink-0" title="Attach file or photo">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                     </button>
 
                     <!-- Message Textarea -->
                     <div class="flex-1 relative min-w-0">
-                        <textarea id="chatMessageInput" rows="1" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" class="w-full resize-none py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-all font-medium max-h-32 custom-scrollbar"></textarea>
+                        <textarea id="chatMessageInput" rows="1" placeholder="Type a message... (Enter to send, Shift+Enter for newline)" class="w-full resize-none py-2 px-3.5 bg-white border border-slate-200/90 rounded-2xl text-[13px] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500/40 focus:border-emerald-500 transition-all font-normal max-h-32 shadow-xs custom-scrollbar"></textarea>
                         
                         <!-- Selected attachment pill -->
-                        <div id="attachmentPreview" class="hidden mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-md text-[11px] font-mono text-slate-700">
+                        <div id="attachmentPreview" class="hidden mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700 shadow-xs">
                             <span id="attachmentFileName" class="truncate max-w-[200px]">file.pdf</span>
                             <button type="button" id="btnRemoveAttachment" class="text-slate-400 hover:text-rose-600">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
                     </div>
 
                     <!-- Send Button -->
-                    <button type="submit" id="btnSendMessage" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] shrink-0">
-                        <span>Send</span>
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    <button type="submit" id="btnSendMessage" class="w-9 h-9 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full flex items-center justify-center transition-all shadow-xs active:scale-95 shrink-0" title="Send message">
+                        <svg class="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                     </button>
                 </form>
             </div>

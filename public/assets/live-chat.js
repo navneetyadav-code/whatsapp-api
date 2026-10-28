@@ -58,7 +58,6 @@
         chatResolutionRemarkText: document.getElementById('chatResolutionRemarkText'),
         chatClosedBannerText: document.getElementById('chatClosedBannerText'),
         chatClosedDot: document.getElementById('chatClosedDot'),
-        btnManualEscalate: document.getElementById('btnManualEscalate'),
         btnToggleBot: document.getElementById('btnToggleBot'),
         botToggleIcon: document.getElementById('botToggleIcon'),
         botToggleLabel: document.getElementById('botToggleLabel'),
@@ -67,7 +66,6 @@
 
         chatEscalationBanner: document.getElementById('chatEscalationBanner'),
         escalationReasonText: document.getElementById('escalationReasonText'),
-        btnAcknowledgeEscalation: document.getElementById('btnAcknowledgeEscalation'),
         btnResolveEscalation: document.getElementById('btnResolveEscalation'),
 
         chatClosedBanner: document.getElementById('chatClosedBanner'),
@@ -194,6 +192,9 @@
 
     function startBuzzerLoop() {
         if (window.WhatsAlerts) {
+            if (window.WhatsAlerts.isSilenced && window.WhatsAlerts.isSilenced()) {
+                return;
+            }
             window.WhatsAlerts.startBuzzer(state.conversations);
             return;
         }
@@ -607,45 +608,39 @@
     async function handleResolveEscalation() {
         if (!state.activePhone) return;
         try {
+            const conv = state.conversations.find(c => c.phone === state.activePhone);
+            const convId = conv ? conv.id : (state.activeConversation ? state.activeConversation.id : 0);
             const res = await fetch(`${API_BASE}/escalations.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ action: 'resolve', phone: state.activePhone })
+                body: JSON.stringify({ action: 'resolve', phone: state.activePhone, conversation_id: convId })
             });
             const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Failed to resolve');
+            if (!data.ok) throw new Error(data.error || 'Failed to resolve escalation');
 
             stopBuzzerLoop();
-            dom.chatEscalationBanner.classList.add('hidden');
-            dom.chatActiveEscalatedBadge.classList.add('hidden');
-            const conv = state.conversations.find(c => c.phone === state.activePhone);
+            if (window.WhatsAlerts) {
+                window.WhatsAlerts.stopBuzzer();
+            }
+
+            if (dom.chatEscalationBanner) dom.chatEscalationBanner.classList.add('hidden');
+            if (dom.chatActiveEscalatedBadge) dom.chatActiveEscalatedBadge.classList.add('hidden');
+
             if (conv) {
                 conv.status = 'open';
                 conv.escalation_reason = null;
+                conv.bot_paused = 1;
             }
+            if (state.activeConversation) {
+                state.activeConversation.status = 'open';
+                state.activeConversation.escalation_reason = null;
+                state.activeConversation.bot_paused = 1;
+            }
+
+            updateBotToggleUi(1);
             fetchConversations(true);
         } catch (err) {
-            alert('Error: ' + err.message);
-        }
-    }
-
-    async function handleManualEscalate() {
-        if (!state.activePhone) return;
-        const reason = prompt('Enter reason for escalating this conversation:', 'Agent requested priority attention');
-        if (reason === null) return;
-
-        try {
-            const res = await fetch(`${API_BASE}/escalations.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ action: 'escalate_manually', phone: state.activePhone, reason: reason || 'manual_agent_escalation' })
-            });
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Failed to escalate');
-
-            fetchConversations(true);
-        } catch (err) {
-            alert('Error: ' + err.message);
+            alert('Error resolving escalation: ' + err.message);
         }
     }
 
@@ -746,39 +741,53 @@
         const isOutbound = msg.sender_type === 'agent' || msg.sender_type === 'bot';
         const isBot = msg.sender_type === 'bot';
         const statusSvg = isOutbound ? getStatusSvg(msg.status) : '';
+        const timeStr = msg.time || msg.formatted_time || '';
 
         let mediaHtml = '';
         if (msg.media_url) {
             if (msg.message_type === 'image') {
-                mediaHtml = `<div class="mb-1.5"><a href="${escapeHtml(msg.media_url)}" target="_blank"><img src="${escapeHtml(msg.media_url)}" alt="Photo" class="rounded-lg max-h-60 max-w-full object-cover"></a></div>`;
+                mediaHtml = `
+                    <div class="mb-1 rounded-lg overflow-hidden max-w-sm">
+                        <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer">
+                            <img src="${escapeHtml(msg.media_url)}" alt="Photo" class="rounded-lg max-h-64 max-w-full object-cover hover:opacity-95 transition-opacity">
+                        </a>
+                    </div>`;
             } else if (msg.message_type === 'video') {
-                mediaHtml = `<div class="mb-1.5"><video controls src="${escapeHtml(msg.media_url)}" class="rounded-lg max-h-60 max-w-full"></video></div>`;
+                mediaHtml = `
+                    <div class="mb-1 rounded-lg overflow-hidden max-w-sm">
+                        <video controls src="${escapeHtml(msg.media_url)}" class="rounded-lg max-h-64 max-w-full bg-black"></video>
+                    </div>`;
             } else if (msg.message_type === 'audio') {
-                mediaHtml = `<div class="mb-1.5"><audio controls src="${escapeHtml(msg.media_url)}" class="h-8 max-w-[260px]"></audio></div>`;
+                mediaHtml = `
+                    <div class="my-1">
+                        <audio controls src="${escapeHtml(msg.media_url)}" class="h-8 max-w-[240px]"></audio>
+                    </div>`;
             } else {
                 const fileName = msg.media_url.split('/').pop() || 'Attachment';
                 mediaHtml = `
-                    <div class="mb-1.5">
-                        <a href="${escapeHtml(msg.media_url)}" target="_blank" class="inline-flex items-center gap-2 p-2 bg-black/5 rounded-lg text-xs font-mono font-medium hover:bg-black/10 transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            <span class="truncate max-w-[180px]">${escapeHtml(fileName)}</span>
+                    <div class="mb-1">
+                        <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 p-2 bg-black/5 hover:bg-black/10 rounded-lg text-xs font-mono font-medium transition-colors">
+                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span class="truncate max-w-[200px] text-slate-800">${escapeHtml(fileName)}</span>
                         </a>
                     </div>`;
             }
         }
 
         const bodyHtml = escapeHtml(msg.body).replace(/\n/g, '<br>');
+        const bubbleBg = isOutbound ? 'bg-[#d9fdd3] text-[#111b21]' : 'bg-white text-[#111b21]';
+        const bubbleCorners = isOutbound ? 'rounded-2xl rounded-tr-xs' : 'rounded-2xl rounded-tl-xs';
 
         return `
-            <div id="msg-${msg.id}" class="flex ${isOutbound ? 'justify-end' : 'justify-start'}">
-                <div class="max-w-[78%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-2xs relative select-text ${isOutbound ? (isBot ? 'bg-[#DCF8C6]/80 text-slate-900 border border-[#b8e49c]' : 'bg-[#DCF8C6] text-slate-900 border border-[#b8e49c]') : 'bg-white text-slate-900 border border-slate-200/70'}">
-                    ${isBot ? '<div class="text-[9px] font-bold text-emerald-800 font-mono uppercase tracking-wider mb-0.5">🤖 AI Assistant</div>' : ''}
+            <div id="msg-${msg.id}" class="flex ${isOutbound ? 'justify-end' : 'justify-start'} my-0.5">
+                <div class="max-w-[85%] sm:max-w-[70%] md:max-w-[62%] ${bubbleCorners} px-3 py-1.5 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] relative select-text ${bubbleBg}">
+                    ${isBot ? '<div class="text-[10px] font-bold text-emerald-800 uppercase tracking-wide mb-1 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>AI Assistant</div>' : ''}
                     ${mediaHtml}
-                    ${bodyHtml ? `<p class="text-xs font-sans leading-relaxed break-words">${bodyHtml}</p>` : ''}
-                    <div class="flex items-center justify-end gap-1 mt-1 select-none">
-                        <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(msg.formatted_time || '')}</span>
+                    ${bodyHtml ? `<span class="text-[13px] leading-[19px] break-words whitespace-pre-wrap">${bodyHtml}</span>` : ''}
+                    <span class="float-right ml-2.5 mt-1 -mb-0.5 inline-flex items-center gap-1 text-[11px] text-slate-400 font-mono select-none">
+                        <span>${escapeHtml(timeStr)}</span>
                         ${statusSvg}
-                    </div>
+                    </span>
                 </div>
             </div>`;
     }
@@ -804,14 +813,13 @@
         // Optimistic UI representation
         const optimisticId = 'opt-' + Date.now();
         const tempBubbleHtml = `
-            <div id="${optimisticId}" class="flex justify-end opacity-70">
-                <div class="max-w-[78%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-2xs relative select-text bg-[#DCF8C6] text-slate-900 border border-[#b8e49c]">
+            <div id="${optimisticId}" class="flex justify-end my-0.5 opacity-80">
+                <div class="max-w-[85%] sm:max-w-[70%] md:max-w-[62%] rounded-2xl rounded-tr-xs px-3 py-1.5 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] relative select-text bg-[#d9fdd3] text-[#111b21]">
                     ${file ? `<div class="mb-1 text-[11px] font-mono text-slate-600">📎 Uploading ${escapeHtml(file.name)}...</div>` : ''}
-                    <p class="text-xs font-sans leading-relaxed break-words">${escapeHtml(text).replace(/\n/g, '<br>')}</p>
-                    <div class="flex items-center justify-end gap-1 mt-1">
-                        <span class="text-[10px] text-slate-400 font-mono">sending...</span>
+                    ${text ? `<span class="text-[13px] leading-[19px] break-words whitespace-pre-wrap">${escapeHtml(text).replace(/\n/g, '<br>')}</span>` : ''}
+                    <span class="float-right ml-2.5 mt-1 -mb-0.5 inline-flex items-center gap-1 text-[11px] text-slate-400 font-mono select-none">
                         <svg class="w-3 h-3 animate-spin text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    </div>
+                    </span>
                 </div>
             </div>`;
         dom.messagesContainer.insertAdjacentHTML('beforeend', tempBubbleHtml);
@@ -944,16 +952,10 @@
     dom.btnToggleBot.addEventListener('click', handleToggleBot);
 
     // Escalation actions
-    if (dom.btnAcknowledgeEscalation) {
-        dom.btnAcknowledgeEscalation.addEventListener('click', handleAcknowledgeEscalation);
-    }
-    if (dom.btnResolveEscalation) {
+        if (dom.btnResolveEscalation) {
         dom.btnResolveEscalation.addEventListener('click', handleResolveEscalation);
     }
-    if (dom.btnManualEscalate) {
-        dom.btnManualEscalate.addEventListener('click', handleManualEscalate);
-    }
-
+    
     // Close / Reopen Chat
     if (dom.btnCloseChat) {
         dom.btnCloseChat.addEventListener('click', () => handleCloseOrReopenChat());
