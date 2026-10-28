@@ -626,11 +626,23 @@ if ($page === 'session-auto-sleep' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     );
     $stmt->execute([$enabled, $timeout, (int) $user['id']]);
 
+    if (!$enabled) {
+        $wakeStmt = Database::pdo()->prepare(
+            'UPDATE whatsapp_sessions
+             SET sleeping = 0, updated_at = NOW()
+             WHERE user_id = ?'
+        );
+        $wakeStmt->execute([(int) $user['id']]);
+    }
+
     try {
         worker_request('POST', "sessions/{$user['id']}/auto-sleep", [
             'auto_sleep_enabled' => (bool) $enabled,
             'auto_sleep_timeout_seconds' => $timeout,
-        ], 2);
+        ], 5);
+        if (!$enabled) {
+            worker_request('POST', "sessions/{$user['id']}/wake", [], 5);
+        }
     } catch (\Throwable $e) {}
 
     flash('success', 'Auto-Sleep settings updated successfully.');

@@ -71,7 +71,9 @@ function renderStatus(data) {
     const session = data.session || {};
     const state = session.state || 'idle';
     const isSleeping = Boolean(session.sleeping);
-    const hasLinkedDevice = state === 'connected' || (isSleeping && Boolean(session.phone || session.pushName));
+    const hasIdentity = Boolean(session.phone || session.pushName);
+    const isReconnecting = hasIdentity && ['connecting', 'disconnected'].includes(state);
+    const hasLinkedDevice = state === 'connected' || (isSleeping && hasIdentity) || isReconnecting;
 
     const statusBadge = document.getElementById('statusBadge');
     const statusIndicator = document.getElementById('statusIndicator');
@@ -98,19 +100,21 @@ function renderStatus(data) {
     const lastErrorText = document.getElementById('lastErrorText');
 
     // Overview Stats Update
-    if (statusText) statusText.textContent = hasLinkedDevice ? (isSleeping ? 'Sleeping' : 'Online') : 'Offline';
+    if (statusText) {
+        statusText.textContent = isReconnecting ? 'Connecting' : (hasLinkedDevice ? (isSleeping ? 'Sleeping' : 'Online') : 'Offline');
+    }
     if (topPhoneText) topPhoneText.textContent = session.phone || 'None';
     if (statusIndicator) {
         const pings = statusIndicator.querySelectorAll('span');
         pings.forEach(p => {
-            p.className = p.className.replace(/bg-\w+-\d+/g, hasLinkedDevice ? (isSleeping ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-500');
+            p.className = p.className.replace(/bg-\w+-\d+/g, hasLinkedDevice ? (isSleeping || isReconnecting ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-500');
         });
     }
 
     // Detail Panel Update
     if (statusBadge) {
         statusBadge.textContent = isSleeping && hasLinkedDevice ? 'sleeping' : state;
-        statusBadge.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex items-center gap-1.5 ' + (hasLinkedDevice ? (isSleeping ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200') : 'bg-slate-100 text-slate-700 border-slate-200');
+        statusBadge.className = 'px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-sm flex items-center gap-1.5 ' + (hasLinkedDevice ? (isSleeping || isReconnecting ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200') : 'bg-slate-100 text-slate-700 border-slate-200');
     }
     
     if (phoneText) phoneText.textContent = session.phone || 'Not connected';
@@ -177,8 +181,8 @@ function renderStatus(data) {
             if (span) {
                 if (session.error) {
                     span.textContent = session.error;
-                } else if (state === 'connecting') {
-                    span.textContent = 'Generating QR code...';
+                } else if (state === 'connecting' || (state === 'qr' && !session.qr)) {
+                    span.textContent = 'Connecting to WhatsApp...';
                 } else if (state === 'qr') {
                     span.textContent = 'Waiting for QR code...';
                 } else {

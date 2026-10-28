@@ -53,6 +53,11 @@
         chatActivePhone: document.getElementById('chatActivePhone'),
         chatActiveBotBadge: document.getElementById('chatActiveBotBadge'),
         chatActiveEscalatedBadge: document.getElementById('chatActiveEscalatedBadge'),
+        chatActiveSessionBadge: document.getElementById('chatActiveSessionBadge'),
+        chatResolutionRemarkBar: document.getElementById('chatResolutionRemarkBar'),
+        chatResolutionRemarkText: document.getElementById('chatResolutionRemarkText'),
+        chatClosedBannerText: document.getElementById('chatClosedBannerText'),
+        chatClosedDot: document.getElementById('chatClosedDot'),
         btnManualEscalate: document.getElementById('btnManualEscalate'),
         btnToggleBot: document.getElementById('btnToggleBot'),
         botToggleIcon: document.getElementById('botToggleIcon'),
@@ -389,10 +394,13 @@
                             <span class="text-[10px] text-slate-400 font-mono shrink-0 ml-1">${escapeHtml(c.time_ago)}</span>
                         </div>
                         <div class="flex items-center justify-between gap-1">
-                            <p class="text-[11px] ${isEscalated ? 'text-rose-700 font-semibold' : 'text-slate-500'} truncate font-medium flex-1">${escapeHtml(c.last_message || 'No messages')}</p>
+                            <div class="flex items-center gap-1 min-w-0 flex-1">
+                                ${c.session_uuid ? `<span class="text-[9px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-1 py-0.2 rounded shrink-0" title="Ticket: ${escapeHtml(c.session_uuid)}">${escapeHtml(c.session_uuid)}</span>` : ''}
+                                <p class="text-[11px] ${isEscalated ? 'text-rose-700 font-semibold' : 'text-slate-500'} truncate font-medium flex-1">${escapeHtml(c.last_message || 'No messages')}</p>
+                            </div>
                             <div class="flex items-center gap-1 shrink-0">
                                 ${isEscalated ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-600 text-white shadow-2xs">🚨 ESCALATED</span>' : ''}
-                                ${isClosed ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Closed</span>' : ''}
+                                ${c.is_auto_closed ? '<span class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="' + escapeHtml(c.resolution_remark || 'Auto-resolved by AI') + '">✨ Auto-Closed</span>' : (isClosed ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Closed</span>' : '')}
                                 ${isBotPaused && !isClosed && !isEscalated ? '<span class="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">⏸️ Takeover</span>' : ''}
                                 ${c.unread_count > 0 ? `<span class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[10px] font-bold font-mono shadow-2xs">${c.unread_count}</span>` : ''}
                             </div>
@@ -452,6 +460,12 @@
         dom.chatActiveName.textContent = displayName;
         dom.chatActivePhone.textContent = formatted;
         dom.chatActiveAvatar.textContent = getInitials(displayName, normalized);
+        if (conv && conv.session_uuid && dom.chatActiveSessionBadge) {
+            dom.chatActiveSessionBadge.textContent = conv.session_uuid;
+            dom.chatActiveSessionBadge.classList.remove('hidden');
+        } else if (dom.chatActiveSessionBadge) {
+            dom.chatActiveSessionBadge.classList.add('hidden');
+        }
         updateBotToggleUi(conv ? conv.bot_paused : 0);
         updateChatClosedUi(conv);
         updateEscalationUi(conv);
@@ -499,9 +513,30 @@
         if (isClosed) {
             dom.chatClosedBanner.classList.remove('hidden');
             dom.btnCloseChat.classList.add('hidden');
+            if (conv && conv.is_auto_closed) {
+                if (dom.chatClosedDot) dom.chatClosedDot.className = 'w-2 h-2 rounded-full bg-emerald-500 shrink-0';
+                if (dom.chatClosedBannerText) {
+                    dom.chatClosedBannerText.innerHTML = '<strong>✨ Auto-Closed by AI:</strong> Customer inquiry satisfied. 5-star rating survey dispatched.';
+                }
+                if (dom.chatResolutionRemarkBar) {
+                    dom.chatResolutionRemarkBar.classList.remove('hidden');
+                    dom.chatResolutionRemarkText.textContent = conv.resolution_remark || 'Customer inquiry satisfied.';
+                }
+            } else {
+                if (dom.chatClosedDot) dom.chatClosedDot.className = 'w-2 h-2 rounded-full bg-amber-500 shrink-0';
+                if (dom.chatClosedBannerText) {
+                    dom.chatClosedBannerText.innerHTML = '<strong>Chat Closed:</strong> Feedback rating requested. Any customer reply will reopen or log to <a href="index.php?page=feedback" class="underline font-bold hover:text-amber-950">Feedback</a>.';
+                }
+                if (dom.chatResolutionRemarkBar) {
+                    dom.chatResolutionRemarkBar.classList.add('hidden');
+                }
+            }
         } else {
             dom.chatClosedBanner.classList.add('hidden');
             dom.btnCloseChat.classList.remove('hidden');
+            if (dom.chatResolutionRemarkBar) {
+                dom.chatResolutionRemarkBar.classList.add('hidden');
+            }
         }
     }
 
@@ -648,6 +683,14 @@
             if (!data.ok) throw new Error(data.error || 'Failed to load messages');
 
             const messages = data.messages || [];
+            if (data.conversation) {
+                state.activeConversation = data.conversation;
+                if (data.conversation.session_uuid && dom.chatActiveSessionBadge) {
+                    dom.chatActiveSessionBadge.textContent = data.conversation.session_uuid;
+                    dom.chatActiveSessionBadge.classList.remove('hidden');
+                }
+                updateChatClosedUi(data.conversation);
+            }
 
             if (!isDelta) {
                 renderAllMessages(messages);

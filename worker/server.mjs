@@ -23,6 +23,12 @@ import {
   buildPromptWithRag,
   generateAiReply
 } from './ai-agent.mjs';
+import { globalDebouncer } from './chat-debouncer.mjs';
+import { globalGreetingCache } from './chat-greeting-cache.mjs';
+import { resolveActiveSession, closeSession } from './chat-session-manager.mjs';
+import { ChatMemoryEngine } from './chat-memory.mjs';
+import { ChatPresenceManager } from './chat-presence.mjs';
+import { ChatResolutionEngine } from './chat-resolution.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv(resolve(__dirname, '..', '.env'));
@@ -738,6 +744,26 @@ function destroySocket(session) {
 
 async function startSession(userId, force = false, waitForReady = true) {
   const session = getSession(userId);
+
+  try {
+    const [prefRows] = await db.execute(
+      'SELECT auto_sleep_enabled, auto_sleep_timeout_seconds, phone, push_name FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
+      [userId]
+    );
+    if (prefRows && prefRows[0]) {
+      if (prefRows[0].auto_sleep_enabled !== undefined && prefRows[0].auto_sleep_enabled !== null) {
+        session.autoSleepEnabled = Number(prefRows[0].auto_sleep_enabled) === 1;
+      }
+      if (prefRows[0].auto_sleep_timeout_seconds) {
+        session.autoSleepTimeoutSeconds = Math.max(15, Math.min(86400, Number(prefRows[0].auto_sleep_timeout_seconds) || 60));
+      }
+      if (!session.phone && prefRows[0].phone) session.phone = prefRows[0].phone;
+      if (!session.pushName && prefRows[0].push_name) session.pushName = prefRows[0].push_name;
+    }
+  } catch (err) {
+    logger.warn({ err: err.message, userId }, 'Could not read auto_sleep settings from database in startSession');
+  }
+
   if (!force && ((session.state === 'connected' && session.sock) || session.starting)) {
     if (waitForReady && session.starting) {
       await session.starting;
@@ -1303,40 +1329,34 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                 }
               }
 
-              // Standard conversation upsert (reopens closed conversation on customer message, preserves escalated)
+              // Standard conversation session resolution (unique ticket lifecycles)
+              let conversationId = null;
+              let currentSessionUuid = null;
+
               if (!feedbackHandled) {
-                await db.execute(
-                  `INSERT INTO chat_conversations (user_id, phone, contact_name, last_message, last_message_at, unread_count, status, closed_at, awaiting_feedback, consecutive_bot_replies)
-                   VALUES (?, ?, ?, ?, NOW(), 1, 'open', NULL, 0, 0)
-                   ON DUPLICATE KEY UPDATE
-                     contact_name = COALESCE(VALUES(contact_name), contact_name),
-                     last_message = VALUES(last_message),
-                     last_message_at = NOW(),
-                     unread_count = unread_count + 1,
-                     status = IF(status = 'escalated', 'escalated', 'open'),
-                     closed_at = NULL,
-                     awaiting_feedback = 0,
-                     consecutive_bot_replies = 0`,
-                  [userId, senderPhone, senderName, messagePreview]
-                );
+                const sessionInfo = await resolveActiveSession(db, userId, senderPhone, senderName, messagePreview);
+                conversationId = sessionInfo.conversationId;
+                currentSessionUuid = sessionInfo.sessionUuid;
+                isBotPaused = sessionInfo.botPaused ? 1 : 0;
+              } else {
+                const [cRows] = await db.execute('SELECT id, session_uuid, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1', [userId, senderPhone]);
+                if (cRows && cRows.length > 0) {
+                  conversationId = cRows[0].id;
+                  currentSessionUuid = cRows[0].session_uuid;
+                  isBotPaused = Number(cRows[0].bot_paused || 0);
+                }
               }
 
-              const [convRows] = await db.execute(
-                'SELECT id, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
-                [userId, senderPhone]
-              );
-              if (convRows && convRows.length > 0) {
-                const conversationId = convRows[0].id;
-                isBotPaused = Number(convRows[0].bot_paused || 0);
-
+              if (conversationId) {
                 const mediaUrl = norm.payload?.media_url || norm.payload?.file_url || null;
                 await db.execute(
                   `INSERT INTO chat_messages
-                   (user_id, conversation_id, sender_type, sender_name, message_type, body, media_url, wa_message_id, status)
-                   VALUES (?, ?, 'contact', ?, ?, ?, ?, ?, 'delivered')`,
+                   (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, media_url, wa_message_id, status)
+                   VALUES (?, ?, ?, 'contact', ?, ?, ?, ?, ?, 'delivered')`,
                   [
                     userId,
                     conversationId,
+                    currentSessionUuid,
                     senderName,
                     norm.messageType || 'text',
                     norm.body || '',
@@ -1493,11 +1513,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             continue;
           }
 
-          // 7. Enterprise AI Agent & Zero-Cloud RAG processing
+          // 7. Enterprise AI Agent with Debouncer, Memory, Typing Presence, & Auto-Resolution
           let aiHandled = false;
           if (!feedbackHandled && isBotPaused !== 1) {
-            const text = (norm.body || '').trim();
-            if (text) {
+            const rawInboundText = (norm.body || '').trim();
+            if (rawInboundText) {
               try {
                 const [aiSettingsRows] = await db.execute(
                   'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
@@ -1507,44 +1527,109 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                 if (aiSettings && (aiSettings.gemini_api_key || aiSettings.groq_api_key || aiSettings.openrouter_api_key)) {
                   const [convCheck] = await db.execute(
-                    'SELECT id, consecutive_bot_replies, status, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
+                    'SELECT id, session_uuid, consecutive_bot_replies, status, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
                     [userId, senderPhone]
                   );
                   if (convCheck && convCheck.length > 0) {
                     const conv = convCheck[0];
-                    if (conv.status !== 'escalated' && conv.bot_paused !== 1 && Number(conv.consecutive_bot_replies || 0) < 6) {
-                      const relevantChunks = await retrieveRelevantKnowledge(db, userId, text, 3, 0.15);
-                      const { systemPrompt, userMessage } = buildPromptWithRag(
-                        aiSettings.system_prompt,
-                        relevantChunks,
-                        text
-                      );
+                    if (conv.status !== 'escalated' && conv.bot_paused !== 1 && Number(conv.consecutive_bot_replies || 0) < 8) {
+                      
+                      // Step A: Dispatch to 2.5s sliding debouncer to consolidate rapid fragmented messages
+                      globalDebouncer.enqueue(userId, msg.key.remoteJid, {
+                        text: rawInboundText,
+                        norm,
+                        msg,
+                        convId: conv.id,
+                        sessionUuid: conv.session_uuid
+                      }, async ({ consolidatedText, primaryItem }) => {
+                        try {
+                          // Double-check conversation status on flush
+                          const [freshConv] = await db.execute(
+                            'SELECT id, session_uuid, status, bot_paused FROM chat_conversations WHERE id = ? LIMIT 1',
+                            [conv.id]
+                          );
+                          if (!freshConv || freshConv.length === 0 || freshConv[0].status === 'escalated' || freshConv[0].bot_paused === 1) {
+                            return;
+                          }
 
-                      const replyText = await generateAiReply(aiSettings, systemPrompt, userMessage);
-                      if (replyText && replyText.trim()) {
-                        const [guard] = await db.execute(
-                          'SELECT status, bot_paused FROM chat_conversations WHERE id = ? LIMIT 1',
-                          [conv.id]
-                        );
-                        if (guard && guard.length > 0 && guard[0].status !== 'escalated' && guard[0].bot_paused !== 1) {
-                          await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
-                          await db.execute(
-                            `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
-                             VALUES (?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                            [userId, conv.id, replyText.trim()]
-                          );
-                          await db.execute(
-                            `UPDATE chat_conversations
-                             SET last_message = ?,
-                                 last_message_at = NOW(),
-                                 consecutive_bot_replies = consecutive_bot_replies + 1
-                             WHERE id = ?`,
-                            [replyText.trim().slice(0, 200), conv.id]
-                          );
-                          aiHandled = true;
-                          logger.info({ userId, convId: conv.id }, 'Dispatched contextual AI Agent reply');
+                          const activeSessionUuid = freshConv[0].session_uuid;
+
+                          // Step B: Retrieve recent multi-turn conversation memory
+                          const historyTurns = await ChatMemoryEngine.getRecentTurns(db, conv.id, activeSessionUuid, 8);
+
+                          // Step C: Check for query resolution / customer satisfaction
+                          const resolutionCheck = ChatResolutionEngine.detectResolution(consolidatedText, historyTurns);
+                          if (resolutionCheck.isResolved) {
+                            logger.info({ userId, convId: conv.id, remark: resolutionCheck.remark }, '🎉 Inquiry resolved! Auto-closing session.');
+                            await closeSession(db, conv.id, resolutionCheck.remark, true);
+
+                            const closureMsg = ChatResolutionEngine.getClosureMessage();
+                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
+                            await db.execute(
+                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                               VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
+                              [userId, conv.id, activeSessionUuid, closureMsg]
+                            );
+                            await db.execute(
+                              `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?`,
+                              [closureMsg.slice(0, 200), conv.id]
+                            );
+                            return;
+                          }
+
+                          // Step D: Token Burn Optimizer - Intercept repeated greetings
+                          const greetingCheck = globalGreetingCache.evaluate(userId, senderPhone, consolidatedText, activeSessionUuid);
+                          if (greetingCheck.shouldIntercept && greetingCheck.replyText) {
+                            logger.info({ userId, senderPhone }, '⚡ Intercepted repeated greeting locally - saved LLM tokens!');
+                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: greetingCheck.replyText });
+                            await db.execute(
+                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
+                              [userId, conv.id, activeSessionUuid, greetingCheck.replyText]
+                            );
+                            return;
+                          }
+
+                          // Step E: Trigger WhatsApp 'typing...' indicator
+                          const stopTyping = await ChatPresenceManager.startTyping(session.sock || sock, msg.key.remoteJid);
+
+                          let replyText = null;
+                          try {
+                            const relevantChunks = await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
+                            const { systemPrompt, userMessage } = buildPromptWithRag(
+                              aiSettings.system_prompt,
+                              relevantChunks,
+                              consolidatedText
+                            );
+
+                            replyText = await generateAiReply(aiSettings, systemPrompt, userMessage, historyTurns);
+                          } finally {
+                            await stopTyping();
+                          }
+
+                          if (replyText && replyText.trim()) {
+                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
+                            await db.execute(
+                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
+                              [userId, conv.id, activeSessionUuid, replyText.trim()]
+                            );
+                            await db.execute(
+                              `UPDATE chat_conversations
+                               SET last_message = ?,
+                                   last_message_at = NOW(),
+                                   consecutive_bot_replies = consecutive_bot_replies + 1
+                               WHERE id = ?`,
+                              [replyText.trim().slice(0, 200), conv.id]
+                            );
+                            logger.info({ userId, convId: conv.id }, 'Dispatched multi-turn AI reply');
+                          }
+                        } catch (debouncedErr) {
+                          logger.error({ debouncedErr: debouncedErr.message, userId }, 'Error executing debounced AI reply');
                         }
-                      }
+                      });
+
+                      aiHandled = true;
                     }
                   }
                 }
@@ -1836,7 +1921,7 @@ async function sendQueuedMessage(message) {
   if (supportsSleepingColumn) {
     try {
       const [sessionRows] = await db.execute(
-        'SELECT sleeping FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
+        'SELECT sleeping, auto_sleep_enabled, auto_sleep_timeout_seconds FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
         [message.user_id]
       );
       if (sessionRows[0]) {
@@ -2363,6 +2448,26 @@ async function processQueueOnce() {
         const lastActivity = session.lastActivityAt || now;
 
         if (now - lastActivity >= timeoutMs) {
+          // Verify with database that auto-sleep is still enabled before sleeping
+          try {
+            const [dbRows] = await db.execute(
+              'SELECT auto_sleep_enabled, auto_sleep_timeout_seconds FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
+              [session.userId]
+            );
+            if (dbRows && dbRows[0]) {
+              if (dbRows[0].auto_sleep_enabled !== undefined && dbRows[0].auto_sleep_enabled !== null) {
+                session.autoSleepEnabled = Number(dbRows[0].auto_sleep_enabled) === 1;
+              }
+              if (dbRows[0].auto_sleep_timeout_seconds) {
+                session.autoSleepTimeoutSeconds = Math.max(15, Math.min(86400, Number(dbRows[0].auto_sleep_timeout_seconds) || 60));
+              }
+            }
+          } catch (_) {}
+
+          if (!session.autoSleepEnabled) {
+            continue; // Auto-sleep disabled by tenant in database
+          }
+
           // Verify no active messages queued or processing for this tenant
           const [activeQueue] = await db.execute(
             `SELECT id FROM message_queue WHERE user_id = ? AND status IN ('queued', 'processing') AND available_at <= NOW() LIMIT 1`,
@@ -2499,6 +2604,18 @@ app.post('/sessions/:userId/auto-sleep', async (req, res) => {
       [Number(enabled), timeoutSeconds, userId]
     );
   } catch (_) {}
+
+  if (!enabled && session.sleeping) {
+    session.sleeping = false;
+    session.wasSleeping = false;
+    session.lastActivityAt = Date.now();
+    try {
+      await updateSessionRecord(userId, session);
+      startSession(userId, false, false).catch((err) => {
+        logger.warn({ err: err.message, userId }, 'Could not automatically wake session after disabling auto-sleep');
+      });
+    } catch (_) {}
+  }
 
   res.json({
     ok: true,
@@ -2640,6 +2757,28 @@ async function startWorker() {
     await db.end();
     process.exitCode = 1;
     return;
+  }
+
+  try {
+    const [rows] = await db.execute(
+      'SELECT user_id, status, phone, push_name, sleeping, auto_sleep_enabled, auto_sleep_timeout_seconds FROM whatsapp_sessions'
+    );
+    for (const row of rows) {
+      const uid = String(row.user_id);
+      const s = getSession(uid);
+      s.phone = row.phone || null;
+      s.pushName = row.push_name || null;
+      s.state = row.status || 'idle';
+      s.sleeping = Number(row.sleeping) === 1;
+      if (row.auto_sleep_enabled !== undefined && row.auto_sleep_enabled !== null) {
+        s.autoSleepEnabled = Number(row.auto_sleep_enabled) === 1;
+      }
+      if (row.auto_sleep_timeout_seconds) {
+        s.autoSleepTimeoutSeconds = Math.max(15, Math.min(86400, Number(row.auto_sleep_timeout_seconds) || 60));
+      }
+    }
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Failed to pre-load sessions from database on worker startup');
   }
 
   const server = app.listen(PORT, '127.0.0.1', () => {
