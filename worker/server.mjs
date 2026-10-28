@@ -1471,7 +1471,9 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                 logger.error({ err: err.message, userId }, 'Failed to record inbound opt-in');
               }
             }
-            continue;
+            if (!isWakeupTrigger(rawText)) {
+              continue;
+            }
           }
 
           // 6. Escalation & Frustration check
@@ -1526,33 +1528,42 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
           // 7. Enterprise AI Agent with Debouncer, Memory, Typing Presence, & Auto-Resolution
           let aiHandled = false;
+          const rawInboundText = (norm.body || '').trim();
+
+          // Intercept wake-up trigger (/start or start): ALWAYS resets bot_paused and sends branded greeting
+          if (rawInboundText && isWakeupTrigger(rawInboundText)) {
+            logger.info({ userId, senderPhone }, '⚡ Wake-up command received (/start or start) - unpausing bot and sending greeting');
+            await db.execute(
+              'UPDATE chat_conversations SET bot_paused = 0, status = "open", escalation_reason = NULL, awaiting_feedback = 0 WHERE user_id = ? AND phone = ?',
+              [userId, senderPhone]
+            );
+            isBotPaused = 0;
+            convStatus = 'open';
+
+            const welcomeText = `Hello! 👋 Welcome to *Aadi Shree Classes*.\n\n` +
+              `I am your virtual counselor, ready to assist you with our courses, fee structure, batch timings, admissions, and scholarships.\n\n` +
+              `How can I help you today? 📚✨`;
+            try {
+              await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
+              await db.execute(
+                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
+                [userId, conversationId, currentSessionUuid, welcomeText]
+              );
+              await db.execute(
+                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
+                [welcomeText.slice(0, 200), conversationId]
+              );
+              aiHandled = true;
+            } catch (sendErr) {
+              logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch start welcome greeting');
+            }
+            continue;
+          }
+
           if (!feedbackHandled && isBotPaused !== 1 && convStatus === 'open') {
-            const rawInboundText = (norm.body || '').trim();
             if (rawInboundText) {
               try {
-                // Intercept wake-up trigger (/start or start)
-                if (isWakeupTrigger(rawInboundText)) {
-                  logger.info({ userId, senderPhone }, '⚡ Wake-up command received (/start) - sending branded greeting');
-                  const welcomeText = `Hello! 👋 Welcome to *Aadi Shree Classes*.\n\n` +
-                    `I am your virtual counselor, ready to assist you with our courses, fee structure, batch timings, admissions, and scholarships.\n\n` +
-                    `How can I help you today? 📚✨`;
-                  try {
-                    await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
-                    await db.execute(
-                      `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                       VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                      [userId, conversationId, currentSessionUuid, welcomeText]
-                    );
-                    await db.execute(
-                      `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
-                      [welcomeText.slice(0, 200), conversationId]
-                    );
-                    aiHandled = true;
-                  } catch (sendErr) {
-                    logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch start welcome greeting');
-                  }
-                  continue;
-                }
 
                 const [aiSettingsRows] = await db.execute(
                   'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',

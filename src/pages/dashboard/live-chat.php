@@ -57,12 +57,20 @@ declare(strict_types=1);
                 </button>
             </div>
 
-            <!-- Filter Tabs -->
-            <div class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 overflow-x-auto">
-                <button type="button" data-filter="all" class="chat-filter-btn px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0">All</button>
-                <button type="button" data-filter="escalated" class="chat-filter-btn px-2 py-0.5 rounded-md hover:bg-rose-100 text-rose-700 transition-all font-bold shrink-0">🚨 Escalated <span id="escalatedFilterBadge" class="ml-0.5 text-[9px] font-mono"></span></button>
-                <button type="button" data-filter="unread" class="chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all shrink-0">Unread <span id="unreadFilterBadge" class="ml-0.5 text-[9px] font-mono <?= $totalChatUnread > 0 ? 'text-emerald-700 font-bold' : '' ?>"><?= $totalChatUnread > 0 ? "({$totalChatUnread})" : '' ?></span></button>
-                <button type="button" data-filter="closed" class="chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all shrink-0">Closed</button>
+            <!-- Filter Tabs (Prioritized: Unread/Human, Bot, Closed - No 'All' clutter) -->
+            <div class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 overflow-x-auto select-none">
+                <button type="button" data-filter="unread" class="chat-filter-btn px-2.5 py-1 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0 flex items-center gap-1" title="Chats requiring human attention (Escalated, Human Takeover, or Unread)">
+                    <span>Unread</span>
+                    <span id="unreadFilterBadge" class="hidden text-[9px] font-mono px-1.5 py-0.2 rounded-full font-bold"></span>
+                </button>
+                <button type="button" data-filter="bot" class="chat-filter-btn px-2.5 py-1 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all font-semibold shrink-0 flex items-center gap-1" title="Conversations where the bot is actively chatting or solving queries">
+                    <span>🤖 Bot</span>
+                    <span id="botFilterBadge" class="text-[9px] font-mono text-slate-400 font-medium"></span>
+                </button>
+                <button type="button" data-filter="closed" class="chat-filter-btn px-2.5 py-1 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all font-semibold shrink-0 flex items-center gap-1" title="All closed and resolved conversations">
+                    <span>Closed</span>
+                    <span id="closedFilterBadge" class="text-[9px] font-mono text-slate-400 font-medium"></span>
+                </button>
             </div>
         </div>
 

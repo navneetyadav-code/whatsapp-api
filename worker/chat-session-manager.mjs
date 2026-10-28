@@ -145,9 +145,10 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
          last_message = ?,
          last_message_at = NOW(),
          unread_count = unread_count + 1,
+         bot_paused = IF(? = 1, 0, bot_paused),
          consecutive_bot_replies = 0
      WHERE id = ?`,
-    [sessionUuid, senderName, messagePreview.slice(0, 200), conv.id]
+    [sessionUuid, senderName, messagePreview.slice(0, 200), isWakeup ? 1 : 0, conv.id]
   );
 
   return {
@@ -155,7 +156,7 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
     sessionUuid,
     isNewSession: false,
     status: conv.status,
-    botPaused: Boolean(Number(conv.bot_paused)),
+    botPaused: isWakeup ? false : Boolean(Number(conv.bot_paused)),
     wokeUp: isWakeup
   };
 }

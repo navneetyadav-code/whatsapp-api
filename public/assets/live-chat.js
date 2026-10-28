@@ -17,7 +17,7 @@
         activeConversation: null,
         lastMessageId: 0,
         conversations: [],
-        currentFilter: 'all',
+        currentFilter: 'unread',
         searchQuery: '',
         isSending: false,
         selectedFile: null,
@@ -38,7 +38,8 @@
         chatSearchInput: document.getElementById('chatSearchInput'),
         chatSearchClear: document.getElementById('chatSearchClear'),
         unreadFilterBadge: document.getElementById('unreadFilterBadge'),
-        escalatedFilterBadge: document.getElementById('escalatedFilterBadge'),
+        botFilterBadge: document.getElementById('botFilterBadge'),
+        closedFilterBadge: document.getElementById('closedFilterBadge'),
         btnRefreshConversations: document.getElementById('btnRefreshConversations'),
         filterBtns: document.querySelectorAll('.chat-filter-btn'),
 
@@ -305,9 +306,6 @@
             // Manage Buzzer Alarm & Desktop Notification Triggers
             if (state.activeEscalationsCount > 0) {
                 startBuzzerLoop();
-                if (dom.escalatedFilterBadge) {
-                    dom.escalatedFilterBadge.textContent = `(${state.activeEscalationsCount})`;
-                }
 
                 // Check for newly escalated conversations to notify
                 for (const c of state.conversations) {
@@ -324,13 +322,10 @@
                 }
             } else {
                 stopBuzzerLoop();
-                if (dom.escalatedFilterBadge) {
-                    dom.escalatedFilterBadge.textContent = '';
-                }
             }
 
+            updateTabBadges();
             renderConversations();
-            updateUnreadBadge();
 
             // Refresh active chat UI in case status changed (e.g. escalated)
             if (state.activePhone) {
@@ -357,21 +352,42 @@
         let items = state.conversations;
 
         if (state.currentFilter === 'unread') {
-            items = items.filter(c => c.unread_count > 0);
+            // Flagged Human: Escalated, Human Takeover, or Has Unread Messages (and not closed)
+            items = items.filter(c => c.status !== 'closed' && (c.status === 'escalated' || c.bot_paused === 1 || Number(c.unread_count || 0) > 0));
+        } else if (state.currentFilter === 'bot') {
+            // Bot: Bot is actively chatting or trying to solve query (open and bot_paused = 0)
+            items = items.filter(c => c.status === 'open' && c.bot_paused === 0 && c.status !== 'escalated');
         } else if (state.currentFilter === 'closed') {
+            // All closed chats
             items = items.filter(c => c.status === 'closed');
-        } else if (state.currentFilter === 'escalated') {
-            items = items.filter(c => c.status === 'escalated');
         }
 
         if (items.length === 0) {
+            let emptyTitle = 'No conversations';
+            let emptySubtitle = 'Inbound messages or new chats will appear here.';
+            let emptyIcon = '<svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>';
+
+            if (state.currentFilter === 'unread') {
+                emptyTitle = 'All caught up!';
+                emptySubtitle = 'No pending unread or human-flagged conversations.';
+                emptyIcon = '<span class="text-xl">✅</span>';
+            } else if (state.currentFilter === 'bot') {
+                emptyTitle = 'No active bot chats';
+                emptySubtitle = 'Chats handled autonomously by the AI bot will appear here.';
+                emptyIcon = '<span class="text-xl">🤖</span>';
+            } else if (state.currentFilter === 'closed') {
+                emptyTitle = 'No closed chats';
+                emptySubtitle = 'Resolved and completed conversations will be stored here.';
+                emptyIcon = '<span class="text-xl">📁</span>';
+            }
+
             dom.conversationsContainer.innerHTML = `
                 <div class="p-8 text-center text-slate-400 select-none">
-                    <div class="w-10 h-10 rounded-full bg-slate-100 mx-auto mb-2 flex items-center justify-center text-slate-300">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    <div class="w-10 h-10 rounded-full bg-slate-100 mx-auto mb-2 flex items-center justify-center">
+                        ${emptyIcon}
                     </div>
-                    <p class="text-xs font-semibold text-slate-500 mb-0.5">No conversations</p>
-                    <p class="text-[11px] text-slate-400">Inbound messages or new chats will appear here.</p>
+                    <p class="text-xs font-semibold text-slate-600 mb-0.5">${emptyTitle}</p>
+                    <p class="text-[11px] text-slate-400">${emptySubtitle}</p>
                 </div>`;
             return;
         }
@@ -429,11 +445,32 @@
         });
     }
 
-    function updateUnreadBadge() {
-        const total = state.conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
+    function updateTabBadges() {
+        const humanItems = state.conversations.filter(c => c.status !== 'closed' && (c.status === 'escalated' || c.bot_paused === 1 || Number(c.unread_count || 0) > 0));
+        const botItems = state.conversations.filter(c => c.status === 'open' && c.bot_paused === 0 && c.status !== 'escalated');
+        const closedItems = state.conversations.filter(c => c.status === 'closed');
+
+        const unreadCount = humanItems.length;
+        const hasEscalations = humanItems.some(c => c.status === 'escalated');
+
         if (dom.unreadFilterBadge) {
-            dom.unreadFilterBadge.textContent = total > 0 ? `(${total})` : '';
-            dom.unreadFilterBadge.className = total > 0 ? 'ml-0.5 text-[9px] font-mono text-emerald-700 font-bold' : 'ml-0.5 text-[9px] font-mono text-slate-400';
+            if (unreadCount > 0) {
+                dom.unreadFilterBadge.textContent = hasEscalations ? `🚨 ${unreadCount}` : String(unreadCount);
+                dom.unreadFilterBadge.className = hasEscalations
+                    ? 'text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-bold animate-pulse'
+                    : 'text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-600 text-white font-bold';
+                dom.unreadFilterBadge.classList.remove('hidden');
+            } else {
+                dom.unreadFilterBadge.classList.add('hidden');
+            }
+        }
+
+        if (dom.botFilterBadge) {
+            dom.botFilterBadge.textContent = botItems.length > 0 ? `(${botItems.length})` : '';
+        }
+
+        if (dom.closedFilterBadge) {
+            dom.closedFilterBadge.textContent = closedItems.length > 0 ? `(${closedItems.length})` : '';
         }
     }
 
@@ -461,7 +498,7 @@
         state.activeConversation = conv;
         if (conv && conv.unread_count > 0) {
             conv.unread_count = 0;
-            updateUnreadBadge();
+            updateTabBadges();
         }
 
         // Update Header
@@ -980,14 +1017,14 @@
         fetchConversations(false);
     });
 
-    // Filter buttons (All / Escalated / Unread / Closed)
+    // Filter buttons (Unread / Bot / Closed)
     dom.filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             dom.filterBtns.forEach(b => {
-                b.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all font-semibold shrink-0';
+                b.className = 'chat-filter-btn px-2.5 py-1 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all font-semibold shrink-0 flex items-center gap-1';
             });
-            btn.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0';
-            state.currentFilter = btn.getAttribute('data-filter') || 'all';
+            btn.className = 'chat-filter-btn px-2.5 py-1 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0 flex items-center gap-1';
+            state.currentFilter = btn.getAttribute('data-filter') || 'unread';
             renderConversations();
         });
     });
