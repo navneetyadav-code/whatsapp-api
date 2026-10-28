@@ -2,11 +2,15 @@
 $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
 $userForSidebar = $user ?? current_user();
 $chatUnreadCount = 0;
+$chatbotRulesCount = 0;
 if (!empty($userForSidebar['id'])) {
     try {
         $unreadStmt = Database::pdo()->prepare('SELECT COALESCE(SUM(unread_count), 0) FROM chat_conversations WHERE user_id = ?');
         $unreadStmt->execute([(int) $userForSidebar['id']]);
-        $chatUnreadCount = (int) $unreadStmt->fetchColumn();
+                $chatUnreadCount = (int) $unreadStmt->fetchColumn();
+        $rulesStmt = Database::pdo()->prepare('SELECT COUNT(*) FROM chatbot_rules WHERE user_id = ?');
+        $rulesStmt->execute([(int) $userForSidebar['id']]);
+        $chatbotRulesCount = (int) $rulesStmt->fetchColumn();
     } catch (\Throwable $e) {}
 }
 ?>
@@ -110,13 +114,44 @@ if (!empty($userForSidebar['id'])) {
             <?php endif; ?>
         </div>
 
-        <a href="<?= e(base_url('index.php?page=chatbot')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'chatbot' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
+        <!-- Section: Keyword Rules (Deterministic Triggers) -->
+        <a href="<?= e(base_url('index.php?page=rules')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= in_array($currentPage, ['rules', 'keyword-rules'], true) ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
             <div class="flex items-center gap-2.5">
-                <svg class="w-4 h-4 <?= $currentPage === 'chatbot' ? 'text-emerald-600' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-                <span>Chatbots</span>
+                <svg class="w-4 h-4 <?= in_array($currentPage, ['rules', 'keyword-rules'], true) ? 'text-amber-500' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                <span>Keyword Rules</span>
             </div>
-            <span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200/60">Auto</span>
+            <span class="px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 text-[10px] font-semibold border border-amber-200/60 font-mono"><?= $chatbotRulesCount ?></span>
         </a>
+
+        <!-- Section: AI Agent Studio (Segmented Hub) -->
+        <div class="space-y-0.5">
+            <a href="<?= e(base_url('index.php?page=chatbot&tab=ai-agent')) ?>" class="flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all <?= $currentPage === 'chatbot' ? 'bg-white shadow-card text-slate-900 font-semibold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70' ?>">
+                <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 <?= $currentPage === 'chatbot' ? 'text-emerald-600' : 'text-slate-400' ?>" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    <span>AI Agent</span>
+                </div>
+                <span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200/60 font-mono">Studio</span>
+            </a>
+
+            <?php if ($currentPage === 'chatbot'): 
+                $activeAiTab = (string) ($_GET['tab'] ?? 'ai-agent');
+            ?>
+                <div class="pl-7 pr-1 py-1 space-y-0.5 text-[11px] border-l-2 border-emerald-500/40 ml-4 my-1">
+                    <a href="<?= e(base_url('index.php?page=chatbot&tab=ai-agent')) ?>" class="flex items-center justify-between <?= $activeAiTab === 'ai-agent' ? 'text-slate-900 font-bold bg-slate-200/60' : 'text-slate-600 hover:text-slate-900 hover:font-medium' ?> py-1 px-2 rounded transition-colors">
+                        <span>🤖 Persona & LLMs</span>
+                    </a>
+                    <a href="<?= e(base_url('index.php?page=chatbot&tab=knowledge')) ?>" class="flex items-center justify-between <?= $activeAiTab === 'knowledge' ? 'text-slate-900 font-bold bg-slate-200/60' : 'text-slate-600 hover:text-slate-900 hover:font-medium' ?> py-1 px-2 rounded transition-colors">
+                        <span>📚 Knowledge (RAG)</span>
+                    </a>
+                    <a href="<?= e(base_url('index.php?page=chatbot&tab=escalations')) ?>" class="flex items-center justify-between <?= $activeAiTab === 'escalations' ? 'text-slate-900 font-bold bg-slate-200/60' : 'text-slate-600 hover:text-slate-900 hover:font-medium' ?> py-1 px-2 rounded transition-colors">
+                        <span>🚨 Escalations</span>
+                    </a>
+                    <a href="<?= e(base_url('index.php?page=chatbot&tab=tools')) ?>" class="flex items-center justify-between <?= $activeAiTab === 'tools' ? 'text-slate-900 font-bold bg-slate-200/60' : 'text-slate-600 hover:text-slate-900 hover:font-medium' ?> py-1 px-2 rounded transition-colors">
+                        <span>🛠️ Tools & RBAC</span>
+                    </a>
+                </div>
+            <?php endif; ?>
+        </div>
 
         <!-- Section: Developer -->
         <div class="px-2.5 mt-4 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Developer</div>

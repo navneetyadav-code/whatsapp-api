@@ -83,8 +83,10 @@ $invStmt = $pdo->prepare('SELECT * FROM ai_tool_invocations WHERE user_id = ? OR
 $invStmt->execute([$userId]);
 $recentInvocations = $invStmt->fetchAll();
 
-// Active tab selector (rules, ai-agent, knowledge, escalations, tools)
-$activeTab = trim((string) ($_GET['tab'] ?? 'rules'));
-if (!in_array($activeTab, ['rules', 'ai-agent', 'knowledge', 'escalations', 'tools'], true)) {
-    $activeTab = 'rules';
+// Active tab selector (ai-agent, knowledge, escalations, tools)
+$requestedTab = trim((string) ($_GET['tab'] ?? ''));
+if ($requestedTab === 'rules') {
+    redirect_to('index.php?page=rules');
 }
+
+$activeTab = in_array($requestedTab, ['ai-agent', 'knowledge', 'escalations', 'tools'], true) ? $requestedTab : 'ai-agent';

@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
 }
 
 $publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home', 'api', 'send', 'messages', 'api-contacts', 'contacts-api', 'api-contacts-batch', 'contacts-batch', 'api-contacts-delete', 'contacts-delete'];
-$dashboardPages = ['dashboard', 'live-chat', 'message', 'device', 'api-keys', 'queue', 'contacts', 'feedback', 'webhooks', 'campaigns', 'audit', 'chatbot', 'security'];
+$dashboardPages = ['dashboard', 'live-chat', 'message', 'device', 'api-keys', 'queue', 'contacts', 'feedback', 'webhooks', 'campaigns', 'audit', 'chatbot', 'rules', 'keyword-rules', 'security'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -492,11 +492,11 @@ if ($page === 'chatbot-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($matchType !== 'catch_all' && $keyword === '') {
         flash('error', 'Keyword is required unless match type is catch_all.');
-        redirect_to('index.php?page=chatbot');
+        redirect_to('index.php?page=rules');
     }
     if ($replyText === '') {
         flash('error', 'Reply text cannot be empty.');
-        redirect_to('index.php?page=chatbot');
+        redirect_to('index.php?page=rules');
     }
 
     $stmt = Database::pdo()->prepare(
@@ -504,8 +504,8 @@ if ($page === 'chatbot-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     );
     $stmt->execute([(int) $user['id'], $keyword, $matchType, $replyText]);
     
-    flash('success', 'Chatbot automation rule created successfully.');
-    redirect_to('index.php?page=chatbot');
+    flash('success', 'Keyword trigger rule created successfully.');
+    redirect_to('index.php?page=rules');
 }
 
 if ($page === 'chatbot-status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -516,7 +516,7 @@ if ($page === 'chatbot-status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     
     $stmt = Database::pdo()->prepare('UPDATE chatbot_rules SET status = ? WHERE id = ? AND user_id = ?');
     $stmt->execute([$status, $id, (int) $user['id']]);
-    redirect_to('index.php?page=chatbot');
+    redirect_to('index.php?page=rules');
 }
 
 if ($page === 'chatbot-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -527,8 +527,8 @@ if ($page === 'chatbot-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = Database::pdo()->prepare('DELETE FROM chatbot_rules WHERE id = ? AND user_id = ?');
     $stmt->execute([$id, (int) $user['id']]);
     
-    flash('success', 'Chatbot rule deleted.');
-    redirect_to('index.php?page=chatbot');
+    flash('success', 'Keyword trigger rule deleted.');
+    redirect_to('index.php?page=rules');
 }
 
 if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {

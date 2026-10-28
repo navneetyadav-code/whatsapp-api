@@ -39,6 +39,8 @@ $sections = [
     'webhooks'  => ['data' => 'webhooks.data.php',  'view' => 'webhooks.php'],
     'audit'     => ['data' => 'audit.data.php',     'view' => 'audit.php'],
     'chatbot'   => ['data' => 'chatbot.data.php',   'view' => 'chatbot.php'],
+    'rules'     => ['data' => 'rules.data.php',     'view' => 'rules.php'],
+    'keyword-rules' => ['data' => 'rules.data.php', 'view' => 'rules.php'],
 ];
 
 if (!isset($sections[$section])) {
