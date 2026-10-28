@@ -42,9 +42,9 @@ if (!empty($userForSidebar['id'])) {
                 <span>Live Chat</span>
             </div>
             <?php if ($chatUnreadCount > 0): ?>
-                <span class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[10px] font-bold font-mono shadow-xs animate-pulse"><?= $chatUnreadCount ?></span>
+                <span id="sidebarLiveChatBadge" class="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[10px] font-bold font-mono shadow-xs animate-pulse"><?= $chatUnreadCount ?></span>
             <?php else: ?>
-                <span class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200/60 font-mono">Live</span>
+                <span id="sidebarLiveChatBadge" class="px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200/60 font-mono">Live</span>
             <?php endif; ?>
         </a>
         

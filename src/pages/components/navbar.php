@@ -57,6 +57,19 @@ $title = $pageLabels[$page ?? ($_GET['page'] ?? 'dashboard')] ?? 'Overview';
 
         <!-- Divider -->
         <div class="h-4 w-px bg-slate-200 hidden sm:block mx-0.5"></div>
+
+        <!-- Global Buzzer Control -->
+        <button id="globalBuzzerBtn" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 transition-all shadow-subtle btn-tactile" title="Buzzer Sound (Click to Mute/Unmute)">
+            <span id="globalBuzzerIcon">🔔</span>
+            <span id="globalBuzzerLabel" class="hidden sm:inline">Buzzer</span>
+            <span id="globalBuzzerBadge" class="hidden px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold animate-pulse">!</span>
+        </button>
+
+        <!-- Desktop Notifications Enable Button -->
+        <button id="globalNotifBtn" type="button" class="hidden inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all shadow-subtle" title="Click to allow desktop notifications for customer messages & escalations">
+            <span class="animate-bounce">🔔</span>
+            <span class="hidden sm:inline">Enable Alerts</span>
+        </button>
         
         <a href="<?= e(base_url('index.php?page=docs')) ?>" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 hidden sm:block transition-colors" title="Documentation">
             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>

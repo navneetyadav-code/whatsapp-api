@@ -193,6 +193,10 @@
     }
 
     function startBuzzerLoop() {
+        if (window.WhatsAlerts) {
+            window.WhatsAlerts.startBuzzer(state.conversations);
+            return;
+        }
         if (buzzerInterval) return;
         playBuzzerTone();
         buzzerInterval = setInterval(() => {
@@ -201,6 +205,9 @@
     }
 
     function stopBuzzerLoop() {
+        if (window.WhatsAlerts) {
+            window.WhatsAlerts.stopBuzzer();
+        }
         if (buzzerInterval) {
             clearInterval(buzzerInterval);
             buzzerInterval = null;
@@ -913,6 +920,11 @@
     // Buzzer control button (toggle mute & test tone / permissions)
     if (dom.btnBuzzerControl) {
         dom.btnBuzzerControl.addEventListener('click', () => {
+            if (window.WhatsAlerts) {
+                state.buzzerMuted = window.WhatsAlerts.toggleMute();
+                updateBuzzerButtonUi();
+                return;
+            }
             initAudioContext();
             requestDesktopNotifications();
 

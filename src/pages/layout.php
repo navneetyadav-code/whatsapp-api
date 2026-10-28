@@ -102,7 +102,9 @@ if ($userForLayout) {
             }
         };
         window.AppConfig = {
-            defaultCountryCode: "<?= e(app_config('app.default_country_code')) ?>" || "in"
+            defaultCountryCode: "<?= e(app_config('app.default_country_code')) ?>" || "in",
+            baseUrl: "<?= e(base_url('')) ?>",
+            apiBase: "<?= e(base_url('api/chat')) ?>"
         };
     </script>
     <style>
@@ -170,6 +172,30 @@ if ($userForLayout) {
     <!-- Main Content Area -->
     <main class="flex-1 flex flex-col h-full md:h-screen min-w-0 bg-[#FBFBFC] relative overflow-hidden">
         <?php require __DIR__ . '/components/navbar.php'; ?>
+
+        <!-- Global Floating Emergency Escalation Banner -->
+        <div id="globalEscalationBanner" class="hidden mx-4 sm:mx-6 mt-3 bg-gradient-to-r from-rose-600 via-rose-700 to-red-800 text-white rounded-xl p-3 px-4 shadow-xl border border-rose-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200 z-30 shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+                <span class="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-base shrink-0 animate-bounce">
+                    🚨
+                </span>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="px-1.5 py-0.2 bg-white text-rose-700 text-[10px] font-black rounded uppercase tracking-wider">Urgent Escalation</span>
+                        <span id="globalEscalationCustomer" class="text-xs font-bold truncate">Customer</span>
+                    </div>
+                    <p id="globalEscalationReason" class="text-[11px] text-rose-100 truncate mt-0.5">Customer requested human takeover. AI Bot paused.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <a id="globalEscalationOpenChatBtn" href="<?= e(base_url('index.php?page=live-chat')) ?>" class="px-3 py-1.5 rounded-lg bg-white text-rose-700 hover:bg-rose-50 text-xs font-bold shadow-xs transition-all active:scale-[0.98]">
+                    Open Live Chat ➔
+                </a>
+                <button type="button" id="globalEscalationSilenceBtn" class="px-2.5 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-950 text-white text-xs font-medium border border-rose-400/30 transition-all" title="Acknowledge and silence buzzer">
+                    🔕 Silence Alarm
+                </button>
+            </div>
+        </div>
         
         <!-- Scrollable Workspace -->
         <div id="workspaceContent" class="flex-1 <?= $currentPage === 'live-chat' ? 'overflow-hidden p-2 md:p-3 flex flex-col' : 'overflow-y-auto overflow-x-hidden custom-scrollbar p-4 md:p-6 lg:p-7' ?> bg-[#FBFBFC] overscroll-contain">
@@ -213,6 +239,7 @@ if ($userForLayout) {
             }
         });
     </script>
+    <script src="<?= e(base_url('assets/global-alerts.js')) ?>?v=<?= time() ?>"></script>
 <?php elseif ($isPublicDocs): ?>
     <main class="public-doc-shell">
         <div class="public-doc-topbar">
