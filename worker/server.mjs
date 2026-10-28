@@ -2811,6 +2811,14 @@ async function startWorker() {
       if (row.auto_sleep_timeout_seconds) {
         s.autoSleepTimeoutSeconds = Math.max(15, Math.min(86400, Number(row.auto_sleep_timeout_seconds) || 60));
       }
+
+      // Auto-reconnect active sessions so WhatsApp Baileys sockets are restored on worker startup
+      if (row.status === 'connected' && !s.sleeping) {
+        logger.info({ userId: uid }, 'Auto-reconnecting active WhatsApp session socket on worker startup');
+        startSession(uid, false, false).catch((reconnectErr) => {
+          logger.warn({ err: reconnectErr.message, userId: uid }, 'Failed to auto-reconnect session on worker startup');
+        });
+      }
     }
   } catch (err) {
     logger.warn({ err: err.message }, 'Failed to pre-load sessions from database on worker startup');

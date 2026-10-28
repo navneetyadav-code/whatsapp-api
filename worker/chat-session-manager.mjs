@@ -1,28 +1,30 @@
 /**
  * WhatsApp Chat Session & Ticket Lifecycle Manager
  * ------------------------------------------------
- * Manages unique inquiry lifecycles per customer. Every fresh inquiry receives
- * a distinct session UUID. Once resolved/closed, previous chat is archived with its
- * resolution remark and CSAT rating. If the user messages again in the future,
- * a clean, fresh session is established.
+ * Manages unique inquiry tickets (SES-YYYYMMDD-XXXX).
+ * When customer inquiry is resolved, the session archives.
+ * When the customer sends a fresh inquiry, a brand new ticket session is created.
  */
 
 import crypto from 'crypto';
 
 /**
- * Generate a clean, human-readable session UUID
- * Example: "SES-20261028-A4F9B2"
+ * Generate human-friendly unique Session Ticket ID
+ * Format: SES-YYYYMMDD-XXXXXX (e.g. SES-20261028-A4F91B)
  * @returns {string}
  */
 export function generateSessionUuid() {
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
   const rand = crypto.randomBytes(3).toString('hex').toUpperCase();
-  return `SES-${dateStr}-${rand}`;
+  return `SES-${yyyy}${mm}${dd}-${rand}`;
 }
 
 /**
- * Resolve or initialize active session for an inbound customer message
- * @param {Object} db - MySQL promise connection/pool
+ * Resolve active session for incoming message or initialize fresh session
+ * @param {Object} db - MySQL connection/pool
  * @param {number|string} userId
  * @param {string} senderPhone
  * @param {string} [senderName]
@@ -96,11 +98,19 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
   // 3. Conversation is active (open or escalated)
   if (!sessionUuid) {
     sessionUuid = generateSessionUuid();
-    await db.execute(
-      'UPDATE chat_conversations SET session_uuid = ? WHERE id = ?',
-      [sessionUuid, conv.id]
-    );
   }
+
+  await db.execute(
+    `UPDATE chat_conversations
+     SET session_uuid = COALESCE(session_uuid, ?),
+         contact_name = COALESCE(?, contact_name),
+         last_message = ?,
+         last_message_at = NOW(),
+         unread_count = unread_count + 1,
+         consecutive_bot_replies = 0
+     WHERE id = ?`,
+    [sessionUuid, senderName, messagePreview.slice(0, 200), conv.id]
+  );
 
   return {
     conversationId: conv.id,
