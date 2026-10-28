@@ -220,7 +220,8 @@ export function evaluateSafeMath(expression) {
 /**
  * Dynamic Configurable Time Clock & Operating Hours
  */
-export function getCurrentCustomTime(config = {}) {
+export function getCurrentCustomTime(config = {}, context = {}) {
+  const isPersonalMode = context.agentMode === 'personal' || config.agent_mode === 'personal';
   const tz = config.timezone || 'Asia/Kolkata';
   const now = new Date();
   
@@ -268,9 +269,11 @@ export function getCurrentCustomTime(config = {}) {
     current_time: formattedTime,
     current_date: formattedDate,
     day_of_week: dayName,
-    is_office_open: isOpen,
-    office_schedule: `${config.open_time || '09:30'} to ${config.close_time || '18:30'} (${tz})`,
-    office_status: isOpen ? 'Currently OPEN for business & live support' : 'Currently CLOSED. Inquiries received now will be prioritized next working morning.'
+    is_office_open: isPersonalMode ? true : isOpen,
+    office_schedule: isPersonalMode ? '24/7 Always Active (Personal Assistant Mode)' : `${config.open_time || '09:30'} to ${config.close_time || '18:30'} (${tz})`,
+    office_status: isPersonalMode
+      ? 'Active 24/7 - Personal Executive Assistant ready on standby'
+      : (isOpen ? 'Currently OPEN for business & live support' : 'Currently CLOSED. Inquiries received now will be prioritized next working morning.')
   };
 }
 
@@ -650,7 +653,7 @@ export class UniversalToolsRegistry {
         } else if (handler === 'evaluate_math') {
           result = evaluateSafeMath(args.expression);
         } else if (handler === 'get_current_time') {
-          result = getCurrentCustomTime(tool.execution_config);
+          result = getCurrentCustomTime(tool.execution_config, context);
         } else if (handler === 'escalate_to_human') {
           result = await triggerHumanEscalation(args.reason, context);
         } else {

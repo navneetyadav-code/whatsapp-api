@@ -258,29 +258,50 @@ export function detectFrustrationAndEscalation(text) {
 /**
  * Format system prompt with company persona and retrieved RAG context
  */
-export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessage) {
+export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessage, options = {}) {
+  const isPersonal = options.agentMode === 'personal';
+  const ownerName = options.ownerName || 'Boss';
+
   let contextBlock = '';
   if (retrievedChunks && retrievedChunks.length > 0) {
     contextBlock = `\n\n--- OFFICIAL VERIFIED KNOWLEDGE BASE ---\n` +
       retrievedChunks.map((c, i) => `[Source ${i + 1}: ${c.title}]\n${c.content}`).join('\n\n') +
       `\n---------------------------------------\n` +
-      `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
+      (isPersonal
+        ? `PERSONAL ASSISTANT DIRECTIVES:
+1. Use the knowledge sources above as helpful background context when assisting your Boss (${ownerName}).
+2. You are NOT restricted to only these sources: answer any general questions, research tasks, calculations, or coding requests freely.
+3. Proactively call tools (web_search, get_weather, evaluate_math, get_current_time) whenever real-time data or calculations are needed.
+4. Keep responses crisp, bold key terms (*bold*), and use clean bullet points. NEVER ask for customer feedback or ratings.`
+        : `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
 1. Base your factual answers STRICTLY on the knowledge base sources above.
 2. DO NOT invent, hallucinate, or assume facts (like batches, prices, phone numbers, or rules) not present in the sources.
 3. If the user asks something not covered in the sources, politely inform them that you do not have that specific detail and offer to connect them with the human front desk (+91 85810 65107).
 4. Language & Tone: Detect the user's language and mirror their style naturally. If they use Hindi or natural Hinglish (e.g. 'bhai fee kitni hai', 'demo class milegi?'), reply in warm, helpful Hinglish ('Haanji! Hamare yahan...'). If they use English, reply in professional, encouraging English.
-5. Format for WhatsApp: Use bold (*text*), clean bullet points, and appropriate emojis. Avoid long unbroken walls of text.`;
+5. Format for WhatsApp: Use bold (*text*), clean bullet points, and appropriate emojis. Avoid long unbroken walls of text.`
+      );
   } else {
-    contextBlock = `\n\n--- KNOWLEDGE RETRIEVAL NOTE ---\n` +
-      `No specific knowledge base records matched the user's query.\n` +
-      `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
+    contextBlock = isPersonal
+      ? `\n\n--- PERSONAL ASSISTANT OPERATING DIRECTIVES ---
+1. You are the dedicated 24/7 Personal Executive Assistant to ${ownerName}.
+2. Full General Intelligence: You assist with ANY topic requested (tasks, to-dos, reminders, web search, weather, coding, math, writing, brainstorming).
+3. Tools: Autonomously call web_search, get_weather, evaluate_math, and get_current_time whenever needed.
+4. NO Feedback/Reviews: Never ask for 5-star ratings or customer feedback surveys.
+5. Tone: Respectful, loyal, efficient, and proactive. Use concise WhatsApp formatting with bold highlights and clean lists.`
+      : `\n\n--- KNOWLEDGE RETRIEVAL NOTE ---\n` +
+        `No specific knowledge base records matched the user's query.\n` +
+        `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
 1. You are a dedicated customer assistant strictly limited to this organization.
 2. If the user asks about out-of-scope topics (e.g. general knowledge, recipes, cooking, coding, competitors, unrelated trivia), DO NOT answer the out-of-scope question. Politely decline and state that you can only assist with our institute's courses, admissions, schedules, and policies.
 3. If they are asking a genuine question about our institute/services that isn't in your knowledge base, apologize politely and offer to connect them with our human team (+91 85810 65107).
 4. For general pleasantries/greetings (e.g. 'hi', 'hello', 'good morning', 'namaste'), respond warmly and ask how you can help them with our courses or services today.`;
   }
 
-  const fullSystem = (systemPersona || 'You are a helpful customer support assistant on WhatsApp.') + contextBlock;
+  const defaultPrompt = isPersonal
+    ? `You are the personal AI executive assistant to ${ownerName}. You assist 24/7 with tasks, research, calculations, live weather, reminders, and daily management.`
+    : 'You are a helpful customer support assistant on WhatsApp.';
+
+  const fullSystem = (systemPersona || defaultPrompt) + contextBlock;
   return {
     systemPrompt: fullSystem,
     userMessage: customerMessage

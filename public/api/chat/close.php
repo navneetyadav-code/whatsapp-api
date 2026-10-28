@@ -67,7 +67,43 @@ if ($action === 'reopen') {
     ]);
 }
 
-// Action: Close Chat & Request 5-Star Feedback
+// Action: Close Chat
+// Check if user has personal assistant mode enabled or has disabled feedback reviews
+$aiSettingsStmt = $pdo->prepare('SELECT agent_mode, feedback_enabled FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
+$aiSettingsStmt->execute([$userId]);
+$aiSettings = $aiSettingsStmt->fetch();
+
+$isPersonalMode = ($aiSettings['agent_mode'] ?? 'support') === 'personal';
+$feedbackActive = !$isPersonalMode && (int) ($aiSettings['feedback_enabled'] ?? 1) === 1;
+
+if (!$feedbackActive) {
+    // Personal Assistant Mode / Feedback Surveys Closed:
+    // Close cleanly without sending any rating prompt or setting awaiting_feedback = 1
+    $updateStmt = $pdo->prepare(
+        'UPDATE chat_conversations
+         SET status = \'closed\', closed_at = NOW(), awaiting_feedback = 0, bot_paused = 0,
+             last_message = \'Conversation closed.\', last_message_at = NOW()
+         WHERE id = ?'
+    );
+    $updateStmt->execute([$convId]);
+
+    json_response([
+        'ok' => true,
+        'action' => 'close',
+        'status' => 'closed',
+        'awaiting_feedback' => 0,
+        'message' => 'Chat closed successfully (feedback surveys closed in personal assistant mode).',
+        'prompt_message_id' => null,
+        'conversation' => [
+            'id' => $convId,
+            'phone' => $phone,
+            'status' => 'closed',
+            'awaiting_feedback' => 0,
+        ],
+    ]);
+}
+
+// Otherwise (Business Support mode with feedback enabled): Request 5-Star Feedback
 $feedbackPrompt = "Thank you for contacting us! 🙏\n"
     . "Your support chat has been marked as closed.\n\n"
     . "⭐ How would you rate your support experience today?\n"

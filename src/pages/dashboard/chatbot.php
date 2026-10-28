@@ -49,6 +49,107 @@
         <form method="post" action="<?= e(base_url('index.php?page=ai-agent-save')) ?>" class="space-y-6">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
+            <!-- ============================================== -->
+            <!-- AI OPERATING MODE & 1-CLICK ASSISTANT SWITCHER -->
+            <!-- ============================================== -->
+            <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-5 text-white shadow-md border border-indigo-900/40 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-800/40">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🤖</span>
+                            <h3 class="text-sm font-bold tracking-tight text-white">AI Operating Mode</h3>
+                            <span id="activeModeBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase <?= ($aiSettings['agent_mode'] ?? 'support') === 'personal' ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' ?>">
+                                <?= ($aiSettings['agent_mode'] ?? 'support') === 'personal' ? '⚡ Personal Assistant (24/7)' : '🏢 Business Support Bot' ?>
+                            </span>
+                        </div>
+                        <p class="text-xs text-indigo-200/80 mt-1">Convert your WhatsApp AI into your personal 24/7 executive assistant or a customer service representative with 1 click.</p>
+                    </div>
+
+                    <!-- Quick 1-Click Action Buttons -->
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button type="button" id="btnConvertToPersonal" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-violet-500/25 transition-all active:scale-[0.98]">
+                            <span>⚡</span>
+                            <span>Convert to Personal Assistant</span>
+                        </button>
+                        <button type="button" id="btnSwitchToSupport" class="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-all active:scale-[0.98]">
+                            <span>🏢</span>
+                            <span>Support Bot Mode</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Mode Selection Radio Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <!-- Option 1: Business Support -->
+                    <label class="relative flex flex-col p-3.5 rounded-xl border transition-all cursor-pointer <?= ($aiSettings['agent_mode'] ?? 'support') === 'support' ? 'bg-indigo-900/40 border-emerald-500/80 ring-1 ring-emerald-500/50' : 'bg-slate-800/40 border-slate-700/60 hover:border-slate-600' ?>">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="inline-flex items-center gap-1.5 text-xs font-bold text-white">
+                                <span>🏢</span> Business Customer Support Bot
+                            </span>
+                            <input type="radio" name="agent_mode" value="support" <?= ($aiSettings['agent_mode'] ?? 'support') === 'support' ? 'checked' : '' ?> class="text-emerald-500 focus:ring-emerald-400 bg-slate-900 border-slate-600">
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-relaxed">
+                            Answers customer inquiries grounded strictly in your verified Knowledge Base (RAG). Adheres to office working hours and automatically requests 5-star feedback ratings when inquiries resolve.
+                        </p>
+                        <div class="mt-2.5 pt-2 border-t border-slate-700/50 flex items-center gap-3 text-[10px] text-slate-400">
+                            <span>⭐ Customer 5-Star Feedback: <strong>Active</strong></span>
+                            <span>🕒 Office Hours: <strong>Observed</strong></span>
+                        </div>
+                    </label>
+
+                    <!-- Option 2: Personal AI Executive Assistant -->
+                    <label class="relative flex flex-col p-3.5 rounded-xl border transition-all cursor-pointer <?= ($aiSettings['agent_mode'] ?? 'support') === 'personal' ? 'bg-violet-900/40 border-violet-400/80 ring-1 ring-violet-500/50' : 'bg-slate-800/40 border-slate-700/60 hover:border-slate-600' ?>">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="inline-flex items-center gap-1.5 text-xs font-bold text-violet-200">
+                                <span>👤</span> Personal AI Assistant (24/7 Always On)
+                            </span>
+                            <input type="radio" name="agent_mode" value="personal" <?= ($aiSettings['agent_mode'] ?? 'support') === 'personal' ? 'checked' : '' ?> class="text-violet-500 focus:ring-violet-400 bg-slate-900 border-slate-600">
+                        </div>
+                        <p class="text-[11px] text-slate-300 leading-relaxed">
+                            Your 24/7 personal executive secretary. Unrestricted general intelligence (tasks, coding, math, web search, weather forecasts, notes). <strong>Customer reviews & feedback surveys are completely silenced</strong>.
+                        </p>
+                        <div class="mt-2.5 pt-2 border-t border-slate-700/50 flex items-center gap-3 text-[10px] text-violet-300">
+                            <span>🚫 Customer Reviews: <strong>Closed / Silenced</strong></span>
+                            <span>⚡ Always On: <strong>24/7 Ready</strong></span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Personal Mode Detail Controls -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-300 mb-1">Address You As (Owner Name)</label>
+                        <input type="text" id="ownerNameInput" name="owner_name" value="<?= e($aiSettings['owner_name'] ?? 'Boss') ?>" placeholder="e.g. Boss, Sir, Ankit" class="w-full text-xs px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-400">
+                    </div>
+                    <div class="flex items-center">
+                        <label class="flex items-center gap-2 cursor-pointer mt-4">
+                            <input type="checkbox" id="feedbackEnabledCheckbox" name="feedback_enabled" value="1" <?= (int) ($aiSettings['feedback_enabled'] ?? 1) === 1 && ($aiSettings['agent_mode'] ?? 'support') !== 'personal' ? 'checked' : '' ?> <?= ($aiSettings['agent_mode'] ?? 'support') === 'personal' ? 'disabled' : '' ?> class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-400">
+                            <span class="text-xs text-slate-300">
+                                Request 5-Star Feedback
+                                <span id="feedbackNoticeText" class="block text-[10px] <?= ($aiSettings['agent_mode'] ?? 'support') === 'personal' ? 'text-amber-400 font-semibold' : 'text-slate-400' ?>">
+                                    <?= ($aiSettings['agent_mode'] ?? 'support') === 'personal' ? '(Closed in Personal Assistant mode)' : '(Sent upon chat closure)' ?>
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <label class="flex items-center gap-2 cursor-pointer mt-4">
+                            <input type="checkbox" name="is_always_on" value="1" <?= (int) ($aiSettings['is_always_on'] ?? 1) === 1 ? 'checked' : '' ?> class="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-400">
+                            <span class="text-xs text-slate-300">
+                                24/7 Always Active
+                                <span class="block text-[10px] text-slate-400">(Never reports closed hours)</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Toast / Status pill -->
+                <div id="modeStatusPill" class="hidden p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs flex items-center justify-between">
+                    <span id="modeStatusText"></span>
+                    <button type="button" onclick="document.getElementById('modeStatusPill').classList.add('hidden')" class="text-emerald-400 hover:text-white font-bold ml-2">✕</button>
+                </div>
+            </div>
+
             <!-- Master Toggles -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/80">
                 <label class="flex items-start gap-3 cursor-pointer">
@@ -511,7 +612,7 @@
                 $cat = $tool['category'];
                 $paramsCount = count($tool['parameters_schema']['properties'] ?? []);
             ?>
-                <div class="tool-card bg-white rounded-xl border border-slate-200/80 p-5 shadow-card flex flex-col justify-between hover:border-slate-300 transition-all" data-category="<?= e($cat) ?>">
+                <div class="tool-card bg-white rounded-xl border border-slate-200/80 p-5 shadow-card flex flex-col justify-between hover:border-slate-300 transition-all" data-category="<?= e($cat) ?>" data-tool="<?= htmlspecialchars(json_encode($tool, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
                     <div>
                         <!-- Header: Icon, Category Badge & Active Toggle -->
                         <div class="flex items-start justify-between gap-3 mb-2.5">
@@ -574,15 +675,15 @@
 
                     <!-- Action Buttons -->
                     <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                        <button type="button" onclick='openSandboxModal(<?= htmlspecialchars(json_encode($tool), ENT_QUOTES, "UTF-8") ?>)' class="px-2.5 py-1 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1">
+                        <button type="button" onclick="handleToolTest(this)" class="px-2.5 py-1 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1">
                             <span>🧪</span> Test
                         </button>
 
                         <div class="flex items-center gap-1.5">
-                            <button type="button" onclick='openEditToolModal(<?= htmlspecialchars(json_encode($tool), ENT_QUOTES, "UTF-8") ?>)' class="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors">
+                            <button type="button" onclick="handleToolEdit(this)" class="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors">
                                 Edit
                             </button>
-                            <form method="post" action="<?= e(base_url('index.php?page=custom-tool-delete')) ?>" onsubmit="return confirm('Delete tool '<?= e($tool['display_name']) ?>'?');" class="inline">
+                            <form method="post" action="<?= e(base_url('index.php?page=custom-tool-delete')) ?>" onsubmit="return confirm('Delete this tool from your catalog?');" class="inline">
                                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                                 <input type="hidden" name="id" value="<?= (int) $tool['id'] ?>">
                                 <button type="submit" class="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors" title="Delete tool">
@@ -905,6 +1006,290 @@
             </div>
         </div>
     </div>
+
+    <!-- Universal Custom Tools Script (Self-Contained & Always Active) -->
+    <script>
+    (function initUniversalTools() {
+        window.filterTools = function(category, btn) {
+            document.querySelectorAll('.tool-cat-btn').forEach(b => {
+                b.className = 'tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all';
+            });
+            if (btn) {
+                btn.className = 'tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs transition-all';
+            }
+
+            document.querySelectorAll('.tool-card').forEach(card => {
+                if (category === 'all' || card.getAttribute('data-category') === category) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        };
+
+        window.toggleCategoryFields = function(cat) {
+            const fRest = document.getElementById('fieldsRestApi');
+            const fShared = document.getElementById('fieldsSharedEnv');
+            const fWeb = document.getElementById('fieldsWebhook');
+            if (fRest) fRest.classList.toggle('hidden', cat !== 'rest_api');
+            if (fShared) fShared.classList.toggle('hidden', cat !== 'shared_env_api');
+            if (fWeb) fWeb.classList.toggle('hidden', cat !== 'webhook');
+        };
+
+        window.addParameterRow = function(name = '', type = 'STRING', desc = '', isRequired = false) {
+            const container = document.getElementById('parameterRowsContainer');
+            if (!container) return;
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-3 py-2">
+                    <input type="text" name="param_name[]" value="${name}" placeholder="e.g. city" required class="w-full text-xs font-mono px-2 py-1 border border-slate-200 rounded">
+                </td>
+                <td class="px-3 py-2">
+                    <select name="param_type[]" class="text-xs px-2 py-1 border border-slate-200 rounded bg-white font-mono">
+                        <option value="STRING" ${type === 'STRING' ? 'selected' : ''}>STRING</option>
+                        <option value="NUMBER" ${type === 'NUMBER' ? 'selected' : ''}>NUMBER</option>
+                        <option value="INTEGER" ${type === 'INTEGER' ? 'selected' : ''}>INTEGER</option>
+                        <option value="BOOLEAN" ${type === 'BOOLEAN' ? 'selected' : ''}>BOOLEAN</option>
+                    </select>
+                </td>
+                <td class="px-3 py-2">
+                    <input type="text" name="param_desc[]" value="${desc}" placeholder="Instruction for AI..." class="w-full text-xs px-2 py-1 border border-slate-200 rounded">
+                </td>
+                <td class="px-3 py-2 text-center">
+                    <input type="checkbox" name="param_required[]" value="1" ${isRequired ? 'checked' : ''} class="rounded text-emerald-600">
+                </td>
+                <td class="px-2 py-2 text-right">
+                    <button type="button" onclick="this.closest('tr').remove()" class="text-slate-400 hover:text-rose-600 text-xs font-bold">✕</button>
+                </td>
+            `;
+            container.appendChild(tr);
+        };
+
+        window.openAddToolModal = function() {
+            document.getElementById('customToolModalTitle').textContent = 'Add Custom Tool';
+            document.getElementById('modalToolId').value = '0';
+            document.getElementById('modalToolSlug').value = '';
+            document.getElementById('modalToolSlug').readOnly = false;
+            document.getElementById('modalDisplayName').value = '';
+            document.getElementById('modalDescription').value = '';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalRestUrl').value = '';
+            document.getElementById('modalRestAuth').value = '';
+            document.getElementById('modalRestPath').value = '';
+            document.getElementById('parameterRowsContainer').innerHTML = '';
+            toggleCategoryFields('rest_api');
+            document.getElementById('customToolModal').classList.remove('hidden');
+        };
+
+        window.handleToolEdit = function(btn) {
+            try {
+                const card = btn.closest('.tool-card');
+                const raw = card.getAttribute('data-tool');
+                const tool = JSON.parse(raw);
+                openEditToolModal(tool);
+            } catch (e) {
+                console.error('Error opening edit modal:', e);
+            }
+        };
+
+        window.openEditToolModal = function(tool) {
+            document.getElementById('customToolModalTitle').textContent = 'Edit Tool: ' + (tool.display_name || tool.tool_slug);
+            document.getElementById('modalToolId').value = tool.id || 0;
+            document.getElementById('modalToolSlug').value = tool.tool_slug || '';
+            document.getElementById('modalDisplayName').value = tool.display_name || '';
+            document.getElementById('modalDescription').value = tool.description || '';
+            document.getElementById('modalCategory').value = tool.category || 'rest_api';
+            toggleCategoryFields(tool.category || 'rest_api');
+
+            if (tool.category === 'rest_api') {
+                document.getElementById('modalRestMethod').value = tool.execution_config?.method || 'GET';
+                document.getElementById('modalRestUrl').value = tool.execution_config?.url || '';
+                document.getElementById('modalRestAuth').value = tool.execution_config?.headers?.Authorization || '';
+                document.getElementById('modalRestPath').value = tool.execution_config?.response_path || '';
+            } else if (tool.category === 'shared_env_api') {
+                const activeEnv = tool.execution_config?.active_env || 'local';
+                const elLoc = document.getElementById('modalEnvLocal');
+                const elLiv = document.getElementById('modalEnvLive');
+                if (elLoc) elLoc.checked = activeEnv === 'local';
+                if (elLiv) elLiv.checked = activeEnv === 'live';
+                document.getElementById('modalSharedLocalUrl').value = tool.execution_config?.environments?.local?.base_url || '';
+                document.getElementById('modalSharedLocalToken').value = tool.execution_config?.environments?.local?.bearer_token || '';
+                document.getElementById('modalSharedLiveUrl').value = tool.execution_config?.environments?.live?.base_url || '';
+                document.getElementById('modalSharedLiveToken').value = tool.execution_config?.environments?.live?.bearer_token || '';
+            } else if (tool.category === 'webhook') {
+                document.getElementById('modalWebhookUrl').value = tool.execution_config?.target_url || '';
+            }
+
+            // Populate parameters
+            const container = document.getElementById('parameterRowsContainer');
+            container.innerHTML = '';
+            const props = tool.parameters_schema?.properties || {};
+            const req = tool.parameters_schema?.required || [];
+            for (const [pName, pSpec] of Object.entries(props)) {
+                addParameterRow(pName, pSpec.type || 'STRING', pSpec.description || '', req.includes(pName));
+            }
+
+            document.getElementById('customToolModal').classList.remove('hidden');
+        };
+
+        window.closeToolModal = function() {
+            document.getElementById('customToolModal').classList.add('hidden');
+        };
+
+        window.openPresetsModal = function() {
+            document.getElementById('presetsModal').classList.remove('hidden');
+        };
+
+        window.closePresetsModal = function() {
+            document.getElementById('presetsModal').classList.add('hidden');
+        };
+
+        window.loadPresetWeather = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'get_weather';
+            document.getElementById('modalDisplayName').value = '🌤️ Live Weather Forecaster';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalDescription').value = 'Fetches real-time weather, temperature, humidity, apparent temperature, and wind speed for any location or city using coordinates.';
+            document.getElementById('modalRestUrl').value = 'https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m';
+            document.getElementById('modalRestPath').value = 'current';
+            toggleCategoryFields('rest_api');
+            addParameterRow('city', 'STRING', 'City name (e.g. "Patna", "Delhi", "London")', true);
+            addParameterRow('latitude', 'NUMBER', 'Latitude coordinate (e.g. 25.59 for Patna)', true);
+            addParameterRow('longitude', 'NUMBER', 'Longitude coordinate (e.g. 85.14 for Patna)', true);
+        };
+
+        window.loadPresetCrypto = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'get_crypto_price';
+            document.getElementById('modalDisplayName').value = '🪙 Crypto Price Tracker';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalDescription').value = 'Queries current live market prices for cryptocurrencies like bitcoin, ethereum, solana in INR and USD.';
+            document.getElementById('modalRestUrl').value = 'https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=inr,usd';
+            toggleCategoryFields('rest_api');
+            addParameterRow('coin_id', 'STRING', 'Cryptocurrency id e.g. "bitcoin", "ethereum", "solana"', true);
+        };
+
+        window.loadPresetWebhook = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'send_crm_lead';
+            document.getElementById('modalDisplayName').value = '🎣 CRM Lead Outbound Webhook';
+            document.getElementById('modalCategory').value = 'webhook';
+            document.getElementById('modalDescription').value = 'Forwards interested customer leads, name, phone, and requirements directly to external CRM webhook.';
+            document.getElementById('modalWebhookUrl').value = 'https://hooks.zapier.com/hooks/catch/12345/abcde';
+            toggleCategoryFields('webhook');
+            addParameterRow('customer_name', 'STRING', 'Full name of customer', true);
+            addParameterRow('customer_phone', 'STRING', 'Contact phone number', true);
+            addParameterRow('notes', 'STRING', 'Summary of customer requirements', false);
+        };
+
+        window.loadPresetSharedEnv = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'custom_shared_crm';
+            document.getElementById('modalDisplayName').value = '🏢 Custom Shared Hosting Backend';
+            document.getElementById('modalCategory').value = 'shared_env_api';
+            document.getElementById('modalDescription').value = 'Connects to your custom PHP/cPanel shared hosting backend or local development API.';
+            toggleCategoryFields('shared_env_api');
+            document.getElementById('modalSharedLocalUrl').value = 'http://localhost/myproject/api/v1';
+            document.getElementById('modalSharedLiveUrl').value = 'https://myproject.com/api/v1';
+            addParameterRow('action', 'STRING', 'Endpoint action to perform', true);
+        };
+
+        // Sandbox Simulator Modal
+        let activeSandboxTool = null;
+        window.handleToolTest = function(btn) {
+            try {
+                const card = btn.closest('.tool-card');
+                const raw = card.getAttribute('data-tool');
+                const tool = JSON.parse(raw);
+                openSandboxModal(tool);
+            } catch (e) {
+                console.error('Error opening test sandbox:', e);
+            }
+        };
+
+        window.openSandboxModal = function(tool) {
+            activeSandboxTool = tool;
+            document.getElementById('sandboxToolTitle').textContent = (tool.tool_slug || 'tool') + ' (' + (tool.category || 'rest_api') + ')';
+            const sampleArgs = {};
+            const props = tool.parameters_schema?.properties || {};
+            for (const [k, v] of Object.entries(props)) {
+                if (k === 'latitude') sampleArgs[k] = 25.5941;
+                else if (k === 'longitude') sampleArgs[k] = 85.1376;
+                else if (k === 'city') sampleArgs[k] = 'Patna';
+                else if (k === 'query') sampleArgs[k] = 'Latest tech news';
+                else if (k === 'expression') sampleArgs[k] = '35000 * 0.82';
+                else if (k === 'coin_id') sampleArgs[k] = 'bitcoin';
+                else if (k === 'action') sampleArgs[k] = 'pricing_plans';
+                else sampleArgs[k] = 'test_value';
+            }
+            document.getElementById('sandboxArgs').value = JSON.stringify(sampleArgs, null, 2);
+            document.getElementById('sandboxResultBox').classList.add('hidden');
+            document.getElementById('sandboxModal').classList.remove('hidden');
+        };
+
+        window.closeSandboxModal = function() {
+            document.getElementById('sandboxModal').classList.add('hidden');
+        };
+
+        window.runSandboxTest = async function() {
+            if (!activeSandboxTool) return;
+            const btn = document.getElementById('btnRunSandbox');
+            const output = document.getElementById('sandboxOutput');
+            const latencyEl = document.getElementById('sandboxLatency');
+            const resultBox = document.getElementById('sandboxResultBox');
+
+            let parsedArgs = {};
+            try {
+                parsedArgs = JSON.parse(document.getElementById('sandboxArgs').value);
+            } catch (e) {
+                alert('Invalid JSON in arguments textarea.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Executing...';
+            resultBox.classList.remove('hidden');
+            output.textContent = 'Contacting endpoint...';
+
+            const startTime = performance.now();
+            try {
+                if (activeSandboxTool.category === 'rest_api') {
+                    let targetUrl = activeSandboxTool.execution_config.url || '';
+                    for (const [k, v] of Object.entries(parsedArgs)) {
+                        targetUrl = targetUrl.replace(new RegExp('\\{' + k + '\\}', 'g'), encodeURIComponent(v));
+                    }
+                    const res = await fetch(targetUrl);
+                    const data = await res.json();
+                    const latency = Math.round(performance.now() - startTime);
+                    latencyEl.textContent = latency + 'ms (HTTP ' + res.status + ')';
+                    output.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    const latency = Math.round(performance.now() - startTime);
+                    latencyEl.textContent = latency + 'ms (Simulated)';
+                    output.textContent = JSON.stringify({
+                        status: 'success',
+                        tool: activeSandboxTool.tool_slug,
+                        category: activeSandboxTool.category,
+                        args_received: parsedArgs,
+                        note: 'Executed through dynamic tool executor.'
+                    }, null, 2);
+                }
+            } catch (err) {
+                const latency = Math.round(performance.now() - startTime);
+                latencyEl.textContent = latency + 'ms (Error)';
+                output.textContent = 'Test failed: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '▶ Execute Live Test';
+            }
+        };
+    })();
+    </script>
     <?php endif; ?>
 
     <!-- Persona AI Rewrite Client Script -->
@@ -1237,6 +1622,7 @@
 
     
         const btnEnhance = document.getElementById('btnEnhancePersona');
+        (function initPersona() {
         const btnUndo = document.getElementById('btnUndoPersona');
         const textarea = document.getElementById('systemPromptTextarea');
         const toneSelect = document.getElementById('personaToneSelect');
@@ -1312,265 +1698,128 @@
                 }
             });
         }
+    })();
 
-        // ==========================================
-        // Universal Custom Tools Client Controllers
-        // ==========================================
-        window.filterTools = function(category, btn) {
-            document.querySelectorAll('.tool-cat-btn').forEach(b => {
-                b.className = 'tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all';
-            });
-            btn.className = 'tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs transition-all';
+    (function initModeSwitcher() {
+        const btnToPersonal = document.getElementById('btnConvertToPersonal');
+        const btnToSupport = document.getElementById('btnSwitchToSupport');
+        const modeRadios = document.querySelectorAll('input[name="agent_mode"]');
+        const textarea = document.getElementById('systemPromptTextarea');
+        const feedbackCheckbox = document.getElementById('feedbackEnabledCheckbox');
+        const feedbackNotice = document.getElementById('feedbackNoticeText');
+        const ownerNameInput = document.getElementById('ownerNameInput');
+        const modeBadge = document.getElementById('activeModeBadge');
+        const statusPill = document.getElementById('modeStatusPill');
+        const statusText = document.getElementById('modeStatusText');
 
-            document.querySelectorAll('.tool-card').forEach(card => {
-                if (category === 'all' || card.getAttribute('data-category') === category) {
-                    card.style.display = 'flex';
-                } else {
-                    card.style.display = 'none';
+        if (!btnToPersonal || !btnToSupport) return;
+
+        function updateModeUI(mode) {
+            modeRadios.forEach(r => {
+                r.checked = (r.value === mode);
+                const card = r.closest('label');
+                if (card) {
+                    if (r.value === mode) {
+                        if (mode === 'personal') {
+                            card.className = 'relative flex flex-col p-3.5 rounded-xl border transition-all cursor-pointer bg-violet-900/40 border-violet-400/80 ring-1 ring-violet-500/50';
+                        } else {
+                            card.className = 'relative flex flex-col p-3.5 rounded-xl border transition-all cursor-pointer bg-indigo-900/40 border-emerald-500/80 ring-1 ring-emerald-500/50';
+                        }
+                    } else {
+                        card.className = 'relative flex flex-col p-3.5 rounded-xl border transition-all cursor-pointer bg-slate-800/40 border-slate-700/60 hover:border-slate-600';
+                    }
                 }
             });
-        };
 
-        window.toggleCategoryFields = function(cat) {
-            const fRest = document.getElementById('fieldsRestApi');
-            const fShared = document.getElementById('fieldsSharedEnv');
-            const fWeb = document.getElementById('fieldsWebhook');
-            if (fRest) fRest.classList.toggle('hidden', cat !== 'rest_api');
-            if (fShared) fShared.classList.toggle('hidden', cat !== 'shared_env_api');
-            if (fWeb) fWeb.classList.toggle('hidden', cat !== 'webhook');
-        };
-
-        window.addParameterRow = function(name = '', type = 'STRING', desc = '', isRequired = false) {
-            const container = document.getElementById('parameterRowsContainer');
-            if (!container) return;
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-slate-50/60';
-            tr.innerHTML = `
-                <td class="px-3 py-2">
-                    <input type="text" name="param_name[]" value="${name}" placeholder="e.g. city" required class="w-full text-xs font-mono px-2 py-1 border border-slate-200 rounded">
-                </td>
-                <td class="px-3 py-2">
-                    <select name="param_type[]" class="text-xs px-2 py-1 border border-slate-200 rounded bg-white font-mono">
-                        <option value="STRING" ${type === 'STRING' ? 'selected' : ''}>STRING</option>
-                        <option value="NUMBER" ${type === 'NUMBER' ? 'selected' : ''}>NUMBER</option>
-                        <option value="INTEGER" ${type === 'INTEGER' ? 'selected' : ''}>INTEGER</option>
-                        <option value="BOOLEAN" ${type === 'BOOLEAN' ? 'selected' : ''}>BOOLEAN</option>
-                    </select>
-                </td>
-                <td class="px-3 py-2">
-                    <input type="text" name="param_desc[]" value="${desc}" placeholder="Instruction for AI..." class="w-full text-xs px-2 py-1 border border-slate-200 rounded">
-                </td>
-                <td class="px-3 py-2 text-center">
-                    <input type="checkbox" name="param_required[]" value="1" ${isRequired ? 'checked' : ''} class="rounded text-emerald-600">
-                </td>
-                <td class="px-2 py-2 text-right">
-                    <button type="button" onclick="this.closest('tr').remove()" class="text-slate-400 hover:text-rose-600 text-xs font-bold">✕</button>
-                </td>
-            `;
-            container.appendChild(tr);
-        };
-
-        window.openAddToolModal = function() {
-            document.getElementById('customToolModalTitle').textContent = 'Add Custom Tool';
-            document.getElementById('modalToolId').value = '0';
-            document.getElementById('modalToolSlug').value = '';
-            document.getElementById('modalToolSlug').readOnly = false;
-            document.getElementById('modalDisplayName').value = '';
-            document.getElementById('modalDescription').value = '';
-            document.getElementById('modalCategory').value = 'rest_api';
-            document.getElementById('modalRestUrl').value = '';
-            document.getElementById('modalRestAuth').value = '';
-            document.getElementById('modalRestPath').value = '';
-            document.getElementById('parameterRowsContainer').innerHTML = '';
-            toggleCategoryFields('rest_api');
-            document.getElementById('customToolModal').classList.remove('hidden');
-        };
-
-        window.openEditToolModal = function(tool) {
-            document.getElementById('customToolModalTitle').textContent = 'Edit Tool: ' + tool.display_name;
-            document.getElementById('modalToolId').value = tool.id;
-            document.getElementById('modalToolSlug').value = tool.tool_slug;
-            document.getElementById('modalDisplayName').value = tool.display_name;
-            document.getElementById('modalDescription').value = tool.description;
-            document.getElementById('modalCategory').value = tool.category;
-            toggleCategoryFields(tool.category);
-
-            if (tool.category === 'rest_api') {
-                document.getElementById('modalRestMethod').value = tool.execution_config?.method || 'GET';
-                document.getElementById('modalRestUrl').value = tool.execution_config?.url || '';
-                document.getElementById('modalRestAuth').value = tool.execution_config?.headers?.Authorization || '';
-                document.getElementById('modalRestPath').value = tool.execution_config?.response_path || '';
-            } else if (tool.category === 'shared_env_api') {
-                const activeEnv = tool.execution_config?.active_env || 'local';
-                const elLoc = document.getElementById('modalEnvLocal');
-                const elLiv = document.getElementById('modalEnvLive');
-                if (elLoc) elLoc.checked = activeEnv === 'local';
-                if (elLiv) elLiv.checked = activeEnv === 'live';
-                document.getElementById('modalSharedLocalUrl').value = tool.execution_config?.environments?.local?.base_url || '';
-                document.getElementById('modalSharedLocalToken').value = tool.execution_config?.environments?.local?.bearer_token || '';
-                document.getElementById('modalSharedLiveUrl').value = tool.execution_config?.environments?.live?.base_url || '';
-                document.getElementById('modalSharedLiveToken').value = tool.execution_config?.environments?.live?.bearer_token || '';
-            } else if (tool.category === 'webhook') {
-                document.getElementById('modalWebhookUrl').value = tool.execution_config?.target_url || '';
+            if (mode === 'personal') {
+                if (feedbackCheckbox) {
+                    feedbackCheckbox.checked = false;
+                    feedbackCheckbox.disabled = true;
+                }
+                if (feedbackNotice) {
+                    feedbackNotice.textContent = '(Closed in Personal Assistant mode)';
+                    feedbackNotice.className = 'block text-[10px] text-amber-400 font-semibold';
+                }
+                if (modeBadge) {
+                    modeBadge.textContent = '⚡ Personal Assistant (24/7)';
+                    modeBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-violet-500/20 text-violet-300 border border-violet-500/30';
+                }
+            } else {
+                if (feedbackCheckbox) {
+                    feedbackCheckbox.disabled = false;
+                    feedbackCheckbox.checked = true;
+                }
+                if (feedbackNotice) {
+                    feedbackNotice.textContent = '(Sent upon chat closure)';
+                    feedbackNotice.className = 'block text-[10px] text-slate-400';
+                }
+                if (modeBadge) {
+                    modeBadge.textContent = '🏢 Business Support Bot';
+                    modeBadge.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+                }
             }
+        }
 
-            // Populate parameters
-            const container = document.getElementById('parameterRowsContainer');
-            container.innerHTML = '';
-            const props = tool.parameters_schema?.properties || {};
-            const req = tool.parameters_schema?.required || [];
-            for (const [pName, pSpec] of Object.entries(props)) {
-                addParameterRow(pName, pSpec.type || 'STRING', pSpec.description || '', req.includes(pName));
-            }
+        modeRadios.forEach(r => {
+            r.addEventListener('change', function() {
+                updateModeUI(this.value);
+            });
+        });
 
-            document.getElementById('customToolModal').classList.remove('hidden');
-        };
+        async function switchMode(mode, applyPrompt = true) {
+            const ownerName = ownerNameInput ? ownerNameInput.value.trim() : 'Boss';
+            const originalBtnText = (mode === 'personal') ? btnToPersonal.innerHTML : btnToSupport.innerHTML;
+            const activeBtn = (mode === 'personal') ? btnToPersonal : btnToSupport;
 
-        window.closeToolModal = function() {
-            document.getElementById('customToolModal').classList.add('hidden');
-        };
+            activeBtn.disabled = true;
+            activeBtn.innerHTML = `<span class="inline-block animate-spin mr-1">⌛</span> Switching...`;
 
-        window.openPresetsModal = function() {
-            document.getElementById('presetsModal').classList.remove('hidden');
-        };
-
-        window.closePresetsModal = function() {
-            document.getElementById('presetsModal').classList.add('hidden');
-        };
-
-        window.loadPresetWeather = function() {
-            closePresetsModal();
-            openAddToolModal();
-            document.getElementById('modalToolSlug').value = 'get_weather';
-            document.getElementById('modalDisplayName').value = '🌤️ Live Weather Forecaster';
-            document.getElementById('modalCategory').value = 'rest_api';
-            document.getElementById('modalDescription').value = 'Fetches real-time weather, temperature, humidity, apparent temperature, and wind speed for any location or city using coordinates.';
-            document.getElementById('modalRestUrl').value = 'https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m';
-            document.getElementById('modalRestPath').value = 'current';
-            toggleCategoryFields('rest_api');
-            addParameterRow('city', 'STRING', 'City name (e.g. "Patna", "Delhi", "London")', true);
-            addParameterRow('latitude', 'NUMBER', 'Latitude coordinate (e.g. 25.59 for Patna)', true);
-            addParameterRow('longitude', 'NUMBER', 'Longitude coordinate (e.g. 85.14 for Patna)', true);
-        };
-
-        window.loadPresetCrypto = function() {
-            closePresetsModal();
-            openAddToolModal();
-            document.getElementById('modalToolSlug').value = 'get_crypto_price';
-            document.getElementById('modalDisplayName').value = '🪙 Crypto Price Tracker';
-            document.getElementById('modalCategory').value = 'rest_api';
-            document.getElementById('modalDescription').value = 'Queries current live market prices for cryptocurrencies like bitcoin, ethereum, solana in INR and USD.';
-            document.getElementById('modalRestUrl').value = 'https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=inr,usd';
-            toggleCategoryFields('rest_api');
-            addParameterRow('coin_id', 'STRING', 'Cryptocurrency id e.g. "bitcoin", "ethereum", "solana"', true);
-        };
-
-        window.loadPresetWebhook = function() {
-            closePresetsModal();
-            openAddToolModal();
-            document.getElementById('modalToolSlug').value = 'send_crm_lead';
-            document.getElementById('modalDisplayName').value = '🎣 CRM Lead Outbound Webhook';
-            document.getElementById('modalCategory').value = 'webhook';
-            document.getElementById('modalDescription').value = 'Forwards interested customer leads, name, phone, and requirements directly to external CRM webhook.';
-            document.getElementById('modalWebhookUrl').value = 'https://hooks.zapier.com/hooks/catch/12345/abcde';
-            toggleCategoryFields('webhook');
-            addParameterRow('customer_name', 'STRING', 'Full name of customer', true);
-            addParameterRow('customer_phone', 'STRING', 'Contact phone number', true);
-            addParameterRow('notes', 'STRING', 'Summary of customer requirements', false);
-        };
-
-        window.loadPresetSharedEnv = function() {
-            closePresetsModal();
-            openAddToolModal();
-            document.getElementById('modalToolSlug').value = 'custom_shared_crm';
-            document.getElementById('modalDisplayName').value = '🏢 Custom Shared Hosting Backend';
-            document.getElementById('modalCategory').value = 'shared_env_api';
-            document.getElementById('modalDescription').value = 'Connects to your custom PHP/cPanel shared hosting backend or local development API.';
-            toggleCategoryFields('shared_env_api');
-            document.getElementById('modalSharedLocalUrl').value = 'http://localhost/myproject/api/v1';
-            document.getElementById('modalSharedLiveUrl').value = 'https://myproject.com/api/v1';
-            addParameterRow('action', 'STRING', 'Endpoint action to perform', true);
-        };
-
-        // Sandbox Simulator Modal
-        let activeSandboxTool = null;
-        window.openSandboxModal = function(tool) {
-            activeSandboxTool = tool;
-            document.getElementById('sandboxToolTitle').textContent = tool.tool_slug + ' (' + tool.category + ')';
-            const sampleArgs = {};
-            const props = tool.parameters_schema?.properties || {};
-            for (const [k, v] of Object.entries(props)) {
-                if (k === 'latitude') sampleArgs[k] = 25.5941;
-                else if (k === 'longitude') sampleArgs[k] = 85.1376;
-                else if (k === 'city') sampleArgs[k] = 'Patna';
-                else if (k === 'query') sampleArgs[k] = 'Latest tech news';
-                else if (k === 'expression') sampleArgs[k] = '35000 * 0.82';
-                else if (k === 'coin_id') sampleArgs[k] = 'bitcoin';
-                else if (k === 'action') sampleArgs[k] = 'pricing_plans';
-                else sampleArgs[k] = 'test_value';
-            }
-            document.getElementById('sandboxArgs').value = JSON.stringify(sampleArgs, null, 2);
-            document.getElementById('sandboxResultBox').classList.add('hidden');
-            document.getElementById('sandboxModal').classList.remove('hidden');
-        };
-
-        window.closeSandboxModal = function() {
-            document.getElementById('sandboxModal').classList.add('hidden');
-        };
-
-        window.runSandboxTest = async function() {
-            if (!activeSandboxTool) return;
-            const btn = document.getElementById('btnRunSandbox');
-            const output = document.getElementById('sandboxOutput');
-            const latencyEl = document.getElementById('sandboxLatency');
-            const resultBox = document.getElementById('sandboxResultBox');
-
-            let parsedArgs = {};
             try {
-                parsedArgs = JSON.parse(document.getElementById('sandboxArgs').value);
-            } catch (e) {
-                alert('Invalid JSON in arguments textarea.');
-                return;
-            }
+                const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+                const res = await fetch(`${basePath}/api/chat/switch-mode.php`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        mode: mode,
+                        owner_name: ownerName,
+                        apply_prompt: applyPrompt
+                    })
+                });
 
-            btn.disabled = true;
-            btn.textContent = '⏳ Executing...';
-            resultBox.classList.remove('hidden');
-            output.textContent = 'Contacting endpoint...';
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error || 'Failed to switch operating mode.');
 
-            const startTime = performance.now();
-            try {
-                if (activeSandboxTool.category === 'rest_api') {
-                    let targetUrl = activeSandboxTool.execution_config.url || '';
-                    for (const [k, v] of Object.entries(parsedArgs)) {
-                        targetUrl = targetUrl.replace(new RegExp('\\{' + k + '\\}', 'g'), encodeURIComponent(v));
-                    }
-                    const res = await fetch(targetUrl);
-                    const data = await res.json();
-                    const latency = Math.round(performance.now() - startTime);
-                    latencyEl.textContent = latency + 'ms (HTTP ' + res.status + ')';
-                    output.textContent = JSON.stringify(data, null, 2);
-                } else {
-                    const latency = Math.round(performance.now() - startTime);
-                    latencyEl.textContent = latency + 'ms (Simulated)';
-                    output.textContent = JSON.stringify({
-                        status: 'success',
-                        tool: activeSandboxTool.tool_slug,
-                        category: activeSandboxTool.category,
-                        args_received: parsedArgs,
-                        note: 'Executed through dynamic tool executor.'
-                    }, null, 2);
+                updateModeUI(mode);
+                if (textarea && data.system_prompt) {
+                    textarea.value = data.system_prompt;
+                }
+
+                if (statusPill && statusText) {
+                    statusText.innerHTML = `<span>✨ ${data.message}</span>`;
+                    statusPill.classList.remove('hidden');
+                    setTimeout(() => statusPill.classList.add('hidden'), 8000);
                 }
             } catch (err) {
-                const latency = Math.round(performance.now() - startTime);
-                latencyEl.textContent = latency + 'ms (Error)';
-                output.textContent = 'Test failed: ' + err.message;
+                alert('Error switching mode: ' + err.message);
             } finally {
-                btn.disabled = false;
-                btn.textContent = '▶ Execute Live Test';
+                activeBtn.disabled = false;
+                activeBtn.innerHTML = originalBtnText;
             }
-        };
-    });
+        }
+
+        btnToPersonal.addEventListener('click', function() {
+            switchMode('personal', true);
+        });
+
+        btnToSupport.addEventListener('click', function() {
+            switchMode('support', true);
+        });
+    })();
+
+            });
     </script>
 
     <!-- Footer Spacer -->

@@ -539,6 +539,12 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $enabled = isset($_POST['enabled']) ? 1 : 0;
     $autoReplyEnabled = isset($_POST['auto_reply_enabled']) ? 1 : 0;
+    $agentMode = in_array($_POST['agent_mode'] ?? '', ['support', 'personal'], true) ? $_POST['agent_mode'] : 'support';
+    // Feedback requests are explicitly disabled/closed when converted to personal assistant mode:
+    $feedbackEnabled = ($agentMode === 'personal') ? 0 : (isset($_POST['feedback_enabled']) ? 1 : 0);
+    $isAlwaysOn = isset($_POST['is_always_on']) ? 1 : 0;
+    $ownerName = trim((string) ($_POST['owner_name'] ?? 'Boss')) ?: 'Boss';
+
     $providerPriority = in_array($_POST['provider_priority'] ?? '', ['gemini', 'groq', 'openrouter'], true) ? $_POST['provider_priority'] : 'gemini';
     $systemPrompt = trim((string) ($_POST['system_prompt'] ?? ''));
     $temperature = max(0.0, min(1.0, (float) ($_POST['temperature'] ?? 0.4)));
@@ -553,8 +559,8 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $openrouterModel = trim((string) ($_POST['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free')) ?: 'meta-llama/llama-3.3-70b-instruct:free';
 
     $stmt = $pdo->prepare(
-        'INSERT INTO ai_agent_settings (user_id, enabled, provider_priority, gemini_api_key, groq_api_key, openrouter_api_key, gemini_model, groq_model, openrouter_model, system_prompt, temperature, max_tokens, auto_reply_enabled)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        'INSERT INTO ai_agent_settings (user_id, enabled, provider_priority, gemini_api_key, groq_api_key, openrouter_api_key, gemini_model, groq_model, openrouter_model, system_prompt, temperature, max_tokens, auto_reply_enabled, agent_mode, feedback_enabled, is_always_on, owner_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            enabled = VALUES(enabled),
            provider_priority = VALUES(provider_priority),
@@ -567,14 +573,21 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
            system_prompt = VALUES(system_prompt),
            temperature = VALUES(temperature),
            max_tokens = VALUES(max_tokens),
-           auto_reply_enabled = VALUES(auto_reply_enabled)'
+           auto_reply_enabled = VALUES(auto_reply_enabled),
+           agent_mode = VALUES(agent_mode),
+           feedback_enabled = VALUES(feedback_enabled),
+           is_always_on = VALUES(is_always_on),
+           owner_name = VALUES(owner_name)'
     );
     $stmt->execute([
         $userId, $enabled, $providerPriority, $geminiKey, $groqKey, $openrouterKey,
-        $geminiModel, $groqModel, $openrouterModel, $systemPrompt, $temperature, $maxTokens, $autoReplyEnabled
+        $geminiModel, $groqModel, $openrouterModel, $systemPrompt, $temperature, $maxTokens, $autoReplyEnabled,
+        $agentMode, $feedbackEnabled, $isAlwaysOn, $ownerName
     ]);
 
-    flash('success', 'AI Agent configuration updated successfully.');
+    flash('success', $agentMode === 'personal'
+        ? '⚡ Personal AI Assistant activated! Operating 24/7 with customer feedback reviews closed.'
+        : '🏢 AI Support Agent configuration updated successfully.');
     redirect_to('index.php?page=chatbot&tab=ai-agent');
 }
 

@@ -24,6 +24,10 @@ $aiSettings = $aiStmt->fetch() ?: [
     'temperature' => '0.40',
     'max_tokens' => 500,
     'auto_reply_enabled' => 1,
+    'agent_mode' => 'support',
+    'feedback_enabled' => 1,
+    'is_always_on' => 1,
+    'owner_name' => 'Boss',
     'frustration_threshold' => '0.65',
     'tools_config' => null
 ];

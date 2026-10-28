@@ -162,22 +162,23 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
 }
 
 /**
- * Close conversation session with resolution remark and feedback prompt
+ * Close conversation session with resolution remark and optional feedback prompt
  * @param {Object} db
  * @param {number|string} conversationId
  * @param {string} remark
  * @param {boolean} [isAuto=true]
+ * @param {boolean} [requestFeedback=true]
  */
-export async function closeSession(db, conversationId, remark, isAuto = true) {
+export async function closeSession(db, conversationId, remark, isAuto = true, requestFeedback = true) {
   await db.execute(
     `UPDATE chat_conversations
      SET status = 'closed',
          closed_at = NOW(),
          resolution_remark = ?,
          is_auto_closed = ?,
-         awaiting_feedback = 1,
+         awaiting_feedback = ?,
          consecutive_bot_replies = 0
      WHERE id = ?`,
-    [remark.slice(0, 500), isAuto ? 1 : 0, conversationId]
+    [remark.slice(0, 500), isAuto ? 1 : 0, requestFeedback ? 1 : 0, conversationId]
   );
 }

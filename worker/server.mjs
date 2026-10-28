@@ -1269,8 +1269,20 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
               );
               const preConv = preConvRows && preConvRows.length > 0 ? preConvRows[0] : null;
 
+              // Check if user has personal assistant mode or feedback surveys disabled
+              const [userSettingsRows] = await db.execute(
+                'SELECT agent_mode, feedback_enabled FROM ai_agent_settings WHERE user_id = ? LIMIT 1',
+                [userId]
+              );
+              const isPersonalModeSetting = userSettingsRows && userSettingsRows.length > 0 && userSettingsRows[0].agent_mode === 'personal';
+              const feedbackAllowedSetting = !isPersonalModeSetting && (!userSettingsRows || userSettingsRows.length === 0 || Number(userSettingsRows[0].feedback_enabled ?? 1) === 1);
+
+              if (preConv && Number(preConv.awaiting_feedback) === 1 && !feedbackAllowedSetting) {
+                await db.execute('UPDATE chat_conversations SET awaiting_feedback = 0 WHERE id = ?', [preConv.id]);
+              }
+
               // Check if contact is responding with 5-star rating feedback
-              if (preConv && Number(preConv.awaiting_feedback) === 1) {
+              if (feedbackAllowedSetting && preConv && Number(preConv.awaiting_feedback) === 1) {
                 const rawBody = (norm.body || '').trim();
                 let parsedRating = null;
 
@@ -1604,23 +1616,29 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           const historyTurns = await ChatMemoryEngine.getRecentTurns(db, conv.id, activeSessionUuid, 8);
 
                           // Step C: Check for query resolution / customer satisfaction
-                          const resolutionCheck = ChatResolutionEngine.detectResolution(consolidatedText, historyTurns);
-                          if (resolutionCheck.isResolved) {
-                            logger.info({ userId, convId: conv.id, remark: resolutionCheck.remark }, '🎉 Inquiry resolved! Auto-closing session.');
-                            await closeSession(db, conv.id, resolutionCheck.remark, true);
+                          // In Personal Assistant mode, customer feedback surveys and auto-closing are completely disabled!
+                          const isPersonalMode = aiSettings.agent_mode === 'personal';
+                          const feedbackAllowed = !isPersonalMode && Number(aiSettings.feedback_enabled ?? 1) === 1;
 
-                            const closureMsg = ChatResolutionEngine.getClosureMessage();
-                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
-                            await db.execute(
-                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                               VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
-                              [userId, conv.id, activeSessionUuid, closureMsg]
-                            );
-                            await db.execute(
-                              `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?`,
-                              [closureMsg.slice(0, 200), conv.id]
-                            );
-                            return;
+                          if (!isPersonalMode && feedbackAllowed) {
+                            const resolutionCheck = ChatResolutionEngine.detectResolution(consolidatedText, historyTurns);
+                            if (resolutionCheck.isResolved) {
+                              logger.info({ userId, convId: conv.id, remark: resolutionCheck.remark }, '🎉 Inquiry resolved! Auto-closing session.');
+                              await closeSession(db, conv.id, resolutionCheck.remark, true, true);
+
+                              const closureMsg = ChatResolutionEngine.getClosureMessage();
+                              await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
+                              await db.execute(
+                                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                                 VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
+                                [userId, conv.id, activeSessionUuid, closureMsg]
+                              );
+                              await db.execute(
+                                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?`,
+                                [closureMsg.slice(0, 200), conv.id]
+                              );
+                              return;
+                            }
                           }
 
                           // Step D: Token Burn Optimizer - Intercept repeated greetings
@@ -1645,7 +1663,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                             const { systemPrompt, userMessage } = buildPromptWithRag(
                               aiSettings.system_prompt,
                               relevantChunks,
-                              consolidatedText
+                              consolidatedText,
+                              {
+                                agentMode: aiSettings.agent_mode || 'support',
+                                ownerName: aiSettings.owner_name || 'Boss'
+                              }
                             );
 
                             // Parse tools configuration and resolve caller role
@@ -1664,7 +1686,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                             const cleanPhone = (senderPhone || '').replace(/[^\d]/g, '');
 
                             let callerRole = 'guest';
-                            if (adminPhones.some(p => cleanPhone.includes(p.replace(/[^\d]/g, '')))) {
+                            if (isPersonalMode || adminPhones.some(p => cleanPhone.includes(p.replace(/[^\d]/g, '')))) {
                               callerRole = 'admin';
                             } else {
                               const [custRows] = await db.execute(
@@ -1682,6 +1704,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               conversationId: conv.id,
                               callerPhone: senderPhone,
                               callerRole,
+                              agentMode: aiSettings.agent_mode || 'support',
+                              ownerName: aiSettings.owner_name || 'Boss',
                               toolsConfig
                             };
 
