@@ -2728,7 +2728,7 @@ app.post('/sessions/:userId/wake', async (req, res) => {
 app.post('/sessions/:userId/send', async (req, res) => {
   const session = getSession(req.params.userId);
   const targetRecipient = await resolveJidToPhone(req.params.userId, req.body?.to, session);
-  const recipient = normalizeRecipient(targetRecipient || req.body?.to);
+  const recipient = targetRecipient ? normalizeRecipient(targetRecipient) : normalizeRecipient(req.body?.to);
   const message = String(req.body?.message || '').trim();
 
   if (!recipient.jid || !message) {

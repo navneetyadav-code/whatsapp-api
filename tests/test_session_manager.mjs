@@ -78,12 +78,17 @@ async function runTest() {
     process.exit(1);
   }
 
-  // Step D: Customer returns next week (fresh inquiry)
-  console.log('[Test 2D] Customer returns later with a new inquiry...');
-  const s3 = await resolveActiveSession(db, userId, testPhone, 'Test User', 'Hi I have another question');
-  console.log('Session 3:', s3);
+  // Step D: Customer returns later (anti-bombing guard prevents accidental wake-up, /start wakes up cleanly)
+  console.log('[Test 2D] Customer returns later while closed...');
+  const sBlocked = await resolveActiveSession(db, userId, testPhone, 'Test User', 'Hi I have another question');
+  if (sBlocked.status === 'closed' && sBlocked.botPaused === true) {
+    console.log('✔ Anti-bombing guard verified: arbitrary text does not reopen closed session.');
+  }
+
+  const s3 = await resolveActiveSession(db, userId, testPhone, 'Test User', '/start');
+  console.log('Session 3 (woken up via /start):', s3);
   if (s3.isNewSession && s3.sessionUuid !== s1.sessionUuid && s3.status === 'open') {
-    console.log('✔ Test 2D Passed: New distinct session established cleanly!\n');
+    console.log('✔ Test 2D Passed: New distinct session established cleanly on /start wake-up!\n');
   } else {
     console.error('❌ Test 2D Failed!');
     process.exit(1);

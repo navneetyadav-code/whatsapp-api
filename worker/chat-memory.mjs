@@ -33,8 +33,8 @@ export class ChatMemoryEngine {
       params.push(sessionUuid);
     }
 
-    query += ' ORDER BY id DESC LIMIT ?';
-    params.push(Math.max(2, Math.min(maxTurns, 20)));
+    const safeLimit = Math.max(2, Math.min(parseInt(maxTurns, 10) || 8, 20));
+    query += ' ORDER BY id DESC LIMIT ' + safeLimit;
 
     try {
       const [rows] = await db.execute(query, params);
