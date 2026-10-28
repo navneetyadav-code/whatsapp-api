@@ -1270,6 +1270,10 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
           const messagePreview = norm.body || (norm.messageType !== 'text' ? `[${norm.messageType}]` : '');
           let isBotPaused = 0;
           let feedbackHandled = false;
+          let convStatus = 'open';
+          let conversationId = null;
+          let currentSessionUuid = null;
+          let wokeUp = false;
 
           if (senderPhone) {
             try {
@@ -1352,12 +1356,6 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
               }
 
               // Standard conversation session resolution (unique ticket lifecycles)
-              let conversationId = null;
-              let currentSessionUuid = null;
-
-              let convStatus = 'open';
-              let wokeUp = false;
-
               if (!feedbackHandled) {
                 const sessionInfo = await resolveActiveSession(db, userId, senderPhone, senderName, messagePreview);
                 conversationId = sessionInfo.conversationId;
