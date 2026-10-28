@@ -612,6 +612,49 @@ if ($page === 'ai-knowledge-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect_to('index.php?page=chatbot&tab=knowledge');
 }
 
+if ($page === 'ai-knowledge-update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $id = (int) ($_POST['id'] ?? 0);
+    $title = trim((string) ($_POST['title'] ?? ''));
+    $content = trim((string) ($_POST['content'] ?? ''));
+
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+              || str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
+
+    if ($id <= 0 || $title === '' || $content === '') {
+        if ($isAjax) {
+            json_response(['success' => false, 'error' => 'Title and content are required.'], 422);
+        }
+        flash('error', 'Title and content are required.');
+        redirect_to('index.php?page=chatbot&tab=knowledge');
+    }
+
+    $stmt = Database::pdo()->prepare(
+        'UPDATE ai_knowledge_chunks 
+         SET title = ?, content = ?, embedding = NULL, updated_at = NOW() 
+         WHERE id = ? AND user_id = ?'
+    );
+    $stmt->execute([$title, $content, $id, $userId]);
+
+    if ($isAjax) {
+        json_response([
+            'success' => true,
+            'message' => 'Knowledge document updated successfully.',
+            'chunk' => [
+                'id' => $id,
+                'title' => $title,
+                'content' => $content,
+                'char_count' => mb_strlen($content),
+            ]
+        ]);
+    }
+
+    flash('success', 'Knowledge document updated successfully.');
+    redirect_to('index.php?page=chatbot&tab=knowledge');
+}
+
 if ($page === 'session-auto-sleep' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();

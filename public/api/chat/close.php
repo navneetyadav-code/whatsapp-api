@@ -71,7 +71,8 @@ if ($action === 'reopen') {
 $feedbackPrompt = "Thank you for contacting us! 🙏\n"
     . "Your support chat has been marked as closed.\n\n"
     . "⭐ How would you rate your support experience today?\n"
-    . "Please reply with a number from 1 to 5 (⭐ 1 = Poor, ⭐⭐⭐⭐⭐ 5 = Excellent) and any comments you'd like to share!";
+    . "Please reply with a number from 1 to 5 (⭐ 1 = Poor, ⭐⭐⭐⭐⭐ 5 = Excellent) and any comments you'd like to share!\n\n"
+    . "_(Note: To chat with us again at any time, simply send /start or start)_";
 
 // Update conversation to closed and awaiting feedback
 $updateStmt = $pdo->prepare(

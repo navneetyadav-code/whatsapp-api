@@ -23,13 +23,24 @@ export function generateSessionUuid() {
 }
 
 /**
+ * Check if incoming text is an explicit wake-up / start command (/start or start)
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isWakeupTrigger(text) {
+  if (!text || typeof text !== 'string') return false;
+  const clean = text.trim().toLowerCase().replace(/[.!?]/g, '');
+  return /^(\/start|start)$/.test(clean);
+}
+
+/**
  * Resolve active session for incoming message or initialize fresh session
  * @param {Object} db - MySQL connection/pool
  * @param {number|string} userId
  * @param {string} senderPhone
  * @param {string} [senderName]
  * @param {string} [messagePreview]
- * @returns {Promise<{ conversationId: number, sessionUuid: string, isNewSession: boolean, status: string, botPaused: boolean }>}
+ * @returns {Promise<{ conversationId: number, sessionUuid: string, isNewSession: boolean, status: string, botPaused: boolean, wokeUp: boolean }>}
  */
 export async function resolveActiveSession(db, userId, senderPhone, senderName = null, messagePreview = '') {
   const [rows] = await db.execute(
@@ -58,15 +69,17 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
       sessionUuid,
       isNewSession: true,
       status: 'open',
-      botPaused: false
+      botPaused: false,
+      wokeUp: isWakeupTrigger(messagePreview)
     };
   }
 
   // 2. Existing conversation exists: check if closed or active
   if (conv.status === 'closed') {
-    const isPassiveCourtesy = /^(ok|okay|k|kk|thx|thanks|thank\s*you|bye|byy|byee|good\s*bye|goodnight|gn|tc|take\s*care|alvida|dhanyawad|shukriya|👍|🙏|😊|👌)+$/i.test((messagePreview || '').trim().toLowerCase());
-    if (isPassiveCourtesy) {
-      // Keep conversation closed, do not spawn a new session or trigger bot replies
+    const isWakeup = isWakeupTrigger(messagePreview);
+    if (!isWakeup) {
+      // Conversation is closed and user did NOT send /start or start.
+      // Keep conversation closed, DO NOT spawn a new session, DO NOT wake the chatbot!
       await db.execute(
         `UPDATE chat_conversations
          SET contact_name = COALESCE(?, contact_name),
@@ -81,11 +94,12 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
         sessionUuid: conv.session_uuid || generateSessionUuid(),
         isNewSession: false,
         status: 'closed',
-        botPaused: true
+        botPaused: true,
+        wokeUp: false
       };
     }
 
-    // Previous session was closed. Fresh genuine inquiry beginning!
+    // User explicitly sent /start or start to wake up the bot! Fresh session begins!
     sessionUuid = generateSessionUuid();
     isNewSession = true;
 
@@ -112,7 +126,8 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
       sessionUuid,
       isNewSession: true,
       status: 'open',
-      botPaused: false
+      botPaused: false,
+      wokeUp: true
     };
   }
 
@@ -120,6 +135,8 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
   if (!sessionUuid) {
     sessionUuid = generateSessionUuid();
   }
+
+  const isWakeup = isWakeupTrigger(messagePreview);
 
   await db.execute(
     `UPDATE chat_conversations
@@ -138,7 +155,8 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
     sessionUuid,
     isNewSession: false,
     status: conv.status,
-    botPaused: Boolean(Number(conv.bot_paused))
+    botPaused: Boolean(Number(conv.bot_paused)),
+    wokeUp: isWakeup
   };
 }
 

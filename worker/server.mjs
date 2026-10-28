@@ -25,7 +25,7 @@ import {
 } from './ai-agent.mjs';
 import { globalDebouncer } from './chat-debouncer.mjs';
 import { globalGreetingCache } from './chat-greeting-cache.mjs';
-import { resolveActiveSession, closeSession } from './chat-session-manager.mjs';
+import { resolveActiveSession, closeSession, isWakeupTrigger } from './chat-session-manager.mjs';
 import { ChatMemoryEngine } from './chat-memory.mjs';
 import { ChatPresenceManager } from './chat-presence.mjs';
 import { ChatResolutionEngine } from './chat-resolution.mjs';
@@ -1317,10 +1317,12 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                     [userId, preConv.id, senderPhone, finalContactName, parsedRating, rawBody]
                   );
 
-                  // Update conversation status: feedback recorded
+                                    // Update conversation status: feedback recorded and status kept closed
                   await db.execute(
                     `UPDATE chat_conversations
                      SET awaiting_feedback = 0,
+                         status = 'closed',
+                         closed_at = COALESCE(closed_at, NOW()),
                          last_message = ?,
                          last_message_at = NOW(),
                          unread_count = unread_count + 1
@@ -1330,17 +1332,22 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                   // Send customer thank-you note via WhatsApp socket
                   const starsDisplay = '⭐'.repeat(parsedRating);
-                  const thanksText = `Thank you for your rating of ${parsedRating}/5 ${starsDisplay}! 🙏 We appreciate your feedback and look forward to serving you again.`;
+                  const thanksText = `Thank you for your rating of ${parsedRating}/5 ${starsDisplay}! 🙏 We appreciate your feedback.\n\n` +
+                    `🔒 *This chat session is now closed.*\n` +
+                    `If you ever want to chat again or have any questions, simply reply with */start* or *start* to begin a new chat session! 😊`;
                   try {
                     await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: thanksText });
                     await db.execute(
-                      `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
-                       VALUES (?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
-                      [userId, preConv.id, thanksText]
+                      `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                       VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
+                      [userId, preConv.id, preConv.session_uuid || null, thanksText]
                     );
                   } catch (replyErr) {
                     logger.warn({ replyErr: replyErr.message }, 'Failed to dispatch feedback thank-you reply');
                   }
+                } else if (isWakeupTrigger(rawBody)) {
+                  // User bypassed rating and typed /start or start
+                  await db.execute('UPDATE chat_conversations SET awaiting_feedback = 0 WHERE id = ?', [preConv.id]);
                 }
               }
 
@@ -1348,17 +1355,23 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
               let conversationId = null;
               let currentSessionUuid = null;
 
+              let convStatus = 'open';
+              let wokeUp = false;
+
               if (!feedbackHandled) {
                 const sessionInfo = await resolveActiveSession(db, userId, senderPhone, senderName, messagePreview);
                 conversationId = sessionInfo.conversationId;
                 currentSessionUuid = sessionInfo.sessionUuid;
                 isBotPaused = sessionInfo.botPaused ? 1 : 0;
+                convStatus = sessionInfo.status;
+                wokeUp = Boolean(sessionInfo.wokeUp);
               } else {
-                const [cRows] = await db.execute('SELECT id, session_uuid, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1', [userId, senderPhone]);
+                const [cRows] = await db.execute('SELECT id, session_uuid, bot_paused, status FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1', [userId, senderPhone]);
                 if (cRows && cRows.length > 0) {
                   conversationId = cRows[0].id;
                   currentSessionUuid = cRows[0].session_uuid;
                   isBotPaused = Number(cRows[0].bot_paused || 0);
+                  convStatus = cRows[0].status;
                 }
               }
 
@@ -1530,10 +1543,34 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
           // 7. Enterprise AI Agent with Debouncer, Memory, Typing Presence, & Auto-Resolution
           let aiHandled = false;
-          if (!feedbackHandled && isBotPaused !== 1) {
+          if (!feedbackHandled && isBotPaused !== 1 && convStatus === 'open') {
             const rawInboundText = (norm.body || '').trim();
             if (rawInboundText) {
               try {
+                // Intercept wake-up trigger (/start or start)
+                if (isWakeupTrigger(rawInboundText)) {
+                  logger.info({ userId, senderPhone }, '⚡ Wake-up command received (/start) - sending branded greeting');
+                  const welcomeText = `Hello! 👋 Welcome to *Aadi Shree Classes*.\n\n` +
+                    `I am your virtual counselor, ready to assist you with our courses, fee structure, batch timings, admissions, and scholarships.\n\n` +
+                    `How can I help you today? 📚✨`;
+                  try {
+                    await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
+                    await db.execute(
+                      `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                       VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
+                      [userId, conversationId, currentSessionUuid, welcomeText]
+                    );
+                    await db.execute(
+                      `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
+                      [welcomeText.slice(0, 200), conversationId]
+                    );
+                    aiHandled = true;
+                  } catch (sendErr) {
+                    logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch start welcome greeting');
+                  }
+                  continue;
+                }
+
                 const [aiSettingsRows] = await db.execute(
                   'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
                   [userId]
@@ -1659,12 +1696,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
           }
 
           // 8. Chatbot rule processing for text messages with loop protection
-          if (feedbackHandled) {
-            continue; // Do not trigger chatbot auto-replies on feedback submissions
-          }
-          if (isBotPaused === 1) {
-            logger.info({ userId, senderPhone }, 'Skipping chatbot auto-reply: bot is paused by human agent for this conversation');
-            continue;
+          if (feedbackHandled || isBotPaused === 1 || convStatus === 'closed') {
+            if (isBotPaused === 1) {
+              logger.info({ userId, senderPhone }, 'Skipping chatbot auto-reply: bot is paused by human agent for this conversation');
+            }
+            continue; // Do not trigger chatbot auto-replies on feedback submissions or closed conversations
           }
           const text = norm.body || '';
           if (!text.trim()) continue;
