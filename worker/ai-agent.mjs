@@ -262,22 +262,23 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
  * Call Google Gemini API
  */
 async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500) {
-  const modelName = model || 'gemini-1.5-flash';
+  const modelName = model || 'gemini-3.6-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+  const promptText = systemPrompt
+    ? `[System Instructions]\n${systemPrompt}\n\n[Customer Message]\n${userMessage}`
+    : userMessage;
 
   const payload = {
     contents: [
       {
         role: 'user',
-        parts: [{ text: userMessage }]
+        parts: [{ text: promptText }]
       }
     ],
-    system_instruction: {
-      parts: [{ text: systemPrompt }]
-    },
     generationConfig: {
-      temperature: Number(temperature),
-      maxOutputTokens: Number(maxTokens)
+      temperature: Number(temperature) || 0.4,
+      maxOutputTokens: Math.max(Number(maxTokens) || 500, 300)
     }
   };
 
@@ -285,7 +286,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(18000)
+    signal: AbortSignal.timeout(10000)
   });
 
   if (!response.ok) {
@@ -305,7 +306,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
  * Call Groq API (OpenAI compatible)
  */
 async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500) {
-  const modelName = model || 'llama-3.3-70b-versatile';
+  const modelName = model || 'openai/gpt-oss-20b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
 
   const payload = {
@@ -315,7 +316,7 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
       { role: 'user', content: userMessage }
     ],
     temperature: Number(temperature),
-    max_tokens: Number(maxTokens)
+    max_tokens: Math.max(Number(maxTokens) || 500, 350)
   };
 
   const response = await fetch(url, {
