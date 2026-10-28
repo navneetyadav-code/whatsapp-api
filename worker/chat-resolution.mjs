@@ -101,6 +101,7 @@ export class ChatResolutionEngine {
   static getClosureMessage(customSalutation = 'Glad I could help you today!') {
     return `${customSalutation} 🙏 I have marked this conversation as resolved.\n\n` +
       `⭐ *How would you rate your support experience today?*\n` +
-      `Please reply with a number from *1 to 5* (⭐ 1 = Poor, ⭐⭐⭐⭐⭐ 5 = Excellent) and any comments you'd like to share!`;
+      `Please reply with a number from *1 to 5* (⭐ 1 = Poor, ⭐⭐⭐⭐⭐ 5 = Excellent).\n\n` +
+      `_(Note: To begin a fresh inquiry at any time, simply send */start* or *start*)_`;
   }
 }

@@ -275,12 +275,12 @@
         </form>
     </div>
 
-    <?php elseif ($activeTab === 'knowledge'): ?>
+        <?php elseif ($activeTab === 'knowledge'): ?>
     <!-- ========================================== -->
     <!-- TAB 3: COMPANY KNOWLEDGE BASE (RAG)        -->
     <!-- ========================================== -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <!-- Knowledge Chunks List -->
+        <!-- Knowledge Chunks List Column -->
         <div class="lg:col-span-2 space-y-4">
             <div class="bg-blue-50/70 border border-blue-200/80 rounded-xl p-4 text-xs text-blue-900 flex items-start gap-3">
                 <span class="text-base">💡</span>
@@ -290,30 +290,95 @@
                 </div>
             </div>
 
-            <?php foreach ($knowledgeChunks as $chunk): ?>
-                <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card transition-all">
-                    <div class="flex items-start justify-between gap-3 mb-2">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                            <h3 class="text-sm font-bold text-slate-900"><?= e($chunk['title']) ?></h3>
-                        </div>
-                        <form method="post" action="<?= e(base_url('index.php?page=ai-knowledge-delete')) ?>" onsubmit="return confirm('Delete this knowledge chunk?');">
-                            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                            <input type="hidden" name="id" value="<?= (int) $chunk['id'] ?>">
-                            <button type="submit" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded transition-colors" title="Delete chunk">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            </button>
-                        </form>
-                    </div>
-                    <div class="bg-slate-50 border border-slate-200/70 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">
-                        <?= e($chunk['content']) ?>
-                    </div>
-                    <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-2">
-                        <span>Characters: <?= strlen($chunk['content']) ?></span>
-                        <span>Model: <?= e($chunk['embedding_model'] ?? 'local-tfidf') ?></span>
-                    </div>
+            <?php if (!empty($knowledgeChunks)): ?>
+            <!-- Dynamic Search Bar (Only Search Bar) -->
+            <div class="relative w-full">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
-            <?php endforeach; ?>
+                <input 
+                    id="knowledgeSearchInput" 
+                    type="text" 
+                    placeholder="Search knowledge documents by title or keywords..." 
+                    autocomplete="off"
+                    class="w-full pl-10 pr-9 py-2.5 text-xs border border-slate-200 rounded-xl bg-white shadow-subtle focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 placeholder:text-slate-400 transition-all"
+                >
+                <button 
+                    type="button" 
+                    id="knowledgeSearchClear" 
+                    class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                    title="Clear search"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <?php endif; ?>
+
+            <!-- Knowledge Chunks List Container -->
+            <div id="knowledgeChunksList" class="space-y-4">
+                <?php foreach ($knowledgeChunks as $chunk): ?>
+                    <div class="knowledge-chunk-card bg-white rounded-xl border border-slate-200/80 p-5 shadow-card transition-all"
+                         data-id="<?= (int) $chunk['id'] ?>"
+                         data-title="<?= e($chunk['title']) ?>">
+                        <textarea class="chunk-raw-content hidden"><?= e($chunk['content']) ?></textarea>
+                        <div class="flex items-start justify-between gap-3 mb-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                <h3 class="text-sm font-bold text-slate-900 truncate chunk-title"><?= e($chunk['title']) ?></h3>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <button type="button" class="btn-edit-chunk text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition-colors" title="Edit document">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                </button>
+                                <form method="post" action="<?= e(base_url('index.php?page=ai-knowledge-delete')) ?>" onsubmit="return confirm('Delete this knowledge chunk?');" class="inline">
+                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $chunk['id'] ?>">
+                                    <button type="submit" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Delete chunk">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-200/70 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed chunk-content">
+                            <?= e($chunk['content']) ?>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-2">
+                            <span class="chunk-chars">Characters: <?= strlen($chunk['content']) ?></span>
+                            <span>Model: <?= e($chunk['embedding_model'] ?? 'local-tfidf') ?></span>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- Empty Search Results State -->
+            <div id="noKnowledgeSearchResults" class="hidden bg-white border border-slate-200/80 rounded-xl p-8 text-center shadow-card">
+                <div class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mx-auto mb-2 text-slate-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900">No matching documents</h3>
+                <p class="text-xs text-slate-500 mt-0.5">No knowledge chunks match your search query.</p>
+                <button type="button" id="btnResetSearch" class="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700 underline">Clear search filter</button>
+            </div>
+
+            <!-- Dynamic Pagination Footer -->
+            <?php if (!empty($knowledgeChunks)): ?>
+            <div id="knowledgePaginationContainer" class="bg-white border border-slate-200/80 rounded-xl p-3 px-4 shadow-card flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div id="knowledgePaginationSummary" class="text-slate-500 font-medium">
+                    Showing <span id="pagStart" class="font-bold text-slate-900">1</span> to <span id="pagEnd" class="font-bold text-slate-900"><?= min(6, count($knowledgeChunks)) ?></span> of <span id="pagTotal" class="font-bold text-slate-900"><?= count($knowledgeChunks) ?></span> documents
+                </div>
+                <div class="flex items-center gap-1.5" id="knowledgePaginationControls">
+                    <button type="button" id="pagPrevBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                        ← Previous
+                    </button>
+                    <div id="pagNumberPills" class="flex items-center gap-1">
+                        <!-- Dynamically populated page pills -->
+                    </div>
+                    <button type="button" id="pagNextBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                        Next →
+                    </button>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php if (!$knowledgeChunks): ?>
                 <div class="bg-white border border-slate-200/80 rounded-xl p-10 text-center shadow-card">
@@ -352,6 +417,53 @@
                 </form>
             </div>
         </div>
+    </div>
+
+    <!-- Modal: Edit Knowledge Chunk Dialog -->
+    <div id="editKnowledgeModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 relative">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <h3 class="text-sm font-bold text-slate-900">Edit Knowledge Document</h3>
+                </div>
+                <button type="button" id="btnCloseEditKnowledgeModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Update the topic title and content details. The AI Agent will immediately reference this updated knowledge.</p>
+            
+            <form id="editKnowledgeForm" method="post" action="<?= e(base_url('index.php?page=ai-knowledge-update')) ?>" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="id" id="editKnowledgeId" value="">
+
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">Topic / Title</label>
+                    <input type="text" name="title" id="editKnowledgeTitle" required class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-medium">
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[11px] font-semibold text-slate-700">Document Content / Details</label>
+                        <span id="editKnowledgeCharCount" class="text-[10px] text-slate-400 font-mono">0 characters</span>
+                    </div>
+                    <textarea name="content" id="editKnowledgeContent" rows="8" required class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none resize-none font-sans leading-relaxed"></textarea>
+                </div>
+
+                <div id="editKnowledgeFeedback" class="hidden p-2.5 rounded-lg text-xs font-medium"></div>
+
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" id="btnCancelEditKnowledge" class="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
+                    <button type="submit" id="btnSubmitEditKnowledge" class="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-xs transition-all active:scale-[0.98]">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div id="knowledgeToast" class="fixed bottom-6 right-6 z-50 transform translate-y-10 opacity-0 pointer-events-none transition-all duration-200 ease-out flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-medium shadow-xl">
+        <span class="text-emerald-400 text-sm">✓</span>
+        <span id="knowledgeToastText">Knowledge document updated successfully.</span>
     </div>
 
     <?php elseif ($activeTab === 'escalations'): ?>
@@ -418,6 +530,332 @@
     <!-- Persona AI Rewrite Client Script -->
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // ==========================================
+        // Knowledge Base: Search, Pagination & Edit
+        // ==========================================
+        (function initKnowledgeBase() {
+            const searchInput = document.getElementById('knowledgeSearchInput');
+            const searchClear = document.getElementById('knowledgeSearchClear');
+            const btnResetSearch = document.getElementById('btnResetSearch');
+            const cardsList = document.getElementById('knowledgeChunksList');
+            const noResults = document.getElementById('noKnowledgeSearchResults');
+            const pagContainer = document.getElementById('knowledgePaginationContainer');
+            const pagStart = document.getElementById('pagStart');
+            const pagEnd = document.getElementById('pagEnd');
+            const pagTotal = document.getElementById('pagTotal');
+            const pagPrevBtn = document.getElementById('pagPrevBtn');
+            const pagNextBtn = document.getElementById('pagNextBtn');
+            const pagNumberPills = document.getElementById('pagNumberPills');
+
+            const editModal = document.getElementById('editKnowledgeModal');
+            const editForm = document.getElementById('editKnowledgeForm');
+            const editId = document.getElementById('editKnowledgeId');
+            const editTitle = document.getElementById('editKnowledgeTitle');
+            const editContent = document.getElementById('editKnowledgeContent');
+            const editCharCount = document.getElementById('editKnowledgeCharCount');
+            const editFeedback = document.getElementById('editKnowledgeFeedback');
+            const btnCloseModal = document.getElementById('btnCloseEditKnowledgeModal');
+            const btnCancelModal = document.getElementById('btnCancelEditKnowledge');
+            const btnSubmit = document.getElementById('btnSubmitEditKnowledge');
+
+            const toast = document.getElementById('knowledgeToast');
+            const toastText = document.getElementById('knowledgeToastText');
+
+            if (!cardsList) return;
+
+            const cards = Array.from(cardsList.querySelectorAll('.knowledge-chunk-card'));
+            if (cards.length === 0) return;
+
+            const PAGE_SIZE = 6;
+            let currentPage = 1;
+            let currentFilterCards = [...cards];
+            let currentEditingCard = null;
+
+            function showToast(msg) {
+                if (!toast || !toastText) return;
+                toastText.textContent = msg;
+                toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+                }, 3000);
+            }
+
+            function renderPagination() {
+                const total = currentFilterCards.length;
+                const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+                if (currentPage > totalPages) {
+                    currentPage = totalPages;
+                }
+
+                const startIndex = (currentPage - 1) * PAGE_SIZE;
+                const endIndex = Math.min(startIndex + PAGE_SIZE, total);
+
+                cards.forEach(card => {
+                    const indexInFiltered = currentFilterCards.indexOf(card);
+                    if (indexInFiltered >= startIndex && indexInFiltered < endIndex) {
+                        card.style.display = '';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                if (total === 0) {
+                    if (noResults) noResults.classList.remove('hidden');
+                    if (pagContainer) pagContainer.classList.add('hidden');
+                } else {
+                    if (noResults) noResults.classList.add('hidden');
+                    if (pagContainer) {
+                        pagContainer.classList.remove('hidden');
+                        if (pagStart) pagStart.textContent = String(startIndex + 1);
+                        if (pagEnd) pagEnd.textContent = String(endIndex);
+                        if (pagTotal) pagTotal.textContent = String(total);
+
+                        if (pagPrevBtn) {
+                            pagPrevBtn.disabled = (currentPage === 1);
+                        }
+                        if (pagNextBtn) {
+                            pagNextBtn.disabled = (currentPage === totalPages);
+                        }
+
+                        if (pagNumberPills) {
+                            pagNumberPills.innerHTML = '';
+                            for (let p = 1; p <= totalPages; p++) {
+                                if (totalPages > 7) {
+                                    if (p !== 1 && p !== totalPages && Math.abs(p - currentPage) > 2) {
+                                        if (p === 2 || p === totalPages - 1) {
+                                            const dot = document.createElement('span');
+                                            dot.className = 'px-1 text-slate-400 font-bold select-none text-[11px]';
+                                            dot.textContent = '…';
+                                            pagNumberPills.appendChild(dot);
+                                        }
+                                        continue;
+                                    }
+                                }
+
+                                const btn = document.createElement('button');
+                                btn.type = 'button';
+                                btn.className = (p === currentPage)
+                                    ? 'w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs'
+                                    : 'w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors';
+                                btn.textContent = String(p);
+                                btn.addEventListener('click', () => {
+                                    currentPage = p;
+                                    renderPagination();
+                                    scrollToSearch();
+                                });
+                                pagNumberPills.appendChild(btn);
+                            }
+                        }
+                    }
+                }
+            }
+
+            function scrollToSearch() {
+                if (searchInput) {
+                    const rect = searchInput.getBoundingClientRect();
+                    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                        searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }
+
+            if (pagPrevBtn) {
+                pagPrevBtn.addEventListener('click', () => {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        renderPagination();
+                        scrollToSearch();
+                    }
+                });
+            }
+
+            if (pagNextBtn) {
+                pagNextBtn.addEventListener('click', () => {
+                    const totalPages = Math.ceil(currentFilterCards.length / PAGE_SIZE);
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        renderPagination();
+                        scrollToSearch();
+                    }
+                });
+            }
+
+            // Dynamic Search Filter
+            function applySearch() {
+                const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
+                if (searchClear) {
+                    if (query !== '') {
+                        searchClear.classList.remove('hidden');
+                    } else {
+                        searchClear.classList.add('hidden');
+                    }
+                }
+
+                if (query === '') {
+                    currentFilterCards = [...cards];
+                } else {
+                    currentFilterCards = cards.filter(card => {
+                        const title = (card.getAttribute('data-title') || '').toLowerCase();
+                        const rawContent = (card.querySelector('.chunk-raw-content')?.value || '').toLowerCase();
+                        return title.includes(query) || rawContent.includes(query);
+                    });
+                }
+
+                currentPage = 1;
+                renderPagination();
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('input', applySearch);
+            }
+
+            if (searchClear) {
+                searchClear.addEventListener('click', () => {
+                    if (searchInput) {
+                        searchInput.value = '';
+                        applySearch();
+                        searchInput.focus();
+                    }
+                });
+            }
+
+            if (btnResetSearch) {
+                btnResetSearch.addEventListener('click', () => {
+                    if (searchInput) {
+                        searchInput.value = '';
+                        applySearch();
+                        searchInput.focus();
+                    }
+                });
+            }
+
+            // Initial render
+            renderPagination();
+
+            // Edit modal open/close
+            function openEditModal(card) {
+                currentEditingCard = card;
+                const id = card.getAttribute('data-id') || '';
+                const title = card.getAttribute('data-title') || '';
+                const content = card.querySelector('.chunk-raw-content')?.value || '';
+
+                editId.value = id;
+                editTitle.value = title;
+                editContent.value = content;
+                if (editCharCount) {
+                    editCharCount.textContent = content.length + ' characters';
+                }
+                if (editFeedback) {
+                    editFeedback.className = 'hidden p-2.5 rounded-lg text-xs font-medium';
+                    editFeedback.textContent = '';
+                }
+
+                editModal.classList.remove('hidden');
+                editTitle.focus();
+            }
+
+            function closeEditModal() {
+                if (editModal) {
+                    editModal.classList.add('hidden');
+                }
+                currentEditingCard = null;
+            }
+
+            cards.forEach(card => {
+                const editBtn = card.querySelector('.btn-edit-chunk');
+                if (editBtn) {
+                    editBtn.addEventListener('click', () => openEditModal(card));
+                }
+            });
+
+            if (editContent && editCharCount) {
+                editContent.addEventListener('input', () => {
+                    editCharCount.textContent = editContent.value.length + ' characters';
+                });
+            }
+
+            if (btnCloseModal) btnCloseModal.addEventListener('click', closeEditModal);
+            if (btnCancelModal) btnCancelModal.addEventListener('click', closeEditModal);
+
+            if (editModal) {
+                editModal.addEventListener('click', (e) => {
+                    if (e.target === editModal) closeEditModal();
+                });
+            }
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && editModal && !editModal.classList.contains('hidden')) {
+                    closeEditModal();
+                }
+            });
+
+            // Handle Edit form submission with AJAX and fallback
+            if (editForm) {
+                editForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const submitBtn = btnSubmit;
+                    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : 'Save Changes';
+
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin text-white inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
+                    }
+
+                    try {
+                        const formData = new FormData(editForm);
+                        const res = await fetch(editForm.action, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: formData
+                        });
+
+                        const data = await res.json();
+                        if (!res.ok || !data.success) {
+                            throw new Error(data.error || 'Failed to update knowledge chunk.');
+                        }
+
+                        // Update card in DOM
+                        if (currentEditingCard && data.chunk) {
+                            currentEditingCard.setAttribute('data-title', data.chunk.title);
+                            const titleEl = currentEditingCard.querySelector('.chunk-title');
+                            if (titleEl) titleEl.textContent = data.chunk.title;
+
+                            const rawEl = currentEditingCard.querySelector('.chunk-raw-content');
+                            if (rawEl) rawEl.value = data.chunk.content;
+
+                            const contentEl = currentEditingCard.querySelector('.chunk-content');
+                            if (contentEl) contentEl.textContent = data.chunk.content;
+
+                            const charsEl = currentEditingCard.querySelector('.chunk-chars');
+                            if (charsEl) charsEl.textContent = 'Characters: ' + data.chunk.char_count;
+                        }
+
+                        closeEditModal();
+                        showToast('Knowledge document updated successfully.');
+                        applySearch();
+
+                    } catch (err) {
+                        if (editFeedback) {
+                            editFeedback.className = 'p-2.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
+                            editFeedback.textContent = err.message || 'Error updating document.';
+                        } else {
+                            alert(err.message);
+                        }
+                    } finally {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalBtnHtml;
+                        }
+                    }
+                });
+            }
+        })();
+
+    
         const btnEnhance = document.getElementById('btnEnhancePersona');
         const btnUndo = document.getElementById('btnUndoPersona');
         const textarea = document.getElementById('systemPromptTextarea');
