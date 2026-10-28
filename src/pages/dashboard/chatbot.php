@@ -159,13 +159,46 @@
                 </label>
             </div>
 
-            <!-- System Role & Persona Description -->
-            <div>
-                <label class="block text-xs font-bold text-slate-800 mb-1">
-                    System Role & Persona Description
-                </label>
-                <p class="text-[11px] text-slate-500 mb-2">Describe what your chatbot is and how it should behave (e.g. role, company identity, tone, response constraints). Official RAG knowledge chunks will be injected automatically below this prompt.</p>
-                <textarea name="system_prompt" rows="5" required class="w-full text-xs px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-subtle font-sans leading-relaxed"><?= e($aiSettings['system_prompt'] ?? '') ?></textarea>
+            <!-- System Role & Persona Description with AI Generator / Polish -->
+            <div class="space-y-2">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-800">
+                            System Role & Persona Description
+                        </label>
+                        <p class="text-[11px] text-slate-500">Write rough notes about your business below (services, hours, delivery, policies). Click <strong>"✨ Rewrite with AI"</strong> to transform it into an enterprise persona.</p>
+                    </div>
+
+                    <!-- AI Action Controls -->
+                    <div class="flex items-center gap-2 shrink-0">
+                        <select id="personaToneSelect" class="text-[11px] font-semibold py-1 px-2.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-900 transition-colors cursor-pointer" title="Select persona tone style">
+                            <option value="professional_warm">Professional & Warm</option>
+                            <option value="friendly_hinglish">Friendly & Hinglish</option>
+                            <option value="formal_authoritative">Formal & Corporate</option>
+                            <option value="concise_direct">Concise & Direct</option>
+                        </select>
+                        <button type="button" id="btnEnhancePersona" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all active:scale-[0.98]" title="Transform your rough notes into an enterprise WhatsApp Persona">
+                            <span id="enhanceIcon">✨</span>
+                            <span id="enhanceLabel">Rewrite with AI</span>
+                        </button>
+                        <button type="button" id="btnUndoPersona" class="hidden text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline transition-colors">
+                            Undo
+                        </button>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <textarea id="systemPromptTextarea" name="system_prompt" rows="7" required class="w-full text-xs px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 shadow-subtle font-sans leading-relaxed custom-scrollbar"><?= e($aiSettings['system_prompt'] ?? '') ?></textarea>
+                    
+                    <!-- Feedback notification pill -->
+                    <div id="personaFeedbackPill" class="hidden mt-1.5 p-2.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-900 text-[11px] flex items-center justify-between shadow-2xs">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs">✨</span>
+                            <span><strong>Polished by AI (<span id="enhancedProviderName">AI Model</span>):</strong> Persona optimized with closed-domain boundaries, formatting, and Hinglish fluency. Click <strong>"Save AI Agent Settings"</strong> below to apply.</span>
+                        </div>
+                        <button type="button" onclick="document.getElementById('personaFeedbackPill').classList.add('hidden')" class="text-violet-500 hover:text-violet-800 font-bold ml-2">✕</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Provider Priority Cascade -->
@@ -381,6 +414,88 @@
         </div>
     </div>
     <?php endif; ?>
+
+    <!-- Persona AI Rewrite Client Script -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const btnEnhance = document.getElementById('btnEnhancePersona');
+        const btnUndo = document.getElementById('btnUndoPersona');
+        const textarea = document.getElementById('systemPromptTextarea');
+        const toneSelect = document.getElementById('personaToneSelect');
+        const feedbackPill = document.getElementById('personaFeedbackPill');
+        const providerSpan = document.getElementById('enhancedProviderName');
+        const enhanceIcon = document.getElementById('enhanceIcon');
+        const enhanceLabel = document.getElementById('enhanceLabel');
+
+        let previousText = '';
+
+        if (!btnEnhance || !textarea) return;
+
+        btnEnhance.addEventListener('click', async function() {
+            const rawText = textarea.value.trim();
+            if (!rawText) {
+                alert('Please write some rough details about your business in the text box first.');
+                textarea.focus();
+                return;
+            }
+
+            previousText = textarea.value;
+
+            // Loading state
+            btnEnhance.disabled = true;
+            enhanceIcon.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin text-white inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            enhanceLabel.textContent = 'Polishing...';
+
+            try {
+                const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+                const res = await fetch(`${basePath}/api/chat/enhance-prompt.php`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        raw_text: rawText,
+                        tone: toneSelect ? toneSelect.value : 'professional_warm'
+                    })
+                });
+
+                const data = await res.json();
+                if (!data.ok) throw new Error(data.error || 'Failed to enhance persona prompt.');
+
+                textarea.value = data.enhanced_prompt;
+                if (providerSpan && data.provider) {
+                    providerSpan.textContent = data.provider;
+                }
+                if (feedbackPill) {
+                    feedbackPill.classList.remove('hidden');
+                }
+                if (btnUndo) {
+                    btnUndo.classList.remove('hidden');
+                }
+
+                // Adjust rows height dynamically
+                textarea.rows = Math.min(18, Math.max(8, data.enhanced_prompt.split('\n').length + 2));
+            } catch (err) {
+                alert('AI Polish Error: ' + err.message);
+            } finally {
+                btnEnhance.disabled = false;
+                enhanceIcon.textContent = '✨';
+                enhanceLabel.textContent = 'Rewrite with AI';
+            }
+        });
+
+        if (btnUndo) {
+            btnUndo.addEventListener('click', function() {
+                if (previousText) {
+                    textarea.value = previousText;
+                    btnUndo.classList.add('hidden');
+                    if (feedbackPill) feedbackPill.classList.add('hidden');
+                }
+            });
+        }
+    });
+    </script>
 
     <!-- Footer Spacer -->
     <div class="h-8"></div>
