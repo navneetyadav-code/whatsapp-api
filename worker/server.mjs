@@ -1306,7 +1306,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                   const starsDisplay = '⭐'.repeat(parsedRating);
                   const thanksText = `Thank you for your rating of ${parsedRating}/5 ${starsDisplay}! 🙏 We appreciate your feedback and look forward to serving you again.`;
                   try {
-                    await session.socket.sendMessage(msg.key.remoteJid, { text: thanksText });
+                    await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: thanksText });
                     await db.execute(
                       `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
                        VALUES (?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
@@ -1491,7 +1491,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                 const handoverMsg = 'I understand you need assistance from our team. I have escalated this conversation to our support representatives and paused automated replies. A team member will join you shortly. 🔔';
                 try {
-                  await session.socket.sendMessage(msg.key.remoteJid, { text: handoverMsg });
+                  await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: handoverMsg });
                   await db.execute(
                     `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
                      VALUES (?, ?, 'bot', 'Support System', 'text', ?, 'sent')`,
@@ -1542,7 +1542,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           [conv.id]
                         );
                         if (guard && guard.length > 0 && guard[0].status !== 'escalated' && guard[0].bot_paused !== 1) {
-                          await session.socket.sendMessage(msg.key.remoteJid, { text: replyText.trim() });
+                          await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
                           await db.execute(
                             `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
                              VALUES (?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
