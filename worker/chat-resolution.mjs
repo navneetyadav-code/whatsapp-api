@@ -17,7 +17,9 @@ export class ChatResolutionEngine {
     /\b(shukriya|dhanyawad|dhanyavaad|bahut\s*shukriya)\b/i,
     /\b(samajh\s*gaya|samajh\s*aagaya|ho\s*gaya|theek\s*hai\s*bhai|kaam\s*ho\s*gaya)\b/i,
     /\b(problem\s*solved|resolved|that\s*helped|perfect\s*thanks)\b/i,
-    /\b(no\s*more\s*questions|that\s*is\s*all|that's\s*all)\b/i
+    /\b(no\s*more\s*questions|that\s*is\s*all|that's\s*all|nothing\s*else|bas\s*yahi)\b/i,
+    /\b(close\s*(the\s*)?chat|end\s*(the\s*)?chat|chat\s*close|chat\s*band|band\s*kar(o|do))\b/i,
+    /\b(good\s*bye|goodbye|bye\s*bye|byy|byee|take\s*care|alvida)\b/i
   ];
 
   /**

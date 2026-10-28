@@ -169,7 +169,7 @@ export function detectFrustrationAndEscalation(text) {
   const HUMAN_KEYWORDS = [
     'human', 'agent', 'support team', 'representative', 'customer service',
     'person', 'operator', 'talk to someone', 'talk to agent', 'speak to human',
-    'real person', 'executive', 'manager', 'boss', 'advisor', 'insaan', 'kisi se baat'
+    'real person', 'executive', 'manager', 'boss', 'advisor', 'insaan', 'kisi se baat', 'transfer', 'tranfer', 'call transfer', 'human agent', 'connect me', 'call lagao', 'baat karao', 'phone pe baat', 'real human'
   ];
   for (const kw of HUMAN_KEYWORDS) {
     const regex = new RegExp(`\\b${kw}\\b`, 'i');
@@ -194,16 +194,30 @@ export function detectFrustrationAndEscalation(text) {
     }
   }
 
-  // 3. Frustration / Anger cues
-  const ANGER_KEYWORDS = [
-    'terrible', 'pathetic', 'useless bot', 'idiot', 'stupid', 'waste of time',
-    'annoying', 'angry', 'hate this', 'disgusted', 'bakwas', 'fraud company'
+  // 3. Profanity & Severe Abuse cues
+  const PROFANITY_KEYWORDS = [
+    'fuck', 'chutiya', 'harami', 'kutta', 'kamina', 'useless bot', 'bakwas', 'fraud company'
   ];
+  for (const kw of PROFANITY_KEYWORDS) {
+    if (lower.includes(kw)) {
+      signals.push(`profanity_abuse:${kw}`);
+      score += 0.75;
+      break;
+    }
+  }
+
+  // 4. Frustration / Anger cues
+  const ANGER_KEYWORDS = [
+    'terrible', 'pathetic', 'idiot', 'stupid', 'waste of time',
+    'annoying', 'angry', 'hate this', 'disgusted', 'pagal', 'faltu', 'rubbish', 'nonsense', 'useless'
+  ];
+  let angerCount = 0;
   for (const kw of ANGER_KEYWORDS) {
     if (lower.includes(kw)) {
       signals.push(`negative_sentiment:${kw}`);
-      score += 0.45;
-      break;
+      score += 0.35;
+      angerCount++;
+      if (angerCount >= 2) break;
     }
   }
 
@@ -246,11 +260,23 @@ export function detectFrustrationAndEscalation(text) {
 export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessage) {
   let contextBlock = '';
   if (retrievedChunks && retrievedChunks.length > 0) {
-    contextBlock = `\n\n--- OFFICIAL COMPANY KNOWLEDGE BASE ---\n` +
+    contextBlock = `\n\n--- OFFICIAL VERIFIED KNOWLEDGE BASE ---\n` +
       retrievedChunks.map((c, i) => `[Source ${i + 1}: ${c.title}]\n${c.content}`).join('\n\n') +
       `\n---------------------------------------\n` +
-      `Instruction: Base your answers strictly on the knowledge base above. If the customer's question is not covered in the knowledge base, politely state that you do not have that information and offer to connect them to a human team member.
-Language & Tone Instruction: Detect the customer's language and mirror their style naturally. If the customer speaks English, reply in professional English. If the customer speaks Hindi or natural Hinglish (e.g. 'bhai price batao', 'kaam kab tak hoga'), respond in friendly, conversational Hinglish ('Haanji bhai! Assistgroup par...'). Format for WhatsApp using bold (*text*), clean bullet points, and appropriate emojis without walls of text.`;
+      `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
+1. Base your factual answers STRICTLY on the knowledge base sources above.
+2. DO NOT invent, hallucinate, or assume facts (like batches, prices, phone numbers, or rules) not present in the sources.
+3. If the user asks something not covered in the sources, politely inform them that you do not have that specific detail and offer to connect them with the human front desk (+91 85810 65107).
+4. Language & Tone: Detect the user's language and mirror their style naturally. If they use Hindi or natural Hinglish (e.g. 'bhai fee kitni hai', 'demo class milegi?'), reply in warm, helpful Hinglish ('Haanji! Hamare yahan...'). If they use English, reply in professional, encouraging English.
+5. Format for WhatsApp: Use bold (*text*), clean bullet points, and appropriate emojis. Avoid long unbroken walls of text.`;
+  } else {
+    contextBlock = `\n\n--- KNOWLEDGE RETRIEVAL NOTE ---\n` +
+      `No specific knowledge base records matched the user's query.\n` +
+      `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
+1. You are a dedicated customer assistant strictly limited to this organization.
+2. If the user asks about out-of-scope topics (e.g. general knowledge, recipes, cooking, coding, competitors, unrelated trivia), DO NOT answer the out-of-scope question. Politely decline and state that you can only assist with our institute's courses, admissions, schedules, and policies.
+3. If they are asking a genuine question about our institute/services that isn't in your knowledge base, apologize politely and offer to connect them with our human team (+91 85810 65107).
+4. For general pleasantries/greetings (e.g. 'hi', 'hello', 'good morning', 'namaste'), respond warmly and ask how you can help them with our courses or services today.`;
   }
 
   const fullSystem = (systemPersona || 'You are a helpful customer support assistant on WhatsApp.') + contextBlock;
@@ -273,7 +299,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
     contents,
     generationConfig: {
       temperature: Number(temperature) || 0.4,
-      maxOutputTokens: Math.max(Number(maxTokens) || 500, 300)
+      maxOutputTokens: Math.max(Number(maxTokens) || 1200, 1000)
     }
   };
 
@@ -310,7 +336,7 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
     model: modelName,
     messages,
     temperature: Number(temperature) || 0.4,
-    max_tokens: Math.max(Number(maxTokens) || 500, 350)
+    max_tokens: Math.max(Number(maxTokens) || 1200, 800)
   };
 
   const response = await fetch(url, {
@@ -349,7 +375,7 @@ async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperat
     model: modelName,
     messages,
     temperature: Number(temperature),
-    max_tokens: Number(maxTokens)
+    max_tokens: Math.max(Number(maxTokens) || 1200, 800)
   };
 
   const response = await fetch(url, {

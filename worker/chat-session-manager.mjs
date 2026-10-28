@@ -64,7 +64,28 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
 
   // 2. Existing conversation exists: check if closed or active
   if (conv.status === 'closed') {
-    // Previous session was closed. Fresh inquiry beginning!
+    const isPassiveCourtesy = /^(ok|okay|k|kk|thx|thanks|thank\s*you|bye|byy|byee|good\s*bye|goodnight|gn|tc|take\s*care|alvida|dhanyawad|shukriya|👍|🙏|😊|👌)+$/i.test((messagePreview || '').trim().toLowerCase());
+    if (isPassiveCourtesy) {
+      // Keep conversation closed, do not spawn a new session or trigger bot replies
+      await db.execute(
+        `UPDATE chat_conversations
+         SET contact_name = COALESCE(?, contact_name),
+             last_message = ?,
+             last_message_at = NOW(),
+             unread_count = unread_count + 1
+         WHERE id = ?`,
+        [senderName, messagePreview.slice(0, 200), conv.id]
+      );
+      return {
+        conversationId: conv.id,
+        sessionUuid: conv.session_uuid || generateSessionUuid(),
+        isNewSession: false,
+        status: 'closed',
+        botPaused: true
+      };
+    }
+
+    // Previous session was closed. Fresh genuine inquiry beginning!
     sessionUuid = generateSessionUuid();
     isNewSession = true;
 
