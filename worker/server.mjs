@@ -1547,7 +1547,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                   );
                   if (convCheck && convCheck.length > 0) {
                     const conv = convCheck[0];
-                    if (conv.status !== 'escalated' && conv.bot_paused !== 1 && Number(conv.consecutive_bot_replies || 0) < 8) {
+                    if (conv.status === 'open' && conv.bot_paused !== 1 && Number(conv.consecutive_bot_replies || 0) < 8) {
                       
                       // Step A: Dispatch to 2.5s sliding debouncer to consolidate rapid fragmented messages
                       globalDebouncer.enqueue(userId, msg.key.remoteJid, {
