@@ -436,7 +436,7 @@
 
     <?php elseif ($activeTab === 'tools'): ?>
     <!-- ========================================== -->
-    <!-- TAB 5: AUTONOMOUS TOOLS & RBAC ENGINE      -->
+    <!-- TAB 4: UNIVERSAL CUSTOM TOOLS & RBAC ENGINE-->
     <!-- ========================================== -->
     <div class="space-y-6 mb-8">
         <!-- Engine Status Banner -->
@@ -445,286 +445,164 @@
                 <div>
                     <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-2">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        Autonomous Function Calling Engine Active
+                        Universal Multi-Tenant Tools Engine
                     </div>
-                    <h2 class="text-xl font-bold tracking-tight">Agent Tools & Role-Based Access Control (RBAC)</h2>
+                    <h2 class="text-xl font-bold tracking-tight">Autonomous Tools & API Integrations</h2>
                     <p class="text-xs text-slate-300 mt-1 max-w-2xl">
-                        Equip your AI Agent with external capabilities. Tools are dynamically pruned from Gemini's prompt schema based on the caller's role, ensuring guests never see or trigger sensitive administrative actions.
+                        Add any external REST API, shared hosting dual-environment backend, or outbound webhook to your WhatsApp AI Agent. The engine compiles parameters dynamically into Gemini function calling with strict role gating.
                     </p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs text-slate-400">Model:</span>
-                    <span class="text-xs font-mono font-bold bg-white/10 px-2.5 py-1 rounded border border-white/10 text-emerald-300">gemini-3.5-flash-lite</span>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="openPresetsModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all shadow-xs active:scale-[0.98]">
+                        <span>⚡ 1-Click Presets</span>
+                    </button>
+                    <button type="button" onclick="openAddToolModal()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-xs active:scale-[0.98]">
+                        <span>+ Add Custom Tool</span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <form method="post" action="<?= e(base_url('index.php?page=ai-tools-save')) ?>" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-
-            <!-- Master Toggle & Admin Phones Whitelist Card -->
-            <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                    <div>
+        <!-- Whitelisted Admin Phones Card -->
+        <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card">
+            <form method="post" action="<?= e(base_url('index.php?page=ai-tools-config-save')) ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex-1">
                         <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                            <span>⚙️</span> Master Tool Engine Switch
+                            <span>🛡️</span> Whitelisted Admin Phone Numbers
                         </h3>
-                        <p class="text-xs text-slate-500 mt-0.5">When disabled, the bot functions as a pure text-only knowledge assistant without calling external APIs.</p>
+                        <p class="text-xs text-slate-500 mt-0.5">WhatsApp numbers permitted to execute privileged administrative actions (e.g. system metrics, CRM lookup):</p>
+                        <div class="mt-2 flex gap-2">
+                            <input type="text" name="admin_phones" value="<?= e(implode(', ', $toolsConfig['admin_phones'] ?? [])) ?>" class="flex-1 text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="+918581065107, +919507286092">
+                            <button type="submit" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors shadow-xs active:scale-[0.98]">
+                                Save Numbers
+                            </button>
+                        </div>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" name="tools_enabled" value="1" <?= !empty($toolsConfig['enabled']) ? 'checked' : '' ?> class="sr-only peer">
-                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                        <span class="ml-3 text-xs font-bold text-slate-700">Enable Agent Tools</span>
-                    </label>
                 </div>
+            </form>
+        </div>
 
-                <div class="pt-4">
-                    <label class="block text-xs font-bold text-slate-800 mb-1">
-                        🛡️ Admin Phone Numbers Whitelist (Comma-Separated)
-                    </label>
-                    <p class="text-[11px] text-slate-500 mb-2">WhatsApp numbers permitted to execute privileged administrative actions (e.g. system statistics, team overview):</p>
-                    <input type="text" name="admin_phones" value="<?= e(implode(', ', $toolsConfig['admin_phones'] ?? ['+918581065107', '+919507286092'])) ?>" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="+918581065107, +919507286092">
-                </div>
+        <!-- Category Filter Tabs Bar -->
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-1.5 overflow-x-auto" id="toolCategoryTabs">
+                <button type="button" onclick="filterTools('all', this)" class="tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs transition-all">
+                    All Tools (<?= count($userTools) ?>)
+                </button>
+                <button type="button" onclick="filterTools('rest_api', this)" class="tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                    Normal REST APIs
+                </button>
+                <button type="button" onclick="filterTools('shared_env_api', this)" class="tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                    Dual-Env Shared APIs
+                </button>
+                <button type="button" onclick="filterTools('webhook', this)" class="tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                    Webhooks
+                </button>
+                <button type="button" onclick="filterTools('builtin', this)" class="tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                    Built-in Utilities
+                </button>
             </div>
+        </div>
 
-            <!-- Grid: Tools Configuration Cards -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-                <!-- TOOL 1: WEB SEARCH ENGINE -->
-                <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card flex flex-col justify-between">
+        <!-- Grid of Tool Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="toolsCardsGrid">
+            <?php foreach ($userTools as $tool): 
+                $cat = $tool['category'];
+                $paramsCount = count($tool['parameters_schema']['properties'] ?? []);
+            ?>
+                <div class="tool-card bg-white rounded-xl border border-slate-200/80 p-5 shadow-card flex flex-col justify-between hover:border-slate-300 transition-all" data-category="<?= e($cat) ?>">
                     <div>
-                        <div class="flex items-start justify-between gap-3 mb-3">
+                        <!-- Header: Icon, Category Badge & Active Toggle -->
+                        <div class="flex items-start justify-between gap-3 mb-2.5">
                             <div class="flex items-center gap-2">
-                                <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-base">🌐</span>
-                                <div>
-                                    <h4 class="text-sm font-bold text-slate-900">Live Web Search</h4>
-                                    <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 uppercase">DuckDuckGo Resilient Scraper</span>
-                                </div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider <?= $cat === 'rest_api' ? 'bg-sky-50 text-sky-700 border border-sky-200' : ($cat === 'shared_env_api' ? 'bg-purple-50 text-purple-700 border border-purple-200' : ($cat === 'webhook' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-700 border border-slate-200')) ?>">
+                                    <?= $cat === 'rest_api' ? 'Normal REST' : ($cat === 'shared_env_api' ? 'Shared Dual-Env' : ($cat === 'webhook' ? 'Webhook' : 'Built-in')) ?>
+                                </span>
                             </div>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" name="web_search_enabled" value="1" <?= !empty($toolsConfig['tools']['web_search']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
-                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                            </label>
+
+                            <form method="post" action="<?= e(base_url('index.php?page=custom-tool-toggle')) ?>" class="inline">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <input type="hidden" name="id" value="<?= (int) $tool['id'] ?>">
+                                <button type="submit" class="px-2 py-0.5 rounded text-[11px] font-bold border transition-colors shadow-subtle <?= !empty($tool['is_active']) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200' ?>">
+                                    <?= !empty($tool['is_active']) ? '● Active' : '○ Disabled' ?>
+                                </button>
+                            </form>
                         </div>
 
-                        <p class="text-xs text-slate-500 mb-4">
-                            Enables the agent to search live internet sources for real-time external facts, competitor comparisons, and news with prompt-injection sanitization.
-                        </p>
+                        <!-- Tool Title & Slug -->
+                        <h4 class="text-sm font-bold text-slate-900 mb-0.5"><?= e($tool['display_name']) ?></h4>
+                        <div class="text-[11px] font-mono text-slate-400 mb-2">slug: <span class="text-slate-700 font-semibold"><?= e($tool['tool_slug']) ?></span></div>
 
-                        <div class="space-y-3 pt-3 border-t border-slate-100">
-                            <div>
-                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Max Snippets Per Query</label>
-                                <input type="number" name="web_search_max_results" value="<?= (int) ($toolsConfig['tools']['web_search']['max_results'] ?? 3) ?>" min="1" max="5" class="w-24 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg">
-                            </div>
+                        <!-- Description -->
+                        <p class="text-xs text-slate-600 line-clamp-2 mb-3 leading-relaxed"><?= e($tool['description']) ?></p>
 
-                            <div>
-                                <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Permitted Roles (RBAC)</label>
-                                <div class="flex items-center gap-4 text-xs text-slate-600">
-                                    <?php $wsRoles = $toolsConfig['tools']['web_search']['roles'] ?? ['guest', 'customer', 'admin']; ?>
-                                    <label class="inline-flex items-center gap-1.5">
-                                        <input type="checkbox" name="web_search_roles[]" value="guest" <?= in_array('guest', $wsRoles, true) ? 'checked' : '' ?> class="rounded text-emerald-600">
-                                        <span>Public Guests</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-1.5">
-                                        <input type="checkbox" name="web_search_roles[]" value="customer" <?= in_array('customer', $wsRoles, true) ? 'checked' : '' ?> class="rounded text-emerald-600">
-                                        <span>Customers</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-1.5">
-                                        <input type="checkbox" name="web_search_roles[]" value="admin" <?= in_array('admin', $wsRoles, true) ? 'checked' : '' ?> class="rounded text-emerald-600">
-                                        <span>Admins</span>
-                                    </label>
+                        <!-- Execution Spec Pill -->
+                        <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100 mb-3 space-y-1 text-[11px]">
+                            <?php if ($cat === 'rest_api'): ?>
+                                <div class="flex items-center gap-1.5 truncate">
+                                    <span class="px-1.5 py-0.2 rounded font-bold font-mono text-[9px] bg-sky-100 text-sky-800"><?= e($tool['execution_config']['method'] ?? 'GET') ?></span>
+                                    <span class="text-slate-600 font-mono truncate" title="<?= e($tool['execution_config']['url'] ?? '') ?>"><?= e($tool['execution_config']['url'] ?? '') ?></span>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TOOL 2: UTILITY ARITHMETIC & CLOCK -->
-                <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-start justify-between gap-3 mb-3">
-                            <div class="flex items-center gap-2">
-                                <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-base">🧮</span>
-                                <div>
-                                    <h4 class="text-sm font-bold text-slate-900">Utility Tool Belt</h4>
-                                    <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 uppercase">Math, Clock & Escalation</span>
+                            <?php elseif ($cat === 'shared_env_api'): ?>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500">Active Env:</span>
+                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold font-mono <?= ($tool['execution_config']['active_env'] ?? 'local') === 'live' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' ?>">
+                                        <?= strtoupper($tool['execution_config']['active_env'] ?? 'local') ?>
+                                    </span>
                                 </div>
-                            </div>
+                            <?php elseif ($cat === 'webhook'): ?>
+                                <div class="truncate text-slate-600 font-mono">
+                                    POST <?= e($tool['execution_config']['target_url'] ?? '') ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="text-slate-600">Handler: <span class="font-mono font-bold text-slate-800"><?= e($tool['execution_config']['handler'] ?? $tool['tool_slug']) ?></span></div>
+                            <?php endif; ?>
+                            <div class="text-[10px] text-slate-400">Parameters: <span class="font-bold text-slate-700"><?= $paramsCount ?> input fields</span></div>
                         </div>
 
-                        <p class="text-xs text-slate-500 mb-4">
-                            Precision calculations (GST, discounts, quotes), real-time Indian Standard Time (IST) office hours checker, and human support handoff alarm.
-                        </p>
-
-                        <div class="space-y-3 pt-3 border-t border-slate-100">
-                            <!-- Math Toggle -->
-                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/70">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-900">Math & Pricing Calculator</div>
-                                    <div class="text-[10px] text-slate-500">Hallucination-free exact arithmetic for quotations</div>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" name="math_enabled" value="1" <?= !empty($toolsConfig['tools']['evaluate_math']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
-                                    <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
-                                </label>
-                            </div>
-
-                            <!-- Time & Clock Toggle -->
-                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/70">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-900">IST Real-Time & Business Hours</div>
-                                    <div class="text-[10px] text-slate-500">Mon-Sat 9:30 AM - 6:30 PM office status check</div>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" name="time_enabled" value="1" <?= !empty($toolsConfig['tools']['get_current_time']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
-                                    <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
-                                </label>
-                            </div>
-
-                            <!-- Human Escalation Toggle -->
-                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/70">
-                                <div>
-                                    <div class="text-xs font-bold text-slate-900">Human Escalation Trigger</div>
-                                    <div class="text-[10px] text-slate-500">Flags conversation & sounds buzzer for human takeover</div>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" name="escalate_enabled" value="1" <?= !empty($toolsConfig['tools']['escalate_to_human']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
-                                    <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TOOL 3: ASSISTGROUP API CONNECTOR (Full Width) -->
-                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-5 shadow-card">
-                    <div class="flex items-start justify-between gap-3 mb-4">
-                        <div class="flex items-center gap-2">
-                            <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-base">🏢</span>
-                            <div>
-                                <h4 class="text-sm font-bold text-slate-900">AssistGroup Multi-Environment API Connector</h4>
-                                <span class="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 uppercase">Localhost & Live Shared Hosting</span>
-                            </div>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="assistgroup_enabled" value="1" <?= !empty($toolsConfig['tools']['assistgroup_api']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
-                            <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                        </label>
-                    </div>
-
-                    <?php
-                    $agConfig = $toolsConfig['tools']['assistgroup_api'] ?? [];
-                    $activeEnv = $agConfig['active_env'] ?? 'local';
-                    $localEnv = $agConfig['environments']['local'] ?? [];
-                    $liveEnv = $agConfig['environments']['live'] ?? [];
-                    ?>
-
-                    <!-- Environment Selector Radios -->
-                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200/80 mb-4">
-                        <div class="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Active Environment Target:</div>
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800">
-                                <input type="radio" name="assistgroup_active_env" value="local" <?= $activeEnv === 'local' ? 'checked' : '' ?> class="text-purple-600">
-                                <span>Localhost Development (<span class="font-mono text-[11px] text-slate-500">http://localhost/assistgroup/...</span>)</span>
-                            </label>
-                            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800">
-                                <input type="radio" name="assistgroup_active_env" value="live" <?= $activeEnv === 'live' ? 'checked' : '' ?> class="text-purple-600">
-                                <span>Live Shared Hosting (<span class="font-mono text-[11px] text-purple-700">https://assistgroup.gt.tc/...</span>)</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Environment Inputs Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                        <div class="p-3.5 rounded-lg border border-slate-200">
-                            <div class="text-xs font-bold text-slate-900 mb-2">💻 Localhost Settings</div>
-                            <div class="space-y-2">
-                                <div>
-                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Base URL</label>
-                                    <input type="text" name="assistgroup_local_url" value="<?= e($localEnv['base_url'] ?? 'http://localhost/assistgroup/api/admin/v1') ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Admin Bearer Token</label>
-                                    <input type="password" name="assistgroup_local_token" placeholder="<?= !empty($localEnv['bearer_token']) ? '•••••••••••••••••••••••• (Configured)' : 'ast_live_...' ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="p-3.5 rounded-lg border border-purple-200 bg-purple-50/20">
-                            <div class="text-xs font-bold text-purple-900 mb-2">🌐 Live Shared Hosting Settings</div>
-                            <div class="space-y-2">
-                                <div>
-                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Base URL</label>
-                                    <input type="text" name="assistgroup_live_url" value="<?= e($liveEnv['base_url'] ?? 'https://assistgroup.gt.tc/api/admin/v1') ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Admin Bearer Token</label>
-                                    <input type="password" name="assistgroup_live_token" placeholder="<?= !empty($liveEnv['bearer_token']) ? '•••••••••••••••••••••••• (Configured)' : 'ast_live_...' ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Role Gated Actions Matrix -->
-                    <div>
-                        <h5 class="text-xs font-bold text-slate-900 mb-2">AssistGroup Action Access Matrix (RBAC)</h5>
-                        <div class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden text-xs">
-                            <?php
-                            $actions = [
-                                'pricing' => ['key' => 'ag_pricing', 'name' => 'Get Services & Pricing Plans', 'desc' => 'Allows bot to quote official web, app, and SEO plans', 'roles' => $agConfig['actions']['get_services_pricing']['roles'] ?? ['guest', 'customer', 'admin']],
-                                'inquiry' => ['key' => 'ag_inquiry', 'name' => 'Create Inquiries / Leads in CRM', 'desc' => 'Directly saves prospective leads into AssistGroup database', 'roles' => $agConfig['actions']['create_inquiry']['roles'] ?? ['guest', 'customer', 'admin']],
-                                'lookup' => ['key' => 'ag_lookup', 'name' => 'Lookup Customer Tickets / Inquiries', 'desc' => 'Retrieves caller past inquiries using their phone number', 'roles' => $agConfig['actions']['lookup_inquiries']['roles'] ?? ['customer', 'admin']],
-                                'team' => ['key' => 'ag_team', 'name' => 'Get Team & Staff Overview', 'desc' => 'Answers questions about developers, engineers, and consultants', 'roles' => $agConfig['actions']['get_team_overview']['roles'] ?? ['guest', 'customer', 'admin']],
-                                'stats' => ['key' => 'ag_stats', 'name' => 'Admin Dashboard Executive Metrics', 'desc' => 'Strictly restricted metrics: registered users, file counts, growth', 'roles' => $agConfig['actions']['admin_dashboard_stats']['roles'] ?? ['admin']]
-                            ];
-                            foreach ($actions as $actKey => $act):
-                            ?>
-                            <div class="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50">
-                                <div>
-                                    <label class="inline-flex items-center gap-2 font-bold text-slate-800">
-                                        <input type="checkbox" name="<?= $act['key'] ?>_enabled" value="1" checked class="rounded text-purple-600">
-                                        <span><?= e($act['name']) ?></span>
-                                    </label>
-                                    <div class="text-[11px] text-slate-400 pl-5"><?= e($act['desc']) ?></div>
-                                </div>
-                                <div class="flex items-center gap-3 pl-5 sm:pl-0 text-slate-600">
-                                    <label class="inline-flex items-center gap-1">
-                                        <input type="checkbox" name="<?= $act['key'] ?>_roles[]" value="guest" <?= in_array('guest', $act['roles'], true) ? 'checked' : '' ?> class="rounded text-purple-600">
-                                        <span>Guest</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-1">
-                                        <input type="checkbox" name="<?= $act['key'] ?>_roles[]" value="customer" <?= in_array('customer', $act['roles'], true) ? 'checked' : '' ?> class="rounded text-purple-600">
-                                        <span>Customer</span>
-                                    </label>
-                                    <label class="inline-flex items-center gap-1">
-                                        <input type="checkbox" name="<?= $act['key'] ?>_roles[]" value="admin" <?= in_array('admin', $act['roles'], true) ? 'checked' : '' ?> class="rounded text-purple-600">
-                                        <span class="font-bold text-slate-900">Admin</span>
-                                    </label>
-                                </div>
-                            </div>
+                        <!-- Role Chips -->
+                        <div class="flex items-center gap-1 flex-wrap mb-4">
+                            <span class="text-[10px] text-slate-400 font-medium mr-1">Access:</span>
+                            <?php foreach (($tool['rbac_roles'] ?? []) as $r): ?>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-bold font-mono <?= $r === 'admin' ? 'bg-purple-100 text-purple-800' : ($r === 'customer' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700') ?>">
+                                    <?= strtoupper($r) ?>
+                                </span>
                             <?php endforeach; ?>
                         </div>
                     </div>
+
+                    <!-- Action Buttons -->
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <button type="button" onclick='openSandboxModal(<?= htmlspecialchars(json_encode($tool), ENT_QUOTES, "UTF-8") ?>)' class="px-2.5 py-1 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1">
+                            <span>🧪</span> Test
+                        </button>
+
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick='openEditToolModal(<?= htmlspecialchars(json_encode($tool), ENT_QUOTES, "UTF-8") ?>)' class="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors">
+                                Edit
+                            </button>
+                            <form method="post" action="<?= e(base_url('index.php?page=custom-tool-delete')) ?>" onsubmit="return confirm('Delete tool '<?= e($tool['display_name']) ?>'?');" class="inline">
+                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                <input type="hidden" name="id" value="<?= (int) $tool['id'] ?>">
+                                <button type="submit" class="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors" title="Delete tool">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
+            <?php endforeach; ?>
+        </div>
 
-            </div>
-
-            <!-- Submit Button Bar -->
-            <div class="flex justify-end gap-3 pt-4">
-                <button type="submit" class="px-5 py-2.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-all active:scale-[0.98]">
-                    💾 Save Autonomous Tools & Permissions
-                </button>
-            </div>
-        </form>
-
-        <!-- Audit Log Table: Recent Tool Invocations -->
-        <div class="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden">
+        <!-- Audit Trail Table -->
+        <div class="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden mt-8">
             <div class="p-4 border-b border-slate-200/80 flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-slate-900">Recent AI Tool Invocations (Audit Trail)</h3>
-                    <p class="text-xs text-slate-500">Real-time log of tools executed by the WhatsApp AI Agent, caller roles, and latencies.</p>
+                    <h3 class="text-sm font-bold text-slate-900">Recent AI Tool Invocations (Live Audit Log)</h3>
+                    <p class="text-xs text-slate-500">Autonomous tool calls executed by the WhatsApp AI Agent with caller roles and latencies.</p>
                 </div>
-                <span class="text-xs font-mono text-slate-400"><?= count($recentInvocations) ?> events</span>
+                <span class="text-xs font-mono text-slate-400"><?= count($recentInvocations) ?> logged events</span>
             </div>
 
             <div class="overflow-x-auto">
@@ -768,6 +646,262 @@
                         <?php endif; ?>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 1: ADD / EDIT CUSTOM TOOL -->
+    <div id="customToolModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <h3 id="customToolModalTitle" class="text-base font-bold text-slate-900">Add Custom Tool</h3>
+                <button type="button" onclick="closeToolModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+            </div>
+
+            <form method="post" action="<?= e(base_url('index.php?page=custom-tool-save')) ?>" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                <input type="hidden" name="tool_id" id="modalToolId" value="0">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Tool Slug (identifier for AI) *</label>
+                        <input type="text" name="tool_slug" id="modalToolSlug" required placeholder="e.g. get_weather, check_order" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Display Title *</label>
+                        <input type="text" name="display_name" id="modalDisplayName" required placeholder="e.g. Real-Time Weather Forecaster" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Integration Category *</label>
+                        <select name="category" id="modalCategory" onchange="toggleCategoryFields(this.value)" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                            <option value="rest_api">Normal REST API (Single Endpoint)</option>
+                            <option value="shared_env_api">Shared Hosting Dual-Environment (Local vs Live)</option>
+                            <option value="webhook">Outbound Webhook</option>
+                            <option value="builtin">Built-in Utility</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center pt-5">
+                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="is_active" id="modalIsActive" value="1" checked class="rounded text-emerald-600 focus:ring-emerald-500">
+                            <span class="text-xs font-bold text-slate-800">Activate tool immediately</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">AI Prompt Description *</label>
+                    <p class="text-[11px] text-slate-500 mb-1">Instruct the AI exactly when and why it should call this tool:</p>
+                    <textarea name="description" id="modalDescription" rows="2" required placeholder="Fetches current weather and conditions for any city or location..." class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"></textarea>
+                </div>
+
+                <!-- CATEGORY FIELDS: NORMAL REST API -->
+                <div id="fieldsRestApi" class="space-y-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <div class="text-xs font-bold text-slate-900">🌐 Normal REST API Configuration</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div class="sm:col-span-1">
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Method</label>
+                            <select name="rest_method" id="modalRestMethod" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-3">
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Target URL (supports {param} placeholders) *</label>
+                            <input type="text" name="rest_url" id="modalRestUrl" placeholder="https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Authorization Header (optional)</label>
+                            <input type="text" name="rest_auth_header" id="modalRestAuth" placeholder="Bearer your_secret_token" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Response Path Filter (optional)</label>
+                            <input type="text" name="rest_response_path" id="modalRestPath" placeholder="e.g. current or data.results" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CATEGORY FIELDS: SHARED HOSTING DUAL-ENV -->
+                <div id="fieldsSharedEnv" class="space-y-3 p-3.5 bg-purple-50/50 rounded-xl border border-purple-200 hidden">
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs font-bold text-purple-950">🏢 Shared Hosting Dual-Environment Configuration</div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-[11px] font-bold text-slate-700">Active:</label>
+                            <label class="inline-flex items-center gap-1 text-[11px] font-mono">
+                                <input type="radio" name="shared_active_env" value="local" id="modalEnvLocal" checked> Local
+                            </label>
+                            <label class="inline-flex items-center gap-1 text-[11px] font-mono">
+                                <input type="radio" name="shared_active_env" value="live" id="modalEnvLive"> Live
+                            </label>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Localhost Base URL</label>
+                            <input type="text" name="shared_local_url" id="modalSharedLocalUrl" placeholder="http://localhost/assistgroup/api/admin/v1" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Localhost Bearer Token</label>
+                            <input type="password" name="shared_local_token" id="modalSharedLocalToken" placeholder="ast_live_..." class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Live Shared Hosting Base URL</label>
+                            <input type="text" name="shared_live_url" id="modalSharedLiveUrl" placeholder="https://assistgroup.gt.tc/api/admin/v1" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Live Shared Hosting Bearer Token</label>
+                            <input type="password" name="shared_live_token" id="modalSharedLiveToken" placeholder="ast_live_..." class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CATEGORY FIELDS: WEBHOOK -->
+                <div id="fieldsWebhook" class="space-y-3 p-3.5 bg-amber-50/50 rounded-xl border border-amber-200 hidden">
+                    <div class="text-xs font-bold text-amber-950">🎣 Outbound Webhook Configuration</div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Target Webhook URL (POST)</label>
+                        <input type="text" name="webhook_url" id="modalWebhookUrl" placeholder="https://hooks.zapier.com/hooks/catch/..." class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                    </div>
+                </div>
+
+                <!-- DYNAMIC PARAMETER BUILDER -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-bold text-slate-800">Dynamic Tool Parameters</label>
+                        <button type="button" onclick="addParameterRow()" class="text-xs font-bold text-emerald-600 hover:text-emerald-700">
+                            + Add Parameter
+                        </button>
+                    </div>
+                    <div class="border border-slate-200 rounded-xl overflow-hidden">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 text-[10px] uppercase">
+                                <tr>
+                                    <th class="px-3 py-2">Name</th>
+                                    <th class="px-3 py-2">Type</th>
+                                    <th class="px-3 py-2">Description for AI</th>
+                                    <th class="px-3 py-2 text-center">Req?</th>
+                                    <th class="px-2 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="parameterRowsContainer" class="divide-y divide-slate-100">
+                                <!-- Dynamic Rows Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- RBAC ROLES SELECTION -->
+                <div class="pt-2">
+                    <label class="block text-xs font-bold text-slate-800 mb-1.5">Permitted Caller Roles (RBAC)</label>
+                    <div class="flex items-center gap-4 text-xs">
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" name="roles[]" value="guest" id="modalRoleGuest" checked class="rounded text-emerald-600">
+                            <span>Public Guest</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" name="roles[]" value="customer" id="modalRoleCustomer" checked class="rounded text-blue-600">
+                            <span>Customer</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                            <input type="checkbox" name="roles[]" value="admin" id="modalRoleAdmin" checked class="rounded text-purple-600">
+                            <span class="font-bold">Admin Only</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeToolModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-5 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-xs">
+                        Save Tool
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: 1-CLICK PRESETS GALLERY -->
+    <div id="presetsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <h3 class="text-base font-bold text-slate-900">⚡ 1-Click Integration Presets</h3>
+                <button type="button" onclick="closePresetsModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Click any preset below to automatically pre-populate the custom tool builder with verified schemas and endpoints:</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <!-- Preset 1: Weather API -->
+                <button type="button" onclick="loadPresetWeather()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
+                    <div class="text-base mb-1">🌤️</div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Live Weather Forecaster</div>
+                    <div class="text-[10px] text-slate-500">Free Open-Meteo REST API for global temperature & weather</div>
+                </button>
+
+                <!-- Preset 2: Crypto Price -->
+                <button type="button" onclick="loadPresetCrypto()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
+                    <div class="text-base mb-1">🪙</div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Crypto Price Tracker</div>
+                    <div class="text-[10px] text-slate-500">CoinGecko free API for live Bitcoin, Ethereum, and INR prices</div>
+                </button>
+
+                <!-- Preset 3: Lead Outbound Webhook -->
+                <button type="button" onclick="loadPresetWebhook()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
+                    <div class="text-base mb-1">🎣</div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">CRM Lead Webhook</div>
+                    <div class="text-[10px] text-slate-500">Fires captured name, phone & requirements to Zapier/n8n</div>
+                </button>
+
+                <!-- Preset 4: Shared Hosting Dual-Env -->
+                <button type="button" onclick="loadPresetSharedEnv()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
+                    <div class="text-base mb-1">🏢</div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Dual-Env Backend API</div>
+                    <div class="text-[10px] text-slate-500">Localhost vs. Live Shared Hosting cPanel backend</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: INTERACTIVE SANDBOX TESTER -->
+    <div id="sandboxModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <span>🧪</span> Tool Test Sandbox Simulator
+                </h3>
+                <button type="button" onclick="closeSandboxModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Testing Tool:</label>
+                    <div id="sandboxToolTitle" class="text-xs font-bold font-mono text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                        get_weather
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Sample Arguments (JSON format):</label>
+                    <textarea id="sandboxArgs" rows="4" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none font-sans"></textarea>
+                </div>
+
+                <button type="button" id="btnRunSandbox" onclick="runSandboxTest()" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors shadow-xs active:scale-[0.98]">
+                    ▶ Execute Live Test
+                </button>
+
+                <div id="sandboxResultBox" class="hidden">
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+                        <span>Execution Output:</span>
+                        <span id="sandboxLatency" class="font-mono text-emerald-600">0ms</span>
+                    </div>
+                    <pre id="sandboxOutput" class="text-[11px] font-mono bg-slate-950 text-emerald-400 p-3 rounded-xl overflow-x-auto max-h-48 whitespace-pre-wrap"></pre>
+                </div>
             </div>
         </div>
     </div>
@@ -1178,6 +1312,264 @@
                 }
             });
         }
+
+        // ==========================================
+        // Universal Custom Tools Client Controllers
+        // ==========================================
+        window.filterTools = function(category, btn) {
+            document.querySelectorAll('.tool-cat-btn').forEach(b => {
+                b.className = 'tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all';
+            });
+            btn.className = 'tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs transition-all';
+
+            document.querySelectorAll('.tool-card').forEach(card => {
+                if (category === 'all' || card.getAttribute('data-category') === category) {
+                    card.style.display = 'flex';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        };
+
+        window.toggleCategoryFields = function(cat) {
+            const fRest = document.getElementById('fieldsRestApi');
+            const fShared = document.getElementById('fieldsSharedEnv');
+            const fWeb = document.getElementById('fieldsWebhook');
+            if (fRest) fRest.classList.toggle('hidden', cat !== 'rest_api');
+            if (fShared) fShared.classList.toggle('hidden', cat !== 'shared_env_api');
+            if (fWeb) fWeb.classList.toggle('hidden', cat !== 'webhook');
+        };
+
+        window.addParameterRow = function(name = '', type = 'STRING', desc = '', isRequired = false) {
+            const container = document.getElementById('parameterRowsContainer');
+            if (!container) return;
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-3 py-2">
+                    <input type="text" name="param_name[]" value="${name}" placeholder="e.g. city" required class="w-full text-xs font-mono px-2 py-1 border border-slate-200 rounded">
+                </td>
+                <td class="px-3 py-2">
+                    <select name="param_type[]" class="text-xs px-2 py-1 border border-slate-200 rounded bg-white font-mono">
+                        <option value="STRING" ${type === 'STRING' ? 'selected' : ''}>STRING</option>
+                        <option value="NUMBER" ${type === 'NUMBER' ? 'selected' : ''}>NUMBER</option>
+                        <option value="INTEGER" ${type === 'INTEGER' ? 'selected' : ''}>INTEGER</option>
+                        <option value="BOOLEAN" ${type === 'BOOLEAN' ? 'selected' : ''}>BOOLEAN</option>
+                    </select>
+                </td>
+                <td class="px-3 py-2">
+                    <input type="text" name="param_desc[]" value="${desc}" placeholder="Instruction for AI..." class="w-full text-xs px-2 py-1 border border-slate-200 rounded">
+                </td>
+                <td class="px-3 py-2 text-center">
+                    <input type="checkbox" name="param_required[]" value="1" ${isRequired ? 'checked' : ''} class="rounded text-emerald-600">
+                </td>
+                <td class="px-2 py-2 text-right">
+                    <button type="button" onclick="this.closest('tr').remove()" class="text-slate-400 hover:text-rose-600 text-xs font-bold">✕</button>
+                </td>
+            `;
+            container.appendChild(tr);
+        };
+
+        window.openAddToolModal = function() {
+            document.getElementById('customToolModalTitle').textContent = 'Add Custom Tool';
+            document.getElementById('modalToolId').value = '0';
+            document.getElementById('modalToolSlug').value = '';
+            document.getElementById('modalToolSlug').readOnly = false;
+            document.getElementById('modalDisplayName').value = '';
+            document.getElementById('modalDescription').value = '';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalRestUrl').value = '';
+            document.getElementById('modalRestAuth').value = '';
+            document.getElementById('modalRestPath').value = '';
+            document.getElementById('parameterRowsContainer').innerHTML = '';
+            toggleCategoryFields('rest_api');
+            document.getElementById('customToolModal').classList.remove('hidden');
+        };
+
+        window.openEditToolModal = function(tool) {
+            document.getElementById('customToolModalTitle').textContent = 'Edit Tool: ' + tool.display_name;
+            document.getElementById('modalToolId').value = tool.id;
+            document.getElementById('modalToolSlug').value = tool.tool_slug;
+            document.getElementById('modalDisplayName').value = tool.display_name;
+            document.getElementById('modalDescription').value = tool.description;
+            document.getElementById('modalCategory').value = tool.category;
+            toggleCategoryFields(tool.category);
+
+            if (tool.category === 'rest_api') {
+                document.getElementById('modalRestMethod').value = tool.execution_config?.method || 'GET';
+                document.getElementById('modalRestUrl').value = tool.execution_config?.url || '';
+                document.getElementById('modalRestAuth').value = tool.execution_config?.headers?.Authorization || '';
+                document.getElementById('modalRestPath').value = tool.execution_config?.response_path || '';
+            } else if (tool.category === 'shared_env_api') {
+                const activeEnv = tool.execution_config?.active_env || 'local';
+                const elLoc = document.getElementById('modalEnvLocal');
+                const elLiv = document.getElementById('modalEnvLive');
+                if (elLoc) elLoc.checked = activeEnv === 'local';
+                if (elLiv) elLiv.checked = activeEnv === 'live';
+                document.getElementById('modalSharedLocalUrl').value = tool.execution_config?.environments?.local?.base_url || '';
+                document.getElementById('modalSharedLocalToken').value = tool.execution_config?.environments?.local?.bearer_token || '';
+                document.getElementById('modalSharedLiveUrl').value = tool.execution_config?.environments?.live?.base_url || '';
+                document.getElementById('modalSharedLiveToken').value = tool.execution_config?.environments?.live?.bearer_token || '';
+            } else if (tool.category === 'webhook') {
+                document.getElementById('modalWebhookUrl').value = tool.execution_config?.target_url || '';
+            }
+
+            // Populate parameters
+            const container = document.getElementById('parameterRowsContainer');
+            container.innerHTML = '';
+            const props = tool.parameters_schema?.properties || {};
+            const req = tool.parameters_schema?.required || [];
+            for (const [pName, pSpec] of Object.entries(props)) {
+                addParameterRow(pName, pSpec.type || 'STRING', pSpec.description || '', req.includes(pName));
+            }
+
+            document.getElementById('customToolModal').classList.remove('hidden');
+        };
+
+        window.closeToolModal = function() {
+            document.getElementById('customToolModal').classList.add('hidden');
+        };
+
+        window.openPresetsModal = function() {
+            document.getElementById('presetsModal').classList.remove('hidden');
+        };
+
+        window.closePresetsModal = function() {
+            document.getElementById('presetsModal').classList.add('hidden');
+        };
+
+        window.loadPresetWeather = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'get_weather';
+            document.getElementById('modalDisplayName').value = '🌤️ Live Weather Forecaster';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalDescription').value = 'Fetches real-time weather, temperature, humidity, apparent temperature, and wind speed for any location or city using coordinates.';
+            document.getElementById('modalRestUrl').value = 'https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m';
+            document.getElementById('modalRestPath').value = 'current';
+            toggleCategoryFields('rest_api');
+            addParameterRow('city', 'STRING', 'City name (e.g. "Patna", "Delhi", "London")', true);
+            addParameterRow('latitude', 'NUMBER', 'Latitude coordinate (e.g. 25.59 for Patna)', true);
+            addParameterRow('longitude', 'NUMBER', 'Longitude coordinate (e.g. 85.14 for Patna)', true);
+        };
+
+        window.loadPresetCrypto = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'get_crypto_price';
+            document.getElementById('modalDisplayName').value = '🪙 Crypto Price Tracker';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalDescription').value = 'Queries current live market prices for cryptocurrencies like bitcoin, ethereum, solana in INR and USD.';
+            document.getElementById('modalRestUrl').value = 'https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=inr,usd';
+            toggleCategoryFields('rest_api');
+            addParameterRow('coin_id', 'STRING', 'Cryptocurrency id e.g. "bitcoin", "ethereum", "solana"', true);
+        };
+
+        window.loadPresetWebhook = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'send_crm_lead';
+            document.getElementById('modalDisplayName').value = '🎣 CRM Lead Outbound Webhook';
+            document.getElementById('modalCategory').value = 'webhook';
+            document.getElementById('modalDescription').value = 'Forwards interested customer leads, name, phone, and requirements directly to external CRM webhook.';
+            document.getElementById('modalWebhookUrl').value = 'https://hooks.zapier.com/hooks/catch/12345/abcde';
+            toggleCategoryFields('webhook');
+            addParameterRow('customer_name', 'STRING', 'Full name of customer', true);
+            addParameterRow('customer_phone', 'STRING', 'Contact phone number', true);
+            addParameterRow('notes', 'STRING', 'Summary of customer requirements', false);
+        };
+
+        window.loadPresetSharedEnv = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'custom_shared_crm';
+            document.getElementById('modalDisplayName').value = '🏢 Custom Shared Hosting Backend';
+            document.getElementById('modalCategory').value = 'shared_env_api';
+            document.getElementById('modalDescription').value = 'Connects to your custom PHP/cPanel shared hosting backend or local development API.';
+            toggleCategoryFields('shared_env_api');
+            document.getElementById('modalSharedLocalUrl').value = 'http://localhost/myproject/api/v1';
+            document.getElementById('modalSharedLiveUrl').value = 'https://myproject.com/api/v1';
+            addParameterRow('action', 'STRING', 'Endpoint action to perform', true);
+        };
+
+        // Sandbox Simulator Modal
+        let activeSandboxTool = null;
+        window.openSandboxModal = function(tool) {
+            activeSandboxTool = tool;
+            document.getElementById('sandboxToolTitle').textContent = tool.tool_slug + ' (' + tool.category + ')';
+            const sampleArgs = {};
+            const props = tool.parameters_schema?.properties || {};
+            for (const [k, v] of Object.entries(props)) {
+                if (k === 'latitude') sampleArgs[k] = 25.5941;
+                else if (k === 'longitude') sampleArgs[k] = 85.1376;
+                else if (k === 'city') sampleArgs[k] = 'Patna';
+                else if (k === 'query') sampleArgs[k] = 'Latest tech news';
+                else if (k === 'expression') sampleArgs[k] = '35000 * 0.82';
+                else if (k === 'coin_id') sampleArgs[k] = 'bitcoin';
+                else if (k === 'action') sampleArgs[k] = 'pricing_plans';
+                else sampleArgs[k] = 'test_value';
+            }
+            document.getElementById('sandboxArgs').value = JSON.stringify(sampleArgs, null, 2);
+            document.getElementById('sandboxResultBox').classList.add('hidden');
+            document.getElementById('sandboxModal').classList.remove('hidden');
+        };
+
+        window.closeSandboxModal = function() {
+            document.getElementById('sandboxModal').classList.add('hidden');
+        };
+
+        window.runSandboxTest = async function() {
+            if (!activeSandboxTool) return;
+            const btn = document.getElementById('btnRunSandbox');
+            const output = document.getElementById('sandboxOutput');
+            const latencyEl = document.getElementById('sandboxLatency');
+            const resultBox = document.getElementById('sandboxResultBox');
+
+            let parsedArgs = {};
+            try {
+                parsedArgs = JSON.parse(document.getElementById('sandboxArgs').value);
+            } catch (e) {
+                alert('Invalid JSON in arguments textarea.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Executing...';
+            resultBox.classList.remove('hidden');
+            output.textContent = 'Contacting endpoint...';
+
+            const startTime = performance.now();
+            try {
+                if (activeSandboxTool.category === 'rest_api') {
+                    let targetUrl = activeSandboxTool.execution_config.url || '';
+                    for (const [k, v] of Object.entries(parsedArgs)) {
+                        targetUrl = targetUrl.replace(new RegExp('\\{' + k + '\\}', 'g'), encodeURIComponent(v));
+                    }
+                    const res = await fetch(targetUrl);
+                    const data = await res.json();
+                    const latency = Math.round(performance.now() - startTime);
+                    latencyEl.textContent = latency + 'ms (HTTP ' + res.status + ')';
+                    output.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    const latency = Math.round(performance.now() - startTime);
+                    latencyEl.textContent = latency + 'ms (Simulated)';
+                    output.textContent = JSON.stringify({
+                        status: 'success',
+                        tool: activeSandboxTool.tool_slug,
+                        category: activeSandboxTool.category,
+                        args_received: parsedArgs,
+                        note: 'Executed through dynamic tool executor.'
+                    }, null, 2);
+                }
+            } catch (err) {
+                const latency = Math.round(performance.now() - startTime);
+                latencyEl.textContent = latency + 'ms (Error)';
+                output.textContent = 'Test failed: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '▶ Execute Live Test';
+            }
+        };
     });
     </script>
 

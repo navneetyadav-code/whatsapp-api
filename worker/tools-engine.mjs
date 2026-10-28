@@ -1,16 +1,25 @@
 /**
- * Autonomous Tools & Function Calling Engine with RBAC
- * ----------------------------------------------------
- * Provides native tool declarations, role-based tool gating, built-from-scratch web search,
- * AssistGroup API connector (localhost & live shared hosting), math engine, IST clock,
- * and human escalation handling.
+ * Universal Dynamic Tools & Multi-Tenant Function Calling Engine
+ * ----------------------------------------------------------------
+ * Completely decoupled, open-source integration framework.
+ * Supports:
+ *  - Account-scoped custom REST APIs (Normal API)
+ *  - Dual-environment APIs (Localhost vs. Live Shared Hosting)
+ *  - Outbound Webhooks
+ *  - Native utility tools (DuckDuckGo search, Safe Math, Business Hours, Escalation)
+ *  - Dynamic Gemini FunctionDeclaration synthesis & RBAC enforcement
+ *  - Audit logging into ai_tool_invocations
  */
 
 import crypto from 'crypto';
 
 // ---------------------------------------------------------------------------
-// 1. BUILT-FROM-SCRATCH WEB SEARCH (DuckDuckGo Lite HTML Scraper)
+// 1. BUILT-IN CORE UTILITIES
 // ---------------------------------------------------------------------------
+
+/**
+ * Resilient DuckDuckGo web search (mobile headers + Instant Answer API fallback)
+ */
 export async function searchWebDuckDuckGo(query, maxResults = 3, timeoutMs = 4000) {
   if (!query || typeof query !== 'string' || !query.trim()) {
     return { query, count: 0, results: [], message: 'Empty search query provided.' };
@@ -63,7 +72,7 @@ export async function searchWebDuckDuckGo(query, maxResults = 3, timeoutMs = 400
       }
     }
 
-    // Fallback: If HTML parser returned 0 results (e.g. rate limit), use Instant Answer API
+    // Fallback: DuckDuckGo Instant Answer JSON API
     if (results.length === 0) {
       try {
         const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&no_html=1&skip_disambig=1`;
@@ -108,119 +117,30 @@ export async function searchWebDuckDuckGo(query, maxResults = 3, timeoutMs = 400
   }
 }
 
-function decodeHtmlEntities(str) {
-  if (!str) return '';
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-}
-
-function sanitizeText(str) {
-  if (!str) return '';
-  return str
-    .replace(/(ignore previous instructions|disregard earlier instructions|system prompt|developer mode)/gi, '[redacted]')
-    .trim();
-}
-
-// ---------------------------------------------------------------------------
-// 2. ASSISTGROUP ADMIN API CONNECTOR (Localhost & Live Shared Hosting)
-// ---------------------------------------------------------------------------
-export async function callAssistGroupApi(endpoint, method = 'GET', body = null, config = {}) {
-  const agConfig = config.tools?.assistgroup_api || {};
-  const activeEnv = agConfig.active_env || 'local';
-  const envConfig = agConfig.environments?.[activeEnv] || {};
-
-  const baseUrl = envConfig.base_url || (activeEnv === 'live' ? 'https://assistgroup.gt.tc/api/admin/v1' : 'http://localhost/assistgroup/api/admin/v1');
-  const token = envConfig.bearer_token || '';
-
-  if (!token) {
-    return { error: 'AssistGroup API Bearer token is not configured.' };
-  }
-
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const fullUrl = `${baseUrl.replace(/\/+$/, '')}${cleanEndpoint}`;
-
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Accept': 'application/json',
-    'User-Agent': 'WhatsGateway-AI-Agent/2.0'
-  };
-
-  const reqOptions = {
-    method,
-    headers,
-    signal: AbortSignal.timeout(agConfig.timeout_ms || 6000)
-  };
-
-  if (body && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
-    headers['Content-Type'] = 'application/json';
-    reqOptions.body = JSON.stringify(body);
-  }
-
-  try {
-    const res = await fetch(fullUrl, reqOptions);
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok || !data) {
-      return {
-        status: res.status,
-        success: false,
-        error: data?.error || `API returned status ${res.status}`
-      };
-    }
-
-    return {
-      status: res.status,
-      success: true,
-      environment: activeEnv,
-      data: data.data || data
-    };
-  } catch (err) {
-    return {
-      success: false,
-      error: `AssistGroup API request failed: ${err.message}`
-    };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 3. SAFE ARITHMETIC / MATH ENGINE (Zero Eval, AST Parsing)
-// ---------------------------------------------------------------------------
+/**
+ * Safe Recursive-Descent Math Parser (Zero eval)
+ */
 export function evaluateSafeMath(expression) {
   if (!expression || typeof expression !== 'string') {
     return { error: 'Missing mathematical expression.' };
   }
 
-  // Pre-process common percentage patterns: "1000 + 18%" or "25000 * 15%"
   let clean = expression
     .replace(/,/g, '')
     .replace(/₹|rs\.?/gi, '')
     .replace(/\s+/g, '')
     .toLowerCase();
 
-  // Validate allowed characters: digits, ., +, -, *, /, (, ), %, ^
   if (!/^[0-9.+\-*/()^%]+$/.test(clean)) {
     return { error: 'Invalid characters in mathematical expression. Only standard arithmetic is permitted.' };
   }
 
   try {
-    // Replace percentage notation: e.g. "15%" -> "0.15"
     clean = clean.replace(/(\d+(\.\d+)?)%/g, '($1/100)');
-
-    // Simple recursive descent parser for +, -, *, /, ^, parentheses
     let index = 0;
 
-    function peek() {
-      return clean[index];
-    }
-
-    function get() {
-      return clean[index++];
-    }
+    function peek() { return clean[index]; }
+    function get() { return clean[index++]; }
 
     function parseExpression() {
       let val = parseTerm();
@@ -255,7 +175,7 @@ export function evaluateSafeMath(expression) {
 
     function parsePrimary() {
       if (peek() === '(') {
-        get(); // consume '('
+        get();
         const val = parseExpression();
         if (get() !== ')') throw new Error("Mismatched parentheses");
         return val;
@@ -297,60 +217,66 @@ export function evaluateSafeMath(expression) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 4. REAL-TIME CLOCK & BUSINESS HOURS (IST)
-// ---------------------------------------------------------------------------
-export function getCurrentIstTime(timeConfig = {}) {
+/**
+ * Dynamic Configurable Time Clock & Operating Hours
+ */
+export function getCurrentCustomTime(config = {}) {
+  const tz = config.timezone || 'Asia/Kolkata';
   const now = new Date();
   
-  // Format to IST (UTC+5:30)
-  const istString = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-  const istDate = new Date(istString);
+  let localString;
+  try {
+    localString = now.toLocaleString('en-US', { timeZone: tz });
+  } catch (e) {
+    localString = now.toLocaleString('en-US', { timeZone: 'UTC' });
+  }
+  const localDate = new Date(localString);
 
-  const dayOfWeek = istDate.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+  const dayOfWeek = localDate.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dayName = dayNames[dayOfWeek];
 
-  const hours = istDate.getHours();
-  const minutes = istDate.getMinutes();
+  const hours = localDate.getHours();
+  const minutes = localDate.getMinutes();
   const currentTimeMinutes = hours * 60 + minutes;
 
-  // Default office hours: Mon-Sat, 9:30 AM (570m) to 6:30 PM (1110m)
-  const openMinutes = 9 * 60 + 30; // 09:30
-  const closeMinutes = 18 * 60 + 30; // 18:30
-  const workDays = [1, 2, 3, 4, 5, 6]; // Mon through Sat
+  const [openH, openM] = (config.open_time || '09:30').split(':').map(Number);
+  const [closeH, closeM] = (config.close_time || '18:30').split(':').map(Number);
+  const openMinutes = (openH || 9) * 60 + (openM || 30);
+  const closeMinutes = (closeH || 18) * 60 + (closeM || 30);
 
+  const workDays = Array.isArray(config.workdays) ? config.workdays : [1, 2, 3, 4, 5, 6];
   const isWorkDay = workDays.includes(dayOfWeek);
   const isOpen = isWorkDay && currentTimeMinutes >= openMinutes && currentTimeMinutes < closeMinutes;
 
-  const formattedDate = istDate.toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
+  const formattedDate = localDate.toLocaleDateString('en-US', {
+    timeZone: tz,
     year: 'numeric',
     month: 'long',
     day: 'numeric'
   });
 
-  const formattedTime = istDate.toLocaleTimeString('en-IN', {
-    timeZone: 'Asia/Kolkata',
+  const formattedTime = localDate.toLocaleTimeString('en-US', {
+    timeZone: tz,
     hour: '2-digit',
     minute: '2-digit',
     hour12: true
   });
 
   return {
-    timezone: 'Asia/Kolkata (IST)',
+    timezone: tz,
     current_time: formattedTime,
     current_date: formattedDate,
     day_of_week: dayName,
     is_office_open: isOpen,
-    office_schedule: 'Monday to Saturday, 9:30 AM to 6:30 PM IST',
+    office_schedule: `${config.open_time || '09:30'} to ${config.close_time || '18:30'} (${tz})`,
     office_status: isOpen ? 'Currently OPEN for business & live support' : 'Currently CLOSED. Inquiries received now will be prioritized next working morning.'
   };
 }
 
-// ---------------------------------------------------------------------------
-// 5. HUMAN ESCALATION ENGINE
-// ---------------------------------------------------------------------------
+/**
+ * Human Escalation Recorder
+ */
 export async function triggerHumanEscalation(reason, context) {
   const { db, userId, conversationId, callerPhone } = context;
 
@@ -385,308 +311,418 @@ export async function triggerHumanEscalation(reason, context) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. TOOLS REGISTRY & GEMINI FUNCTION SCHEMAS
+// 2. DYNAMIC PARAMETER INTERPOLATION & HTTP EXECUTOR
 // ---------------------------------------------------------------------------
-export class ToolsRegistry {
-  /**
-   * Complete definitions matching Google Gemini FunctionDeclaration specification
-   */
-  static DEFINITIONS = {
-    web_search: {
-      name: 'web_search',
-      description: 'Search the live internet for up-to-date facts, current news, technology comparisons, and information not contained in the local knowledge base.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          query: {
-            type: 'STRING',
-            description: 'The search query to look up on the web'
-          }
-        },
-        required: ['query']
-      }
-    },
 
-    assistgroup_get_services_pricing: {
-      name: 'assistgroup_get_services_pricing',
-      description: 'Fetch official AssistGroup services, active pricing packages, and features for web development, software engineering, cloud services, and mobile applications.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {},
-        required: []
+/**
+ * Replaces {variable} placeholders in strings or nested objects
+ */
+function interpolateVariables(template, variables = {}) {
+  if (typeof template === 'string') {
+    return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => {
+      if (variables[key] !== undefined && variables[key] !== null) {
+        return encodeURIComponent(String(variables[key]));
       }
-    },
+      return match;
+    });
+  }
 
-    assistgroup_create_inquiry: {
-      name: 'assistgroup_create_inquiry',
-      description: 'Submit a new prospective customer inquiry, project lead, or quote request directly into the AssistGroup CRM system.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          name: { type: 'STRING', description: "Prospective customer's full name" },
-          phone: { type: 'STRING', description: "Prospective customer's contact phone number" },
-          email: { type: 'STRING', description: "Customer's email address (optional)" },
-          service: { type: 'STRING', description: 'The requested service type, e.g. "Web Development", "App Development", "SEO", "Custom CRM"' },
-          message: { type: 'STRING', description: 'Brief summary of their requirements or project goals' }
-        },
-        required: ['name', 'phone', 'message']
-      }
-    },
+  if (Array.isArray(template)) {
+    return template.map(item => interpolateVariables(item, variables));
+  }
 
-    assistgroup_lookup_inquiries: {
-      name: 'assistgroup_lookup_inquiries',
-      description: 'Look up past inquiries, support tickets, and quotes submitted by a customer using their registered contact phone number.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          phone: { type: 'STRING', description: "The customer's phone number to look up" }
-        },
-        required: ['phone']
-      }
-    },
-
-    assistgroup_get_team: {
-      name: 'assistgroup_get_team',
-      description: 'Get information about AssistGroup team members, leadership, and technical specializations.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {},
-        required: []
-      }
-    },
-
-    assistgroup_admin_dashboard_stats: {
-      name: 'assistgroup_admin_dashboard_stats',
-      description: '[ADMIN ONLY] Fetch executive real-time metrics: registered users, file storage, inquiries count, and system status.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {},
-        required: []
-      }
-    },
-
-    evaluate_math: {
-      name: 'evaluate_math',
-      description: 'Evaluate arithmetic calculations, pricing plans, percentage discounts, GST (18%), or project cost totals with 100% precision without hallucinations.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          expression: {
-            type: 'STRING',
-            description: 'The math expression to evaluate, e.g. "25000 * 0.85" or "15000 + (15000 * 0.18)"'
-          }
-        },
-        required: ['expression']
-      }
-    },
-
-    get_current_time: {
-      name: 'get_current_time',
-      description: 'Get the exact current date, time in Indian Standard Time (IST), day of the week, and check whether AssistGroup offices are open.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {},
-        required: []
-      }
-    },
-
-    escalate_to_human: {
-      name: 'escalate_to_human',
-      description: 'Escalate the chat to a human agent, engineer, or supervisor when requested or when an inquiry requires custom human assessment.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          reason: {
-            type: 'STRING',
-            description: 'The specific reason why human intervention is required'
-          }
-        },
-        required: ['reason']
-      }
+  if (template && typeof template === 'object') {
+    const output = {};
+    for (const [k, v] of Object.entries(template)) {
+      output[k] = interpolateVariables(v, variables);
     }
+    return output;
+  }
+
+  return template;
+}
+
+/**
+ * Executes a custom REST API (Normal API)
+ */
+async function executeCustomRestApi(executionConfig, args = {}) {
+  const rawUrl = executionConfig.url || '';
+  if (!rawUrl) {
+    return { error: 'Target URL is missing in tool execution configuration.' };
+  }
+
+  // 1. Interpolate URL parameters
+  const finalUrl = interpolateVariables(rawUrl, args);
+
+  // Security guardrail: Validate protocol
+  if (!/^https?:\/\//i.test(finalUrl)) {
+    return { error: 'Invalid URL protocol. Only HTTP and HTTPS are permitted.' };
+  }
+
+  const method = (executionConfig.method || 'GET').toUpperCase();
+  const headers = {
+    'Accept': 'application/json',
+    'User-Agent': 'WhatsGateway-Autonomous-Engine/3.0',
+    ...(executionConfig.headers || {})
   };
 
+  const reqOptions = {
+    method,
+    headers,
+    signal: AbortSignal.timeout(executionConfig.timeout_ms || 5000)
+  };
+
+  // 2. Attach JSON body for write methods
+  if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    headers['Content-Type'] = 'application/json';
+    if (executionConfig.body_template) {
+      reqOptions.body = JSON.stringify(interpolateVariables(executionConfig.body_template, args));
+    } else {
+      reqOptions.body = JSON.stringify(args);
+    }
+  }
+
+  try {
+    const res = await fetch(finalUrl, reqOptions);
+    const contentType = res.headers.get('content-type') || '';
+    
+    let responseData;
+    if (contentType.includes('application/json')) {
+      responseData = await res.json();
+    } else {
+      const text = await res.text();
+      responseData = { raw_text: text.slice(0, 1000) };
+    }
+
+    if (!res.ok) {
+      return {
+        status: res.status,
+        success: false,
+        error: responseData?.error || `API returned HTTP ${res.status}`,
+        details: responseData
+      };
+    }
+
+    // Optional response path extraction (e.g. "current" or "data.items")
+    if (executionConfig.response_path && responseData && typeof responseData === 'object') {
+      const parts = executionConfig.response_path.split('.');
+      let target = responseData;
+      for (const p of parts) {
+        if (target && target[p] !== undefined) {
+          target = target[p];
+        }
+      }
+      return { success: true, status: res.status, data: target };
+    }
+
+    return { success: true, status: res.status, data: responseData };
+  } catch (err) {
+    return {
+      success: false,
+      error: `API request failed: ${err.message}`
+    };
+  }
+}
+
+/**
+ * Executes a Dual-Environment Shared Hosting API
+ */
+async function executeSharedEnvApi(executionConfig, args = {}) {
+  const activeEnv = executionConfig.active_env || 'local';
+  const envData = executionConfig.environments?.[activeEnv] || {};
+
+  const baseUrl = envData.base_url || '';
+  const token = envData.bearer_token || '';
+
+  if (!baseUrl) {
+    return { error: `Base URL is not configured for active environment: ${activeEnv}` };
+  }
+
+  // Determine endpoint: check action or explicit endpoint
+  let endpoint = executionConfig.endpoint || '';
+  if (args.action) {
+    // Standardize action routing: e.g. "pricing_plans" -> "/pricing/plans"
+    if (args.action === 'pricing_plans') endpoint = '/pricing/plans';
+    else if (args.action === 'team_overview') endpoint = '/team';
+    else if (args.action === 'create_inquiry') endpoint = '/inquiries';
+    else if (args.action === 'dashboard_metrics') endpoint = '/dashboard/metrics';
+    else endpoint = `/${args.action.replace(/^\/+/, '')}`;
+  }
+
+  const finalUrl = `${baseUrl.replace(/\/+$/, '')}/${endpoint.replace(/^\/+/, '')}`;
+  const method = args.action === 'create_inquiry' ? 'POST' : (executionConfig.method || 'GET').toUpperCase();
+
+  const headers = {
+    'Accept': 'application/json',
+    'User-Agent': 'WhatsGateway-DualEnv-Engine/3.0',
+    ...(executionConfig.headers || {})
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const reqOptions = {
+    method,
+    headers,
+    signal: AbortSignal.timeout(executionConfig.timeout_ms || 6000)
+  };
+
+  if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    headers['Content-Type'] = 'application/json';
+    reqOptions.body = JSON.stringify({
+      name: args.client_name || args.name || 'WhatsApp Client',
+      phone: args.client_phone || args.phone || '',
+      service: args.service || 'General Inquiry',
+      message: args.requirement || args.message || 'WhatsApp Bot Inquiry'
+    });
+  }
+
+  try {
+    const res = await fetch(finalUrl, reqOptions);
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data) {
+      return {
+        status: res.status,
+        success: false,
+        error: data?.error || `Dual-env API returned status ${res.status}`
+      };
+    }
+
+    return {
+      status: res.status,
+      success: true,
+      environment: activeEnv,
+      data: data.data || data
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Dual-env API request failed (${activeEnv}): ${err.message}`
+    };
+  }
+}
+
+/**
+ * Executes an Outbound Webhook tool
+ */
+async function executeWebhookTool(executionConfig, args = {}) {
+  const targetUrl = executionConfig.target_url || '';
+  if (!targetUrl) {
+    return { error: 'Webhook target URL is not configured.' };
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'WhatsGateway-Webhook-Dispatcher/3.0',
+    ...(executionConfig.headers || {})
+  };
+
+  const payload = executionConfig.body_template 
+    ? interpolateVariables(executionConfig.body_template, args)
+    : { event: 'ai_tool_invocation', data: args, timestamp: new Date().toISOString() };
+
+  try {
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(executionConfig.timeout_ms || 5000)
+    });
+
+    return {
+      dispatched: true,
+      status: res.status,
+      message: `Webhook sent with status ${res.status}`
+    };
+  } catch (err) {
+    return {
+      dispatched: false,
+      error: `Webhook delivery failed: ${err.message}`
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 3. UNIVERSAL TOOLS REGISTRY & GEMINI SCHEMA GENERATOR
+// ---------------------------------------------------------------------------
+
+export class UniversalToolsRegistry {
   /**
-   * Filter tools based on caller's RBAC role and configuration
+   * Loads all active tools for a given user from ai_custom_tools table
    */
-  static getDeclarationsForRole(role = 'guest', toolsConfig = {}) {
-    if (!toolsConfig.enabled) {
+  static async loadUserTools(userId, db) {
+    if (!userId || !db) return [];
+
+    try {
+      const [rows] = await db.execute(
+        `SELECT tool_slug, display_name, category, description, parameters_schema, execution_config, rbac_roles, is_active
+         FROM ai_custom_tools
+         WHERE user_id = ? AND is_active = 1
+         ORDER BY id ASC`,
+        [userId]
+      );
+
+      return rows.map(r => ({
+        tool_slug: r.tool_slug,
+        display_name: r.display_name,
+        category: r.category,
+        description: r.description,
+        parameters_schema: typeof r.parameters_schema === 'string' ? JSON.parse(r.parameters_schema) : (r.parameters_schema || {}),
+        execution_config: typeof r.execution_config === 'string' ? JSON.parse(r.execution_config) : (r.execution_config || {}),
+        rbac_roles: typeof r.rbac_roles === 'string' ? JSON.parse(r.rbac_roles) : (r.rbac_roles || ['admin']),
+        is_active: Boolean(r.is_active)
+      }));
+    } catch (err) {
+      console.error('[UniversalToolsRegistry] Failed to load tools from database:', err.message);
       return [];
     }
-
-    const allowed = [];
-    const cfg = toolsConfig.tools || {};
-
-    for (const [toolKey, toolDef] of Object.entries(this.DEFINITIONS)) {
-      let isPermitted = false;
-
-      if (toolKey.startsWith('assistgroup_')) {
-        const agCfg = cfg.assistgroup_api || {};
-        if (agCfg.enabled) {
-          const actionKey = toolKey.replace('assistgroup_', '');
-          const actionCfg = agCfg.actions?.[actionKey];
-          if (actionCfg && actionCfg.enabled && actionCfg.roles?.includes(role)) {
-            isPermitted = true;
-          }
-        }
-      } else {
-        const tCfg = cfg[toolKey];
-        if (tCfg && tCfg.enabled && tCfg.roles?.includes(role)) {
-          isPermitted = true;
-        }
-      }
-
-      if (isPermitted) {
-        allowed.push(toolDef);
-      }
-    }
-
-    if (allowed.length === 0) return [];
-
-    return [
-      {
-        function_declarations: allowed
-      }
-    ];
   }
 
   /**
-   * Execute tool with security bounds, RBAC validation, and audit logging
+   * Compiles Gemini FunctionDeclaration schemas for tools allowed for caller's role
    */
-  static async executeTool(toolName, args = {}, context = {}) {
-    const startTime = Date.now();
-    const { db, userId, conversationId, callerPhone, callerRole, toolsConfig } = context;
+  static compileDeclarationsForRole(tools = [], callerRole = 'guest') {
+    const declarations = [];
 
-    // RBAC Execution Guard (Defense-in-depth)
-    const declarations = this.getDeclarationsForRole(callerRole, toolsConfig);
-    const permittedFunctions = declarations[0]?.function_declarations?.map(d => d.name) || [];
-
-    if (!permittedFunctions.includes(toolName)) {
-      const errRes = {
-        error: `Permission Denied: Caller role '${callerRole}' is not authorized to execute tool '${toolName}'.`
-      };
-      await this.logInvocation(context, toolName, args, errRes, Date.now() - startTime, 'denied', errRes.error);
-      return errRes;
-    }
-
-    let result = null;
-    let status = 'success';
-    let errorMessage = null;
-
-    try {
-      switch (toolName) {
-        case 'web_search': {
-          const maxResults = toolsConfig.tools?.web_search?.max_results || 3;
-          const timeout = toolsConfig.tools?.web_search?.timeout_ms || 4000;
-          result = await searchWebDuckDuckGo(args.query, maxResults, timeout);
-          break;
-        }
-
-        case 'assistgroup_get_services_pricing': {
-          const res = await callAssistGroupApi('/pricing/plans', 'GET', null, toolsConfig);
-          if (res.success && Array.isArray(res.data)) {
-            result = {
-              services_and_packages: res.data.map(p => ({
-                id: p.id,
-                plan_name: p.plan_name || p.name || 'Custom Package',
-                price: p.price ? `₹${p.price}` : 'Custom Quote',
-                billing_cycle: p.billing_cycle || 'one-time',
-                features: p.features || []
-              }))
-            };
-          } else {
-            result = res;
-          }
-          break;
-        }
-
-        case 'assistgroup_create_inquiry': {
-          const payload = {
-            name: args.name,
-            phone: args.phone || callerPhone,
-            email: args.email || '',
-            service_type: args.service || 'General Inquiry',
-            message: args.message
-          };
-          result = await callAssistGroupApi('/inquiries', 'POST', payload, toolsConfig);
-          break;
-        }
-
-        case 'assistgroup_lookup_inquiries': {
-          const phoneToLookup = args.phone || callerPhone;
-          result = await callAssistGroupApi(`/inquiries?search=${encodeURIComponent(phoneToLookup)}&limit=5`, 'GET', null, toolsConfig);
-          break;
-        }
-
-        case 'assistgroup_get_team': {
-          result = await callAssistGroupApi('/team', 'GET', null, toolsConfig);
-          break;
-        }
-
-        case 'assistgroup_admin_dashboard_stats': {
-          result = await callAssistGroupApi('/dashboard/metrics', 'GET', null, toolsConfig);
-          break;
-        }
-
-        case 'evaluate_math': {
-          result = evaluateSafeMath(args.expression);
-          break;
-        }
-
-        case 'get_current_time': {
-          result = getCurrentIstTime(toolsConfig.tools?.get_current_time);
-          break;
-        }
-
-        case 'escalate_to_human': {
-          result = await triggerHumanEscalation(args.reason, context);
-          break;
-        }
-
-        default:
-          status = 'error';
-          errorMessage = `Unknown tool: ${toolName}`;
-          result = { error: errorMessage };
+    for (const tool of tools) {
+      // Check RBAC permission
+      const allowedRoles = Array.isArray(tool.rbac_roles) ? tool.rbac_roles : ['admin'];
+      if (!allowedRoles.includes(callerRole) && callerRole !== 'admin') {
+        continue;
       }
-    } catch (err) {
-      status = 'error';
-      errorMessage = err.message;
-      result = { error: `Tool execution failed: ${err.message}` };
+
+      // Ensure valid parameters object conforming to Gemini API spec
+      let params = tool.parameters_schema;
+      if (!params || typeof params !== 'object' || !params.type) {
+        params = {
+          type: 'OBJECT',
+          properties: {},
+          required: []
+        };
+      }
+
+      declarations.push({
+        name: tool.tool_slug,
+        description: tool.description,
+        parameters: params
+      });
     }
 
-    const duration = Date.now() - startTime;
-    await this.logInvocation(context, toolName, args, result, duration, status, errorMessage);
+    return declarations;
+  }
+
+  /**
+   * Dispatches and executes tool dynamically by slug
+   */
+  static async executeTool(toolName, args, tools = [], context = {}) {
+    const startTime = Date.now();
+    const callerRole = context.callerRole || 'guest';
+    const userId = context.userId || 1;
+    const db = context.db;
+
+    // 1. Locate tool in catalog
+    const tool = tools.find(t => t.tool_slug === toolName);
+
+    if (!tool) {
+      return { error: `Tool "${toolName}" is not registered or is disabled.` };
+    }
+
+    // 2. Enforce Role-Based Access Control
+    const allowedRoles = Array.isArray(tool.rbac_roles) ? tool.rbac_roles : ['admin'];
+    if (!allowedRoles.includes(callerRole) && callerRole !== 'admin') {
+      const deniedResponse = {
+        denied: true,
+        error: `Permission Denied: Caller role "${callerRole}" is not permitted to execute tool "${toolName}".`
+      };
+      await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, deniedResponse, 0, 'denied');
+      return deniedResponse;
+    }
+
+    // 3. Execute according to category
+    let result;
+    try {
+      if (tool.category === 'builtin') {
+        const handler = tool.execution_config.handler || tool.tool_slug;
+        if (handler === 'web_search') {
+          result = await searchWebDuckDuckGo(args.query, tool.execution_config.max_results, tool.execution_config.timeout_ms);
+        } else if (handler === 'evaluate_math') {
+          result = evaluateSafeMath(args.expression);
+        } else if (handler === 'get_current_time') {
+          result = getCurrentCustomTime(tool.execution_config);
+        } else if (handler === 'escalate_to_human') {
+          result = await triggerHumanEscalation(args.reason, context);
+        } else {
+          result = { error: `Unknown built-in handler: ${handler}` };
+        }
+      } else if (tool.category === 'rest_api') {
+        result = await executeCustomRestApi(tool.execution_config, args);
+      } else if (tool.category === 'shared_env_api') {
+        result = await executeSharedEnvApi(tool.execution_config, args);
+      } else if (tool.category === 'webhook') {
+        result = await executeWebhookTool(tool.execution_config, args);
+      } else {
+        result = { error: `Unsupported tool category: ${tool.category}` };
+      }
+    } catch (execErr) {
+      result = { error: `Execution exception: ${execErr.message}` };
+    }
+
+    const latency = Date.now() - startTime;
+    const status = result?.error ? 'error' : 'success';
+
+    // 4. Record audit log
+    await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, result, latency, status);
 
     return result;
   }
 
   /**
-   * Log tool invocation to audit table
+   * Internal audit logger into ai_tool_invocations
    */
-  static async logInvocation(context, toolName, args, result, duration, status, errorMessage) {
-    const { db, userId, conversationId, callerPhone, callerRole } = context;
+  static async logInvocation(db, userId, callerPhone, callerRole, toolName, args, result, latencyMs, status) {
     if (!db || !userId) return;
 
     try {
       await db.execute(
-        `INSERT INTO ai_tool_invocations
-          (user_id, conversation_id, caller_phone, caller_role, tool_name, tool_arguments, tool_result, execution_time_ms, status, error_message)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ai_tool_invocations 
+         (user_id, caller_phone, caller_role, tool_name, tool_arguments, tool_result, execution_time_ms, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
-          conversationId || null,
           callerPhone || 'unknown',
           callerRole || 'guest',
           toolName,
           JSON.stringify(args || {}),
-          JSON.stringify(result || {}),
-          duration,
-          status,
-          errorMessage || null
+          JSON.stringify(result || {}).slice(0, 4000),
+          latencyMs || 0,
+          status || 'success'
         ]
       );
-    } catch (err) {
-      console.error('Failed to log tool invocation audit:', err.message);
+    } catch (e) {
+      console.error('[UniversalToolsRegistry] Audit log insert failed:', e.message);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// 4. SANITIZATION HELPERS
+// ---------------------------------------------------------------------------
+function decodeHtmlEntities(str) {
+  if (!str) return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+function sanitizeText(str) {
+  if (!str) return '';
+  return str
+    .replace(/(ignore previous instructions|disregard earlier instructions|system prompt|developer mode)/gi, '[redacted]')
+    .trim();
 }

@@ -1658,7 +1658,9 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               } catch (e) {}
                             }
 
-                            const adminPhones = toolsConfig?.admin_phones || ['+918581065107', '+919507286092', '8581065107', '9507286092'];
+                            const adminPhones = Array.isArray(toolsConfig?.admin_phones) && toolsConfig.admin_phones.length > 0
+                              ? toolsConfig.admin_phones
+                              : (process.env.ADMIN_WHITELIST_PHONES ? process.env.ADMIN_WHITELIST_PHONES.split(',').map(s => s.trim()) : []);
                             const cleanPhone = (senderPhone || '').replace(/[^\d]/g, '');
 
                             let callerRole = 'guest';

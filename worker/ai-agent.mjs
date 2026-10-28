@@ -1,5 +1,5 @@
 import { ChatMemoryEngine } from './chat-memory.mjs';
-import { ToolsRegistry } from './tools-engine.mjs';
+import { UniversalToolsRegistry } from './tools-engine.mjs';
 /**
  * Enterprise Multi-Provider AI Agent & Zero-Cloud Vector RAG Engine
  * ----------------------------------------------------------------
@@ -299,11 +299,17 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
-  // Check if tools are enabled and caller has tool declarations
+  // Dynamically load active custom & built-in tools for this user from ai_custom_tools
   let toolDeclarations = [];
-  if (toolsContext && toolsContext.toolsConfig && toolsContext.toolsConfig.enabled) {
-    const callerRole = toolsContext.callerRole || 'guest';
-    toolDeclarations = ToolsRegistry.getDeclarationsForRole(callerRole, toolsContext.toolsConfig);
+  let userTools = [];
+  if (toolsContext && toolsContext.userId && toolsContext.db) {
+    try {
+      userTools = await UniversalToolsRegistry.loadUserTools(toolsContext.userId, toolsContext.db);
+      const callerRole = toolsContext.callerRole || 'guest';
+      toolDeclarations = UniversalToolsRegistry.compileDeclarationsForRole(userTools, callerRole);
+    } catch (e) {
+      console.error('[AI Agent] Failed to compile tool declarations:', e.message);
+    }
   }
 
   const maxTurns = 4; // Up to 3 autonomous tool turns + final synthesis
@@ -321,7 +327,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 
     // Supply tools on turns < maxTurns; omit on final turn to guarantee text synthesis
     if (toolDeclarations.length > 0 && turn < maxTurns) {
-      payload.tools = toolDeclarations;
+      payload.tools = [{ functionDeclarations: toolDeclarations }];
     }
 
     const response = await fetch(url, {
@@ -347,7 +353,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
       for (const call of functionCalls) {
         const fnName = call.functionCall.name;
         const fnArgs = call.functionCall.args || {};
-        const result = await ToolsRegistry.executeTool(fnName, fnArgs, toolsContext);
+        const result = await UniversalToolsRegistry.executeTool(fnName, fnArgs, userTools, toolsContext);
         functionResponseParts.push({
           functionResponse: {
             name: fnName,

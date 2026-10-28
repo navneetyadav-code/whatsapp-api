@@ -578,130 +578,183 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect_to('index.php?page=chatbot&tab=ai-agent');
 }
 
-if ($page === 'ai-tools-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();
     $userId = (int) $user['id'];
     $pdo = Database::pdo();
 
-    // Fetch existing configuration to preserve unchanged tokens
+    $toolId = (int) ($_POST['tool_id'] ?? 0);
+    $rawSlug = strtolower(trim((string) ($_POST['tool_slug'] ?? '')));
+    $toolSlug = preg_replace('/[^a-z0-9_]/', '_', $rawSlug);
+    $displayName = trim((string) ($_POST['display_name'] ?? ''));
+    $category = trim((string) ($_POST['category'] ?? 'rest_api'));
+    if (!in_array($category, ['rest_api', 'shared_env_api', 'webhook', 'builtin'], true)) {
+        $category = 'rest_api';
+    }
+    $description = trim((string) ($_POST['description'] ?? ''));
+
+    if ($toolSlug === '' || $displayName === '' || $description === '') {
+        flash('error', 'Tool identifier, display title, and AI prompt description are required.');
+        redirect_to('index.php?page=chatbot&tab=tools');
+    }
+
+    // Compile parameters schema from builder inputs or JSON
+    $props = [];
+    $req = [];
+    if (!empty($_POST['param_name']) && is_array($_POST['param_name'])) {
+        foreach ($_POST['param_name'] as $idx => $pName) {
+            $pName = trim((string) $pName);
+            if ($pName === '') continue;
+            $pType = strtoupper(trim((string) ($_POST['param_type'][$idx] ?? 'STRING')));
+            $pDesc = trim((string) ($_POST['param_desc'][$idx] ?? ''));
+            $isReq = !empty($_POST['param_required'][$idx]);
+            $props[$pName] = [
+                'type' => in_array($pType, ['STRING', 'NUMBER', 'INTEGER', 'BOOLEAN', 'OBJECT', 'ARRAY'], true) ? $pType : 'STRING',
+                'description' => $pDesc
+            ];
+            if ($isReq) {
+                $req[] = $pName;
+            }
+        }
+    }
+    $parametersSchema = [
+        'type' => 'OBJECT',
+        'properties' => (object) $props,
+        'required' => array_values(array_unique($req))
+    ];
+
+    // Compile Execution Config by Category
+    $executionConfig = [];
+    if ($category === 'rest_api') {
+        $executionConfig = [
+            'url' => trim((string) ($_POST['rest_url'] ?? '')),
+            'method' => strtoupper(trim((string) ($_POST['rest_method'] ?? 'GET'))),
+            'headers' => ['Accept' => 'application/json'],
+            'timeout_ms' => max(1000, min(30000, (int) ($_POST['rest_timeout_ms'] ?? 5000))),
+            'response_path' => trim((string) ($_POST['rest_response_path'] ?? ''))
+        ];
+        if (!empty($_POST['rest_auth_header'])) {
+            $executionConfig['headers']['Authorization'] = trim((string) $_POST['rest_auth_header']);
+        }
+    } elseif ($category === 'shared_env_api') {
+        $executionConfig = [
+            'active_env' => ($_POST['shared_active_env'] ?? 'local') === 'live' ? 'live' : 'local',
+            'environments' => [
+                'local' => [
+                    'base_url' => trim((string) ($_POST['shared_local_url'] ?? 'http://localhost/api/v1')),
+                    'bearer_token' => trim((string) ($_POST['shared_local_token'] ?? ''))
+                ],
+                'live' => [
+                    'base_url' => trim((string) ($_POST['shared_live_url'] ?? '')),
+                    'bearer_token' => trim((string) ($_POST['shared_live_token'] ?? ''))
+                ]
+            ],
+            'timeout_ms' => max(1000, min(30000, (int) ($_POST['shared_timeout_ms'] ?? 6000)))
+        ];
+    } elseif ($category === 'webhook') {
+        $executionConfig = [
+            'target_url' => trim((string) ($_POST['webhook_url'] ?? '')),
+            'timeout_ms' => max(1000, min(30000, (int) ($_POST['webhook_timeout_ms'] ?? 5000)))
+        ];
+    } else {
+        // Builtin
+        $executionConfig = [
+            'handler' => $toolSlug
+        ];
+    }
+
+    $rbacRoles = isset($_POST['roles']) && is_array($_POST['roles']) ? $_POST['roles'] : ['guest', 'customer', 'admin'];
+    $isActive = isset($_POST['is_active']) ? 1 : 0;
+
+    if ($toolId > 0) {
+        $stmt = $pdo->prepare(
+            'UPDATE ai_custom_tools 
+             SET tool_slug = ?, display_name = ?, category = ?, description = ?, parameters_schema = ?, execution_config = ?, rbac_roles = ?, is_active = ?
+             WHERE id = ? AND user_id = ?'
+        );
+        $stmt->execute([
+            $toolSlug, $displayName, $category, $description,
+            json_encode($parametersSchema, JSON_UNESCAPED_SLASHES),
+            json_encode($executionConfig, JSON_UNESCAPED_SLASHES),
+            json_encode(array_values($rbacRoles)),
+            $isActive,
+            $toolId,
+            $userId
+        ]);
+        flash('success', 'Custom Tool "' . $displayName . '" updated successfully.');
+    } else {
+        $stmt = $pdo->prepare(
+            'INSERT INTO ai_custom_tools 
+             (user_id, tool_slug, display_name, category, description, parameters_schema, execution_config, rbac_roles, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+             display_name = VALUES(display_name),
+             category = VALUES(category),
+             description = VALUES(description),
+             parameters_schema = VALUES(parameters_schema),
+             execution_config = VALUES(execution_config),
+             rbac_roles = VALUES(rbac_roles),
+             is_active = VALUES(is_active)'
+        );
+        $stmt->execute([
+            $userId, $toolSlug, $displayName, $category, $description,
+            json_encode($parametersSchema, JSON_UNESCAPED_SLASHES),
+            json_encode($executionConfig, JSON_UNESCAPED_SLASHES),
+            json_encode(array_values($rbacRoles)),
+            $isActive
+        ]);
+        flash('success', 'Custom Tool "' . $displayName . '" registered and active.');
+    }
+
+    redirect_to('index.php?page=chatbot&tab=tools');
+}
+
+if ($page === 'custom-tool-toggle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $toolId = (int) ($_POST['id'] ?? 0);
+
+    $stmt = Database::pdo()->prepare('UPDATE ai_custom_tools SET is_active = 1 - is_active WHERE id = ? AND user_id = ?');
+    $stmt->execute([$toolId, $userId]);
+
+    flash('success', 'Tool activation status updated.');
+    redirect_to('index.php?page=chatbot&tab=tools');
+}
+
+if ($page === 'custom-tool-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $toolId = (int) ($_POST['id'] ?? 0);
+
+    $stmt = Database::pdo()->prepare('DELETE FROM ai_custom_tools WHERE id = ? AND user_id = ?');
+    $stmt->execute([$toolId, $userId]);
+
+    flash('success', 'Tool removed from account catalog.');
+    redirect_to('index.php?page=chatbot&tab=tools');
+}
+
+if ($page === 'ai-tools-config-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $pdo = Database::pdo();
+
     $stmt = $pdo->prepare('SELECT tools_config FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
     $stmt->execute([$userId]);
-    $existingRaw = $stmt->fetchColumn() ?: '';
-    $existing = !empty($existingRaw) ? json_decode((string) $existingRaw, true) : [];
+    $existing = json_decode((string) ($stmt->fetchColumn() ?: '{}'), true) ?: [];
 
-    $toolsEnabled = isset($_POST['tools_enabled']) ? true : false;
-
-    // Parse admin phones
     $rawPhones = trim((string) ($_POST['admin_phones'] ?? ''));
     $adminPhones = array_values(array_filter(array_map('trim', explode(',', $rawPhones))));
-    if (empty($adminPhones)) {
-        $adminPhones = $existing['admin_phones'] ?? ['+918581065107', '+919507286092'];
-    }
 
-    // Web Search
-    $wsRoles = isset($_POST['web_search_roles']) && is_array($_POST['web_search_roles']) ? $_POST['web_search_roles'] : ['guest', 'customer', 'admin'];
-    $webSearch = [
-        'enabled' => isset($_POST['web_search_enabled']),
-        'provider' => 'duckduckgo',
-        'max_results' => max(1, min(10, (int) ($_POST['web_search_max_results'] ?? 3))),
-        'timeout_ms' => 4000,
-        'roles' => $wsRoles
-    ];
-
-    // AssistGroup API Connector
-    $activeEnv = ($_POST['assistgroup_active_env'] ?? 'local') === 'live' ? 'live' : 'local';
-    
-    $localToken = trim((string) ($_POST['assistgroup_local_token'] ?? ''));
-    if ($localToken === '' && !empty($existing['tools']['assistgroup_api']['environments']['local']['bearer_token'])) {
-        $localToken = $existing['tools']['assistgroup_api']['environments']['local']['bearer_token'];
-    }
-
-    $liveToken = trim((string) ($_POST['assistgroup_live_token'] ?? ''));
-    if ($liveToken === '' && !empty($existing['tools']['assistgroup_api']['environments']['live']['bearer_token'])) {
-        $liveToken = $existing['tools']['assistgroup_api']['environments']['live']['bearer_token'];
-    }
-
-    $assistGroupApi = [
-        'enabled' => isset($_POST['assistgroup_enabled']),
-        'active_env' => $activeEnv,
-        'environments' => [
-            'local' => [
-                'base_url' => trim((string) ($_POST['assistgroup_local_url'] ?? 'http://localhost/assistgroup/api/admin/v1')),
-                'bearer_token' => $localToken
-            ],
-            'live' => [
-                'base_url' => trim((string) ($_POST['assistgroup_live_url'] ?? 'https://assistgroup.gt.tc/api/admin/v1')),
-                'bearer_token' => $liveToken
-            ]
-        ],
-        'actions' => [
-            'get_services_pricing' => [
-                'enabled' => isset($_POST['ag_pricing_enabled']),
-                'roles' => isset($_POST['ag_pricing_roles']) && is_array($_POST['ag_pricing_roles']) ? $_POST['ag_pricing_roles'] : ['guest', 'customer', 'admin']
-            ],
-            'create_inquiry' => [
-                'enabled' => isset($_POST['ag_inquiry_enabled']),
-                'roles' => isset($_POST['ag_inquiry_roles']) && is_array($_POST['ag_inquiry_roles']) ? $_POST['ag_inquiry_roles'] : ['guest', 'customer', 'admin']
-            ],
-            'lookup_inquiries' => [
-                'enabled' => isset($_POST['ag_lookup_enabled']),
-                'roles' => isset($_POST['ag_lookup_roles']) && is_array($_POST['ag_lookup_roles']) ? $_POST['ag_lookup_roles'] : ['customer', 'admin']
-            ],
-            'get_team_overview' => [
-                'enabled' => isset($_POST['ag_team_enabled']),
-                'roles' => isset($_POST['ag_team_roles']) && is_array($_POST['ag_team_roles']) ? $_POST['ag_team_roles'] : ['guest', 'customer', 'admin']
-            ],
-            'admin_dashboard_stats' => [
-                'enabled' => isset($_POST['ag_stats_enabled']),
-                'roles' => isset($_POST['ag_stats_roles']) && is_array($_POST['ag_stats_roles']) ? $_POST['ag_stats_roles'] : ['admin']
-            ]
-        ]
-    ];
-
-    // Math Evaluator
-    $mathRoles = isset($_POST['math_roles']) && is_array($_POST['math_roles']) ? $_POST['math_roles'] : ['guest', 'customer', 'admin'];
-    $math = [
-        'enabled' => isset($_POST['math_enabled']),
-        'roles' => $mathRoles
-    ];
-
-    // Real-Time Clock & Business Hours
-    $timeRoles = isset($_POST['time_roles']) && is_array($_POST['time_roles']) ? $_POST['time_roles'] : ['guest', 'customer', 'admin'];
-    $clock = [
-        'enabled' => isset($_POST['time_enabled']),
-        'timezone' => 'Asia/Kolkata',
-        'office_hours' => [
-            'start' => '09:30',
-            'end' => '18:30',
-            'work_days' => [1, 2, 3, 4, 5, 6]
-        ],
-        'roles' => $timeRoles
-    ];
-
-    // Human Escalation
-    $escRoles = isset($_POST['escalate_roles']) && is_array($_POST['escalate_roles']) ? $_POST['escalate_roles'] : ['guest', 'customer', 'admin'];
-    $escalate = [
-        'enabled' => isset($_POST['escalate_enabled']),
-        'roles' => $escRoles
-    ];
-
-    $newConfig = [
-        'enabled' => $toolsEnabled,
-        'admin_phones' => $adminPhones,
-        'tools' => [
-            'web_search' => $webSearch,
-            'assistgroup_api' => $assistGroupApi,
-            'evaluate_math' => $math,
-            'get_current_time' => $clock,
-            'escalate_to_human' => $escalate
-        ]
-    ];
+    $existing['admin_phones'] = $adminPhones;
 
     $updateStmt = $pdo->prepare('UPDATE ai_agent_settings SET tools_config = ? WHERE user_id = ?');
-    $updateStmt->execute([json_encode($newConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), $userId]);
+    $updateStmt->execute([json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), $userId]);
 
-    flash('success', 'Autonomous Tools & RBAC permissions saved successfully.');
+    flash('success', 'Admin whitelisted phone numbers saved successfully.');
     redirect_to('index.php?page=chatbot&tab=tools');
 }
 

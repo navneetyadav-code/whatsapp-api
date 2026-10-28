@@ -45,38 +45,25 @@ $escStmt = $pdo->prepare(
 $escStmt->execute([$userId]);
 $recentEscalations = $escStmt->fetchAll();
 
-// 5. Tools Configuration & Recent Tool Invocations
+// 5. Universal Custom Tools Catalog & Recent Invocations
+$toolsStmt = $pdo->prepare('SELECT * FROM ai_custom_tools WHERE user_id = ? ORDER BY id ASC');
+$toolsStmt->execute([$userId]);
+$userTools = $toolsStmt->fetchAll();
+
+foreach ($userTools as &$ut) {
+    $ut['parameters_schema'] = !empty($ut['parameters_schema']) ? json_decode((string) $ut['parameters_schema'], true) : [];
+    $ut['execution_config'] = !empty($ut['execution_config']) ? json_decode((string) $ut['execution_config'], true) : [];
+    $ut['rbac_roles'] = !empty($ut['rbac_roles']) ? json_decode((string) $ut['rbac_roles'], true) : ['guest', 'customer', 'admin'];
+}
+unset($ut);
+
 $toolsConfigRaw = $aiSettings['tools_config'] ?? null;
 $toolsConfig = [];
 if (!empty($toolsConfigRaw)) {
     $toolsConfig = json_decode((string) $toolsConfigRaw, true) ?: [];
 }
-if (empty($toolsConfig)) {
-    $toolsConfig = [
-        'enabled' => true,
-        'admin_phones' => ['+918581065107', '+919507286092', '8581065107', '9507286092'],
-        'tools' => [
-            'web_search' => ['enabled' => true, 'provider' => 'duckduckgo', 'max_results' => 3, 'timeout_ms' => 3500, 'roles' => ['guest', 'customer', 'admin']],
-            'assistgroup_api' => [
-                'enabled' => true,
-                'active_env' => 'local',
-                'environments' => [
-                    'local' => ['base_url' => 'http://localhost/assistgroup/api/admin/v1', 'bearer_token' => ''],
-                    'live' => ['base_url' => 'https://assistgroup.gt.tc/api/admin/v1', 'bearer_token' => '']
-                ],
-                'actions' => [
-                    'get_services_pricing' => ['enabled' => true, 'roles' => ['guest', 'customer', 'admin']],
-                    'create_inquiry' => ['enabled' => true, 'roles' => ['guest', 'customer', 'admin']],
-                    'lookup_inquiries' => ['enabled' => true, 'roles' => ['customer', 'admin']],
-                    'get_team_overview' => ['enabled' => true, 'roles' => ['guest', 'customer', 'admin']],
-                    'admin_dashboard_stats' => ['enabled' => true, 'roles' => ['admin']]
-                ]
-            ],
-            'evaluate_math' => ['enabled' => true, 'roles' => ['guest', 'customer', 'admin']],
-            'get_current_time' => ['enabled' => true, 'timezone' => 'Asia/Kolkata', 'roles' => ['guest', 'customer', 'admin']],
-            'escalate_to_human' => ['enabled' => true, 'roles' => ['guest', 'customer', 'admin']]
-        ]
-    ];
+if (!isset($toolsConfig['admin_phones']) || !is_array($toolsConfig['admin_phones'])) {
+    $toolsConfig['admin_phones'] = [];
 }
 
 $invStmt = $pdo->prepare('SELECT * FROM ai_tool_invocations WHERE user_id = ? ORDER BY id DESC LIMIT 15');
