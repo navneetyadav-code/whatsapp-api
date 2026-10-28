@@ -91,8 +91,10 @@ exit /b 0
 :pid_running
 call :read_pid
 if not defined WORKER_PID exit /b 1
-powershell -NoProfile -Command "if (Get-Process -Id %WORKER_PID% -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul
+powershell -NoProfile -Command "if ((Get-Process -Id %WORKER_PID% -ErrorAction SilentlyContinue).ProcessName -eq 'node') { exit 0 } else { exit 1 }" >nul
 if errorlevel 1 (
+    if exist "%PID_FILE%" del /q "%PID_FILE%" >nul 2>nul
+    set "WORKER_PID="
     exit /b 1
 )
 exit /b 0
@@ -104,7 +106,6 @@ if errorlevel 1 exit /b 1
 call :pid_running
 if not errorlevel 1 (
     echo Worker is already running with PID %WORKER_PID%.
-    echo Worker are started to work.
     exit /b 0
 )
 
@@ -122,7 +123,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-timeout /t 2 /nobreak >nul
+powershell -NoProfile -Command "Start-Sleep -Seconds 2"
 call :pid_running
 if errorlevel 1 (
     echo Worker failed to stay running. Check:
@@ -131,7 +132,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Worker are started to work.
+echo Worker started successfully (PID: %WORKER_PID%).
 echo To stop it, run: start-worker.bat stop
 exit /b 0
 
@@ -150,7 +151,7 @@ if errorlevel 1 (
 )
 
 if exist "%PID_FILE%" del /q "%PID_FILE%" >nul 2>nul
-echo Worker stopped.
+echo Worker stopped successfully.
 exit /b 0
 
 :restart_worker
