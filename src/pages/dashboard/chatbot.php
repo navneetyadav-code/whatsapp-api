@@ -25,6 +25,9 @@
         <a href="<?= e(base_url('index.php?page=chatbot&tab=escalations')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'escalations' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
             🚨 Escalations & Buzzer Logs
         </a>
+        <a href="<?= e(base_url('index.php?page=chatbot&tab=tools')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'tools' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
+            🛠️ Tools & Integrations (RBAC)
+        </a>
     </div>
 
     <?php if ($activeTab === 'rules'): ?>
@@ -523,6 +526,344 @@
                     <?php endif; ?>
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <?php elseif ($activeTab === 'tools'): ?>
+    <!-- ========================================== -->
+    <!-- TAB 5: AUTONOMOUS TOOLS & RBAC ENGINE      -->
+    <!-- ========================================== -->
+    <div class="space-y-6 mb-8">
+        <!-- Engine Status Banner -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-6 text-white shadow-card">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Autonomous Function Calling Engine Active
+                    </div>
+                    <h2 class="text-xl font-bold tracking-tight">Agent Tools & Role-Based Access Control (RBAC)</h2>
+                    <p class="text-xs text-slate-300 mt-1 max-w-2xl">
+                        Equip your AI Agent with external capabilities. Tools are dynamically pruned from Gemini's prompt schema based on the caller's role, ensuring guests never see or trigger sensitive administrative actions.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400">Model:</span>
+                    <span class="text-xs font-mono font-bold bg-white/10 px-2.5 py-1 rounded border border-white/10 text-emerald-300">gemini-3.5-flash-lite</span>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" action="<?= e(base_url('index.php?page=ai-tools-save')) ?>" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+
+            <!-- Master Toggle & Admin Phones Whitelist Card -->
+            <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <span>⚙️</span> Master Tool Engine Switch
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">When disabled, the bot functions as a pure text-only knowledge assistant without calling external APIs.</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="tools_enabled" value="1" <?= !empty($toolsConfig['enabled']) ? 'checked' : '' ?> class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                        <span class="ml-3 text-xs font-bold text-slate-700">Enable Agent Tools</span>
+                    </label>
+                </div>
+
+                <div class="pt-4">
+                    <label class="block text-xs font-bold text-slate-800 mb-1">
+                        🛡️ Admin Phone Numbers Whitelist (Comma-Separated)
+                    </label>
+                    <p class="text-[11px] text-slate-500 mb-2">WhatsApp numbers permitted to execute privileged administrative actions (e.g. system statistics, team overview):</p>
+                    <input type="text" name="admin_phones" value="<?= e(implode(', ', $toolsConfig['admin_phones'] ?? ['+918581065107', '+919507286092'])) ?>" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="+918581065107, +919507286092">
+                </div>
+            </div>
+
+            <!-- Grid: Tools Configuration Cards -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <!-- TOOL 1: WEB SEARCH ENGINE -->
+                <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-base">🌐</span>
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-900">Live Web Search</h4>
+                                    <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 uppercase">DuckDuckGo Resilient Scraper</span>
+                                </div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="web_search_enabled" value="1" <?= !empty($toolsConfig['tools']['web_search']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+
+                        <p class="text-xs text-slate-500 mb-4">
+                            Enables the agent to search live internet sources for real-time external facts, competitor comparisons, and news with prompt-injection sanitization.
+                        </p>
+
+                        <div class="space-y-3 pt-3 border-t border-slate-100">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Max Snippets Per Query</label>
+                                <input type="number" name="web_search_max_results" value="<?= (int) ($toolsConfig['tools']['web_search']['max_results'] ?? 3) ?>" min="1" max="5" class="w-24 text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg">
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1.5">Permitted Roles (RBAC)</label>
+                                <div class="flex items-center gap-4 text-xs text-slate-600">
+                                    <?php $wsRoles = $toolsConfig['tools']['web_search']['roles'] ?? ['guest', 'customer', 'admin']; ?>
+                                    <label class="inline-flex items-center gap-1.5">
+                                        <input type="checkbox" name="web_search_roles[]" value="guest" <?= in_array('guest', $wsRoles, true) ? 'checked' : '' ?> class="rounded text-emerald-600">
+                                        <span>Public Guests</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-1.5">
+                                        <input type="checkbox" name="web_search_roles[]" value="customer" <?= in_array('customer', $wsRoles, true) ? 'checked' : '' ?> class="rounded text-emerald-600">
+                                        <span>Customers</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-1.5">
+                                        <input type="checkbox" name="web_search_roles[]" value="admin" <?= in_array('admin', $wsRoles, true) ? 'checked' : '' ?> class="rounded text-emerald-600">
+                                        <span>Admins</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TOOL 2: UTILITY ARITHMETIC & CLOCK -->
+                <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-base">🧮</span>
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-900">Utility Tool Belt</h4>
+                                    <span class="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 uppercase">Math, Clock & Escalation</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-slate-500 mb-4">
+                            Precision calculations (GST, discounts, quotes), real-time Indian Standard Time (IST) office hours checker, and human support handoff alarm.
+                        </p>
+
+                        <div class="space-y-3 pt-3 border-t border-slate-100">
+                            <!-- Math Toggle -->
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/70">
+                                <div>
+                                    <div class="text-xs font-bold text-slate-900">Math & Pricing Calculator</div>
+                                    <div class="text-[10px] text-slate-500">Hallucination-free exact arithmetic for quotations</div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="math_enabled" value="1" <?= !empty($toolsConfig['tools']['evaluate_math']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
+                                    <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
+
+                            <!-- Time & Clock Toggle -->
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/70">
+                                <div>
+                                    <div class="text-xs font-bold text-slate-900">IST Real-Time & Business Hours</div>
+                                    <div class="text-[10px] text-slate-500">Mon-Sat 9:30 AM - 6:30 PM office status check</div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="time_enabled" value="1" <?= !empty($toolsConfig['tools']['get_current_time']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
+                                    <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
+
+                            <!-- Human Escalation Toggle -->
+                            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/70">
+                                <div>
+                                    <div class="text-xs font-bold text-slate-900">Human Escalation Trigger</div>
+                                    <div class="text-[10px] text-slate-500">Flags conversation & sounds buzzer for human takeover</div>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="escalate_enabled" value="1" <?= !empty($toolsConfig['tools']['escalate_to_human']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
+                                    <div class="w-8 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TOOL 3: ASSISTGROUP API CONNECTOR (Full Width) -->
+                <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-5 shadow-card">
+                    <div class="flex items-start justify-between gap-3 mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-base">🏢</span>
+                            <div>
+                                <h4 class="text-sm font-bold text-slate-900">AssistGroup Multi-Environment API Connector</h4>
+                                <span class="text-[10px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 uppercase">Localhost & Live Shared Hosting</span>
+                            </div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="assistgroup_enabled" value="1" <?= !empty($toolsConfig['tools']['assistgroup_api']['enabled']) ? 'checked' : '' ?> class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                        </label>
+                    </div>
+
+                    <?php
+                    $agConfig = $toolsConfig['tools']['assistgroup_api'] ?? [];
+                    $activeEnv = $agConfig['active_env'] ?? 'local';
+                    $localEnv = $agConfig['environments']['local'] ?? [];
+                    $liveEnv = $agConfig['environments']['live'] ?? [];
+                    ?>
+
+                    <!-- Environment Selector Radios -->
+                    <div class="p-3 bg-slate-50 rounded-lg border border-slate-200/80 mb-4">
+                        <div class="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">Active Environment Target:</div>
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800">
+                                <input type="radio" name="assistgroup_active_env" value="local" <?= $activeEnv === 'local' ? 'checked' : '' ?> class="text-purple-600">
+                                <span>Localhost Development (<span class="font-mono text-[11px] text-slate-500">http://localhost/assistgroup/...</span>)</span>
+                            </label>
+                            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-800">
+                                <input type="radio" name="assistgroup_active_env" value="live" <?= $activeEnv === 'live' ? 'checked' : '' ?> class="text-purple-600">
+                                <span>Live Shared Hosting (<span class="font-mono text-[11px] text-purple-700">https://assistgroup.gt.tc/...</span>)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Environment Inputs Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                        <div class="p-3.5 rounded-lg border border-slate-200">
+                            <div class="text-xs font-bold text-slate-900 mb-2">💻 Localhost Settings</div>
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Base URL</label>
+                                    <input type="text" name="assistgroup_local_url" value="<?= e($localEnv['base_url'] ?? 'http://localhost/assistgroup/api/admin/v1') ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Admin Bearer Token</label>
+                                    <input type="password" name="assistgroup_local_token" placeholder="<?= !empty($localEnv['bearer_token']) ? '•••••••••••••••••••••••• (Configured)' : 'ast_live_...' ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-3.5 rounded-lg border border-purple-200 bg-purple-50/20">
+                            <div class="text-xs font-bold text-purple-900 mb-2">🌐 Live Shared Hosting Settings</div>
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Base URL</label>
+                                    <input type="text" name="assistgroup_live_url" value="<?= e($liveEnv['base_url'] ?? 'https://assistgroup.gt.tc/api/admin/v1') ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-slate-500 uppercase font-semibold mb-0.5">Admin Bearer Token</label>
+                                    <input type="password" name="assistgroup_live_token" placeholder="<?= !empty($liveEnv['bearer_token']) ? '•••••••••••••••••••••••• (Configured)' : 'ast_live_...' ?>" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Role Gated Actions Matrix -->
+                    <div>
+                        <h5 class="text-xs font-bold text-slate-900 mb-2">AssistGroup Action Access Matrix (RBAC)</h5>
+                        <div class="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden text-xs">
+                            <?php
+                            $actions = [
+                                'pricing' => ['key' => 'ag_pricing', 'name' => 'Get Services & Pricing Plans', 'desc' => 'Allows bot to quote official web, app, and SEO plans', 'roles' => $agConfig['actions']['get_services_pricing']['roles'] ?? ['guest', 'customer', 'admin']],
+                                'inquiry' => ['key' => 'ag_inquiry', 'name' => 'Create Inquiries / Leads in CRM', 'desc' => 'Directly saves prospective leads into AssistGroup database', 'roles' => $agConfig['actions']['create_inquiry']['roles'] ?? ['guest', 'customer', 'admin']],
+                                'lookup' => ['key' => 'ag_lookup', 'name' => 'Lookup Customer Tickets / Inquiries', 'desc' => 'Retrieves caller past inquiries using their phone number', 'roles' => $agConfig['actions']['lookup_inquiries']['roles'] ?? ['customer', 'admin']],
+                                'team' => ['key' => 'ag_team', 'name' => 'Get Team & Staff Overview', 'desc' => 'Answers questions about developers, engineers, and consultants', 'roles' => $agConfig['actions']['get_team_overview']['roles'] ?? ['guest', 'customer', 'admin']],
+                                'stats' => ['key' => 'ag_stats', 'name' => 'Admin Dashboard Executive Metrics', 'desc' => 'Strictly restricted metrics: registered users, file counts, growth', 'roles' => $agConfig['actions']['admin_dashboard_stats']['roles'] ?? ['admin']]
+                            ];
+                            foreach ($actions as $actKey => $act):
+                            ?>
+                            <div class="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50">
+                                <div>
+                                    <label class="inline-flex items-center gap-2 font-bold text-slate-800">
+                                        <input type="checkbox" name="<?= $act['key'] ?>_enabled" value="1" checked class="rounded text-purple-600">
+                                        <span><?= e($act['name']) ?></span>
+                                    </label>
+                                    <div class="text-[11px] text-slate-400 pl-5"><?= e($act['desc']) ?></div>
+                                </div>
+                                <div class="flex items-center gap-3 pl-5 sm:pl-0 text-slate-600">
+                                    <label class="inline-flex items-center gap-1">
+                                        <input type="checkbox" name="<?= $act['key'] ?>_roles[]" value="guest" <?= in_array('guest', $act['roles'], true) ? 'checked' : '' ?> class="rounded text-purple-600">
+                                        <span>Guest</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-1">
+                                        <input type="checkbox" name="<?= $act['key'] ?>_roles[]" value="customer" <?= in_array('customer', $act['roles'], true) ? 'checked' : '' ?> class="rounded text-purple-600">
+                                        <span>Customer</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-1">
+                                        <input type="checkbox" name="<?= $act['key'] ?>_roles[]" value="admin" <?= in_array('admin', $act['roles'], true) ? 'checked' : '' ?> class="rounded text-purple-600">
+                                        <span class="font-bold text-slate-900">Admin</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Submit Button Bar -->
+            <div class="flex justify-end gap-3 pt-4">
+                <button type="submit" class="px-5 py-2.5 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-all active:scale-[0.98]">
+                    💾 Save Autonomous Tools & Permissions
+                </button>
+            </div>
+        </form>
+
+        <!-- Audit Log Table: Recent Tool Invocations -->
+        <div class="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden">
+            <div class="p-4 border-b border-slate-200/80 flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900">Recent AI Tool Invocations (Audit Trail)</h3>
+                    <p class="text-xs text-slate-500">Real-time log of tools executed by the WhatsApp AI Agent, caller roles, and latencies.</p>
+                </div>
+                <span class="text-xs font-mono text-slate-400"><?= count($recentInvocations) ?> events</span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 border-b border-slate-200/70 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                        <tr>
+                            <th class="px-4 py-3">Timestamp</th>
+                            <th class="px-4 py-3">Caller Phone</th>
+                            <th class="px-4 py-3">Role</th>
+                            <th class="px-4 py-3">Tool Invocated</th>
+                            <th class="px-4 py-3">Latency</th>
+                            <th class="px-4 py-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <?php foreach ($recentInvocations as $inv): ?>
+                            <tr class="hover:bg-slate-50/70 transition-colors">
+                                <td class="px-4 py-3 text-slate-500 font-mono text-[11px] whitespace-nowrap"><?= e($inv['created_at']) ?></td>
+                                <td class="px-4 py-3 font-mono text-slate-900"><?= e($inv['caller_phone']) ?></td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold <?= $inv['caller_role'] === 'admin' ? 'bg-purple-100 text-purple-800 border border-purple-200' : ($inv['caller_role'] === 'customer' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700') ?>">
+                                        <?= strtoupper($inv['caller_role']) ?>
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 font-mono text-slate-800 font-semibold"><?= e($inv['tool_name']) ?></td>
+                                <td class="px-4 py-3 text-slate-500 font-mono text-[11px]"><?= (int) $inv['execution_time_ms'] ?>ms</td>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold <?= $inv['status'] === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : ($inv['status'] === 'denied' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-rose-100 text-rose-800') ?>">
+                                        <?= strtoupper($inv['status']) ?>
+                                    </span>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+
+                        <?php if (!$recentInvocations): ?>
+                            <tr>
+                                <td colspan="6" class="px-4 py-8 text-center text-slate-400">
+                                    No tool invocations recorded yet. Inbound messages triggering external actions will be logged here.
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     <?php endif; ?>

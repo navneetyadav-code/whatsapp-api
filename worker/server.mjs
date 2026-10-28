@@ -1648,7 +1648,42 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               consolidatedText
                             );
 
-                            replyText = await generateAiReply(aiSettings, systemPrompt, userMessage, historyTurns);
+                            // Parse tools configuration and resolve caller role
+                            let toolsConfig = null;
+                            if (aiSettings.tools_config) {
+                              try {
+                                toolsConfig = typeof aiSettings.tools_config === 'string'
+                                  ? JSON.parse(aiSettings.tools_config)
+                                  : aiSettings.tools_config;
+                              } catch (e) {}
+                            }
+
+                            const adminPhones = toolsConfig?.admin_phones || ['+918581065107', '+919507286092', '8581065107', '9507286092'];
+                            const cleanPhone = (senderPhone || '').replace(/[^\d]/g, '');
+
+                            let callerRole = 'guest';
+                            if (adminPhones.some(p => cleanPhone.includes(p.replace(/[^\d]/g, '')))) {
+                              callerRole = 'admin';
+                            } else {
+                              const [custRows] = await db.execute(
+                                'SELECT id FROM contacts WHERE user_id = ? AND (phone = ? OR phone LIKE ?) LIMIT 1',
+                                [userId, senderPhone, `%${cleanPhone.slice(-10)}%`]
+                              );
+                              if (custRows && custRows.length > 0) {
+                                callerRole = 'customer';
+                              }
+                            }
+
+                            const toolsContext = {
+                              db,
+                              userId,
+                              conversationId: conv.id,
+                              callerPhone: senderPhone,
+                              callerRole,
+                              toolsConfig
+                            };
+
+                            replyText = await generateAiReply(aiSettings, systemPrompt, userMessage, historyTurns, toolsContext);
                           } finally {
                             await stopTyping();
                           }

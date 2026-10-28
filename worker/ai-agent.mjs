@@ -1,4 +1,5 @@
 import { ChatMemoryEngine } from './chat-memory.mjs';
+import { ToolsRegistry } from './tools-engine.mjs';
 /**
  * Enterprise Multi-Provider AI Agent & Zero-Cloud Vector RAG Engine
  * ----------------------------------------------------------------
@@ -287,40 +288,91 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
 }
 
 /**
- * Call Google Gemini API
+ * Call Google Gemini API with Autonomous Multi-Turn Function Calling Support
  */
-async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = []) {
-  const modelName = model || 'gemini-3.6-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
+  let modelName = model || 'gemini-3.5-flash-lite';
+  if (modelName === 'gemini-1.5-flash' || modelName === 'gemini-2.5-flash') {
+    modelName = 'gemini-3.5-flash-lite';
+  }
 
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
-  const payload = {
-    contents,
-    generationConfig: {
-      temperature: Number(temperature) || 0.4,
-      maxOutputTokens: Math.max(Number(maxTokens) || 1200, 1000)
+  // Check if tools are enabled and caller has tool declarations
+  let toolDeclarations = [];
+  if (toolsContext && toolsContext.toolsConfig && toolsContext.toolsConfig.enabled) {
+    const callerRole = toolsContext.callerRole || 'guest';
+    toolDeclarations = ToolsRegistry.getDeclarationsForRole(callerRole, toolsContext.toolsConfig);
+  }
+
+  const maxTurns = 4; // Up to 3 autonomous tool turns + final synthesis
+  let turn = 0;
+
+  while (turn < maxTurns) {
+    turn++;
+    const payload = {
+      contents,
+      generationConfig: {
+        temperature: Number(temperature) || 0.4,
+        maxOutputTokens: Math.max(Number(maxTokens) || 1200, 1000)
+      }
+    };
+
+    // Supply tools on turns < maxTurns; omit on final turn to guarantee text synthesis
+    if (toolDeclarations.length > 0 && turn < maxTurns) {
+      payload.tools = toolDeclarations;
     }
-  };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(10000)
-  });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(35000)
+    });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error [${response.status}]: ${errText.slice(0, 200)}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini API error [${response.status}]: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const candidate = data?.candidates?.[0];
+    const parts = candidate?.content?.parts || [];
+
+    const functionCalls = parts.filter(p => p.functionCall);
+
+    if (functionCalls.length > 0 && turn < maxTurns) {
+      const functionResponseParts = [];
+      for (const call of functionCalls) {
+        const fnName = call.functionCall.name;
+        const fnArgs = call.functionCall.args || {};
+        const result = await ToolsRegistry.executeTool(fnName, fnArgs, toolsContext);
+        functionResponseParts.push({
+          functionResponse: {
+            name: fnName,
+            response: result
+          }
+        });
+      }
+
+      contents.push(candidate.content);
+      contents.push({
+        role: 'user',
+        parts: functionResponseParts
+      });
+      // Continue to next turn
+    } else {
+      const textParts = parts.filter(p => p.text).map(p => p.text) || [];
+      const text = textParts.join('\n').trim();
+      if (!text) {
+        throw new Error('Gemini API returned empty text');
+      }
+      return text;
+    }
   }
 
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error('Gemini API returned empty text');
-  }
-  return text.trim();
+  throw new Error('Gemini function calling loop exceeded max turns without generating text');
 }
 
 /**
@@ -406,7 +458,7 @@ async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperat
 /**
  * Execute Multi-Provider Generation Cascade
  */
-export async function generateAiReply(settings, systemPrompt, customerMessage, conversationHistory = []) {
+export async function generateAiReply(settings, systemPrompt, customerMessage, conversationHistory = [], toolsContext = null) {
   const priority = settings.provider_priority || 'gemini';
   const providers = [];
 
@@ -429,7 +481,8 @@ export async function generateAiReply(settings, systemPrompt, customerMessage, c
           customerMessage,
           settings.temperature,
           settings.max_tokens,
-          conversationHistory
+          conversationHistory,
+          toolsContext
         );
       }
       if (prov === 'groq' && settings.groq_api_key) {

@@ -578,6 +578,133 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect_to('index.php?page=chatbot&tab=ai-agent');
 }
 
+if ($page === 'ai-tools-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $pdo = Database::pdo();
+
+    // Fetch existing configuration to preserve unchanged tokens
+    $stmt = $pdo->prepare('SELECT tools_config FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
+    $stmt->execute([$userId]);
+    $existingRaw = $stmt->fetchColumn() ?: '';
+    $existing = !empty($existingRaw) ? json_decode((string) $existingRaw, true) : [];
+
+    $toolsEnabled = isset($_POST['tools_enabled']) ? true : false;
+
+    // Parse admin phones
+    $rawPhones = trim((string) ($_POST['admin_phones'] ?? ''));
+    $adminPhones = array_values(array_filter(array_map('trim', explode(',', $rawPhones))));
+    if (empty($adminPhones)) {
+        $adminPhones = $existing['admin_phones'] ?? ['+918581065107', '+919507286092'];
+    }
+
+    // Web Search
+    $wsRoles = isset($_POST['web_search_roles']) && is_array($_POST['web_search_roles']) ? $_POST['web_search_roles'] : ['guest', 'customer', 'admin'];
+    $webSearch = [
+        'enabled' => isset($_POST['web_search_enabled']),
+        'provider' => 'duckduckgo',
+        'max_results' => max(1, min(10, (int) ($_POST['web_search_max_results'] ?? 3))),
+        'timeout_ms' => 4000,
+        'roles' => $wsRoles
+    ];
+
+    // AssistGroup API Connector
+    $activeEnv = ($_POST['assistgroup_active_env'] ?? 'local') === 'live' ? 'live' : 'local';
+    
+    $localToken = trim((string) ($_POST['assistgroup_local_token'] ?? ''));
+    if ($localToken === '' && !empty($existing['tools']['assistgroup_api']['environments']['local']['bearer_token'])) {
+        $localToken = $existing['tools']['assistgroup_api']['environments']['local']['bearer_token'];
+    }
+
+    $liveToken = trim((string) ($_POST['assistgroup_live_token'] ?? ''));
+    if ($liveToken === '' && !empty($existing['tools']['assistgroup_api']['environments']['live']['bearer_token'])) {
+        $liveToken = $existing['tools']['assistgroup_api']['environments']['live']['bearer_token'];
+    }
+
+    $assistGroupApi = [
+        'enabled' => isset($_POST['assistgroup_enabled']),
+        'active_env' => $activeEnv,
+        'environments' => [
+            'local' => [
+                'base_url' => trim((string) ($_POST['assistgroup_local_url'] ?? 'http://localhost/assistgroup/api/admin/v1')),
+                'bearer_token' => $localToken
+            ],
+            'live' => [
+                'base_url' => trim((string) ($_POST['assistgroup_live_url'] ?? 'https://assistgroup.gt.tc/api/admin/v1')),
+                'bearer_token' => $liveToken
+            ]
+        ],
+        'actions' => [
+            'get_services_pricing' => [
+                'enabled' => isset($_POST['ag_pricing_enabled']),
+                'roles' => isset($_POST['ag_pricing_roles']) && is_array($_POST['ag_pricing_roles']) ? $_POST['ag_pricing_roles'] : ['guest', 'customer', 'admin']
+            ],
+            'create_inquiry' => [
+                'enabled' => isset($_POST['ag_inquiry_enabled']),
+                'roles' => isset($_POST['ag_inquiry_roles']) && is_array($_POST['ag_inquiry_roles']) ? $_POST['ag_inquiry_roles'] : ['guest', 'customer', 'admin']
+            ],
+            'lookup_inquiries' => [
+                'enabled' => isset($_POST['ag_lookup_enabled']),
+                'roles' => isset($_POST['ag_lookup_roles']) && is_array($_POST['ag_lookup_roles']) ? $_POST['ag_lookup_roles'] : ['customer', 'admin']
+            ],
+            'get_team_overview' => [
+                'enabled' => isset($_POST['ag_team_enabled']),
+                'roles' => isset($_POST['ag_team_roles']) && is_array($_POST['ag_team_roles']) ? $_POST['ag_team_roles'] : ['guest', 'customer', 'admin']
+            ],
+            'admin_dashboard_stats' => [
+                'enabled' => isset($_POST['ag_stats_enabled']),
+                'roles' => isset($_POST['ag_stats_roles']) && is_array($_POST['ag_stats_roles']) ? $_POST['ag_stats_roles'] : ['admin']
+            ]
+        ]
+    ];
+
+    // Math Evaluator
+    $mathRoles = isset($_POST['math_roles']) && is_array($_POST['math_roles']) ? $_POST['math_roles'] : ['guest', 'customer', 'admin'];
+    $math = [
+        'enabled' => isset($_POST['math_enabled']),
+        'roles' => $mathRoles
+    ];
+
+    // Real-Time Clock & Business Hours
+    $timeRoles = isset($_POST['time_roles']) && is_array($_POST['time_roles']) ? $_POST['time_roles'] : ['guest', 'customer', 'admin'];
+    $clock = [
+        'enabled' => isset($_POST['time_enabled']),
+        'timezone' => 'Asia/Kolkata',
+        'office_hours' => [
+            'start' => '09:30',
+            'end' => '18:30',
+            'work_days' => [1, 2, 3, 4, 5, 6]
+        ],
+        'roles' => $timeRoles
+    ];
+
+    // Human Escalation
+    $escRoles = isset($_POST['escalate_roles']) && is_array($_POST['escalate_roles']) ? $_POST['escalate_roles'] : ['guest', 'customer', 'admin'];
+    $escalate = [
+        'enabled' => isset($_POST['escalate_enabled']),
+        'roles' => $escRoles
+    ];
+
+    $newConfig = [
+        'enabled' => $toolsEnabled,
+        'admin_phones' => $adminPhones,
+        'tools' => [
+            'web_search' => $webSearch,
+            'assistgroup_api' => $assistGroupApi,
+            'evaluate_math' => $math,
+            'get_current_time' => $clock,
+            'escalate_to_human' => $escalate
+        ]
+    ];
+
+    $updateStmt = $pdo->prepare('UPDATE ai_agent_settings SET tools_config = ? WHERE user_id = ?');
+    $updateStmt->execute([json_encode($newConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), $userId]);
+
+    flash('success', 'Autonomous Tools & RBAC permissions saved successfully.');
+    redirect_to('index.php?page=chatbot&tab=tools');
+}
+
 if ($page === 'ai-knowledge-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();
