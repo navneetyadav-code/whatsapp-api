@@ -86,6 +86,18 @@ if ($existing) {
     $insertStmt->execute([$userId, $chosenPrompt, $targetMode, $feedbackEnabled, $isAlwaysOn, $ownerName]);
 }
 
+// Start fresh session tickets for all conversations of this user to flush out previous mode history
+$newSessionPrefix = 'SES-' . date('Ymd') . '-';
+$convStmt = $pdo->prepare('SELECT id FROM chat_conversations WHERE user_id = ?');
+$convStmt->execute([$userId]);
+$userConvs = $convStmt->fetchAll();
+
+foreach ($userConvs as $c) {
+    $freshUuid = $newSessionPrefix . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+    $pdo->prepare('UPDATE chat_conversations SET session_uuid = ?, consecutive_bot_replies = 0, awaiting_feedback = 0 WHERE id = ?')
+        ->execute([$freshUuid, (int)$c['id']]);
+}
+
 json_response([
     'ok' => true,
     'mode' => $targetMode,

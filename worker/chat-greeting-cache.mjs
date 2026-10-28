@@ -38,9 +38,10 @@ export class GreetingCache {
    * @param {string} senderPhone
    * @param {string} text
    * @param {string} [sessionUuid]
+   * @param {Object} [options={}]
    * @returns {{ shouldIntercept: boolean, replyText: string|null }}
    */
-  evaluate(userId, senderPhone, text, sessionUuid = null) {
+  evaluate(userId, senderPhone, text, sessionUuid = null, options = {}) {
     if (!this.isGreetingOnly(text)) {
       return { shouldIntercept: false, replyText: null };
     }
@@ -68,11 +69,18 @@ export class GreetingCache {
       record.greetedSessions.add(sessionUuid);
     }
 
+    const isPersonal = options.isPersonalMode === true;
+    const owner = options.ownerName || 'Boss';
+
     // If within cooldown (e.g. 5 minutes) and user is spamming greetings
     if (timeSinceLast < this.cooldownMs) {
-      let canned = "I'm right here! 👋 How can I help you today? Feel free to ask about our products, services, or any questions you have.";
+      let canned = isPersonal
+        ? `I'm right here, ${owner}! 👋 How can I assist you right now? Let me know what you need.`
+        : "I'm right here! 👋 How can I help you today? Feel free to ask any questions you have.";
       if (record.greetingCount >= 3) {
-        canned = "I'm still here and listening! 😊 Please let me know what you need assistance with.";
+        canned = isPersonal
+          ? `I'm right here on standby, ${owner}! 😊 Just let me know what you need.`
+          : "I'm still here and listening! 😊 Please let me know what you need assistance with.";
       }
       return { shouldIntercept: true, replyText: canned };
     }

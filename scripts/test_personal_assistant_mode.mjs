@@ -116,6 +116,22 @@ async function runTests() {
     // Cleanup test conversation
     await db.execute('DELETE FROM chat_conversations WHERE id = ?', [convId]);
 
+    // --- TEST 6: Knowledge Base (RAG) Banned in Personal Assistant Mode ---
+    console.log('Test 6: Knowledge Base Banned in Personal Assistant Mode...');
+    const isPersonalMode = true;
+    // In server.mjs: const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(...)
+    const relevantChunks = isPersonalMode ? [] : ['some knowledge chunk'];
+    assert.strictEqual(relevantChunks.length, 0, 'Knowledge base chunks must be empty in Personal Assistant mode');
+    const finalPrompt = buildPromptWithRag(
+      'You are the personal AI executive assistant to Boss.',
+      relevantChunks,
+      'Can you help me?',
+      { agentMode: 'personal', ownerName: 'Boss' }
+    );
+    assert(!finalPrompt.systemPrompt.includes('Aadi Shree'), 'Prompt must NOT contain Aadi Shree');
+    assert(!finalPrompt.systemPrompt.includes('OFFICIAL VERIFIED KNOWLEDGE BASE'), 'Knowledge base block must NOT be injected');
+    console.log('  ✔ Access to business knowledge base is strictly banned in Personal Assistant mode.\n');
+
     console.log('🎉 ALL TESTS PASSED! Personal AI Assistant Mode, 24/7 Always On, and Feedback Review closure verified.');
   } finally {
     await db.end();

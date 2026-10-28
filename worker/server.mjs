@@ -1542,19 +1542,33 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
           let aiHandled = false;
           const rawInboundText = (norm.body || '').trim();
 
-          // Intercept wake-up trigger (/start or start): ALWAYS resets bot_paused and sends branded greeting
+          // Fetch active AI agent settings first to determine mode & persona
+          const [aiSettingsRows] = await db.execute(
+            'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
+            [userId]
+          );
+          const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
+          const isPersonalMode = aiSettings?.agent_mode === 'personal';
+          const ownerName = aiSettings?.owner_name || 'Boss';
+
+          // Intercept wake-up trigger (/start or start): ALWAYS resets bot_paused, starts a fresh session ticket, and sends dynamic greeting
           if (rawInboundText && isWakeupTrigger(rawInboundText)) {
-            logger.info({ userId, senderPhone }, '⚡ Wake-up command received (/start or start) - unpausing bot and sending greeting');
+            logger.info({ userId, senderPhone, isPersonalMode }, '⚡ Wake-up command received (/start or start) - unpausing bot and starting fresh session');
+            currentSessionUuid = generateSessionUuid();
             await db.execute(
-              'UPDATE chat_conversations SET bot_paused = 0, status = "open", escalation_reason = NULL, awaiting_feedback = 0 WHERE user_id = ? AND phone = ?',
-              [userId, senderPhone]
+              'UPDATE chat_conversations SET session_uuid = ?, bot_paused = 0, status = "open", escalation_reason = NULL, awaiting_feedback = 0 WHERE user_id = ? AND phone = ?',
+              [currentSessionUuid, userId, senderPhone]
             );
             isBotPaused = 0;
             convStatus = 'open';
 
-            const welcomeText = `Hello! 👋 Welcome to *Aadi Shree Classes*.\n\n` +
-              `I am your virtual counselor, ready to assist you with our courses, fee structure, batch timings, admissions, and scholarships.\n\n` +
-              `How can I help you today? 📚✨`;
+            const welcomeText = isPersonalMode
+              ? `Hello ${ownerName}! 👋 I am your 24/7 Personal AI Executive Assistant.\n\n` +
+                `I am ready to assist you with tasks, live web searches, weather updates, math calculations, drafting messages, and daily planning.\n\n` +
+                `How can I help you right now? ⚡`
+              : `Hello! 👋 Welcome to our support desk.\n\n` +
+                `I am your virtual assistant, ready to assist you with inquiries, services, and support.\n\n` +
+                `How can I help you today? ✨`;
             try {
               await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
               await db.execute(
@@ -1576,13 +1590,6 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
           if (!feedbackHandled && isBotPaused !== 1 && convStatus === 'open') {
             if (rawInboundText) {
               try {
-
-                const [aiSettingsRows] = await db.execute(
-                  'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
-                  [userId]
-                );
-                const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
-
                 if (aiSettings && (aiSettings.gemini_api_key || aiSettings.groq_api_key || aiSettings.openrouter_api_key)) {
                   const [convCheck] = await db.execute(
                     'SELECT id, session_uuid, consecutive_bot_replies, status, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
@@ -1642,7 +1649,10 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           }
 
                           // Step D: Token Burn Optimizer - Intercept repeated greetings
-                          const greetingCheck = globalGreetingCache.evaluate(userId, senderPhone, consolidatedText, activeSessionUuid);
+                          const greetingCheck = globalGreetingCache.evaluate(userId, senderPhone, consolidatedText, activeSessionUuid, {
+                            isPersonalMode,
+                            ownerName
+                          });
                           if (greetingCheck.shouldIntercept && greetingCheck.replyText) {
                             logger.info({ userId, senderPhone }, '⚡ Intercepted repeated greeting locally - saved LLM tokens!');
                             await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: greetingCheck.replyText });
@@ -1659,7 +1669,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                           let replyText = null;
                           try {
-                            const relevantChunks = await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
+                            // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
+                            const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
                             const { systemPrompt, userMessage } = buildPromptWithRag(
                               aiSettings.system_prompt,
                               relevantChunks,
