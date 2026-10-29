@@ -25,5 +25,6 @@ require_once __DIR__ . '/lib/MessageQueue.php';
 require_once __DIR__ . '/lib/WorkerClient.php';
 require_once __DIR__ . '/lib/Security.php';
 require_once __DIR__ . '/lib/ContactService.php';
+require_once __DIR__ . '/lib/CurlImporter.php';
 
 Database::configure($config['db']);

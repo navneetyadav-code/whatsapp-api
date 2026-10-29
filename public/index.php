@@ -621,7 +621,8 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($pName === '') continue;
             $pType = strtoupper(trim((string) ($_POST['param_type'][$idx] ?? 'STRING')));
             $pDesc = trim((string) ($_POST['param_desc'][$idx] ?? ''));
-            $isReq = !empty($_POST['param_required'][$idx]);
+            $reqRaw = (array) ($_POST['param_required'] ?? []);
+            $isReq = !empty($reqRaw[$idx]) || in_array($pName, $reqRaw, true) || in_array((string) $idx, $reqRaw, true);
             $props[$pName] = [
                 'type' => in_array($pType, ['STRING', 'NUMBER', 'INTEGER', 'BOOLEAN', 'OBJECT', 'ARRAY'], true) ? $pType : 'STRING',
                 'description' => $pDesc

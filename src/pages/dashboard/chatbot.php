@@ -554,11 +554,15 @@
                     </p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="openAiImporterModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white transition-all shadow-md active:scale-[0.98]">
+                        <span class="text-sm">✨</span>
+                        <span>AI & cURL 1-Click Importer</span>
+                    </button>
                     <button type="button" onclick="openPresetsModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all shadow-xs active:scale-[0.98]">
-                        <span>⚡ 1-Click Presets</span>
+                        <span>⚡ App Store Presets</span>
                     </button>
                     <button type="button" onclick="openAddToolModal()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition-all shadow-xs active:scale-[0.98]">
-                        <span>+ Add Custom Tool</span>
+                        <span>+ Manual Builder</span>
                     </button>
                 </div>
             </div>
@@ -912,43 +916,270 @@
         </div>
     </div>
 
-    <!-- MODAL 2: 1-CLICK PRESETS GALLERY -->
+    <!-- MODAL 2: 1-CLICK APP STORE PRESETS GALLERY -->
     <div id="presetsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl">
+        <div class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-                <h3 class="text-base font-bold text-slate-900">⚡ 1-Click Integration Presets</h3>
+                <div>
+                    <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 mb-1">
+                        <span>⚡ 1-Click Integrations</span>
+                    </div>
+                    <h3 class="text-base font-bold text-slate-900">Pre-Built App Store Catalog</h3>
+                </div>
                 <button type="button" onclick="closePresetsModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
             </div>
-            <p class="text-xs text-slate-500 mb-4">Click any preset below to automatically pre-populate the custom tool builder with verified schemas and endpoints:</p>
+            <p class="text-xs text-slate-500 mb-4">Select any pre-configured integration below to instantly populate parameters, execution URLs, and AI tool descriptions:</p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <!-- Preset 1: Weather API -->
-                <button type="button" onclick="loadPresetWeather()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
-                    <div class="text-base mb-1">🌤️</div>
-                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Live Weather Forecaster</div>
-                    <div class="text-[10px] text-slate-500">Free Open-Meteo REST API for global temperature & weather</div>
+                <!-- Preset 1: AssistGroup Enterprise Suite -->
+                <button type="button" onclick="loadPresetAssistGroup()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-purple-500 hover:bg-purple-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">🏢</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">PRODUCTION CRM</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-purple-700">AssistGroup Enterprise API</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Connects your live AssistGroup backend (inquiries, user lookup, system health).</div>
                 </button>
 
-                <!-- Preset 2: Crypto Price -->
-                <button type="button" onclick="loadPresetCrypto()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
-                    <div class="text-base mb-1">🪙</div>
-                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Crypto Price Tracker</div>
-                    <div class="text-[10px] text-slate-500">CoinGecko free API for live Bitcoin, Ethereum, and INR prices</div>
+                <!-- Preset 2: Weather API -->
+                <button type="button" onclick="loadPresetWeather()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-sky-500 hover:bg-sky-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">🌤️</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-sky-100 text-sky-800 border border-sky-200">FREE / ZERO-KEY</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-sky-700">Live Weather Forecaster</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Real-time global weather, temperature, humidity, and forecast using Open-Meteo.</div>
                 </button>
 
-                <!-- Preset 3: Lead Outbound Webhook -->
-                <button type="button" onclick="loadPresetWebhook()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
-                    <div class="text-base mb-1">🎣</div>
-                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">CRM Lead Webhook</div>
-                    <div class="text-[10px] text-slate-500">Fires captured name, phone & requirements to Zapier/n8n</div>
+                <!-- Preset 3: Crypto Price Tracker -->
+                <button type="button" onclick="loadPresetCrypto()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-amber-500 hover:bg-amber-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">🪙</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200">FREE / ZERO-KEY</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-amber-700">Crypto Price Tracker</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Live CoinGecko prices for Bitcoin, Ethereum, Solana, and altcoins in INR/USD.</div>
                 </button>
 
-                <!-- Preset 4: Shared Hosting Dual-Env -->
-                <button type="button" onclick="loadPresetSharedEnv()" class="text-left p-3.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group">
-                    <div class="text-base mb-1">🏢</div>
-                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">Dual-Env Backend API</div>
-                    <div class="text-[10px] text-slate-500">Localhost vs. Live Shared Hosting cPanel backend</div>
+                <!-- Preset 4: E-Commerce & Shipment Tracker -->
+                <button type="button" onclick="loadPresetEcommerce()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">📦</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">ORDERS & COURIER</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-emerald-700">E-Commerce Shipment Tracker</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Tracks courier shipments, waybills, and order status (Shiprocket / Delhivery compatible).</div>
                 </button>
+
+                <!-- Preset 5: Razorpay Payment Status -->
+                <button type="button" onclick="loadPresetRazorpay()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">💳</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">PAYMENTS</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-blue-700">Razorpay Payment Status</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Verifies live customer payment status, capture states, and invoice IDs.</div>
+                </button>
+
+                <!-- Preset 6: Lead Webhook -->
+                <button type="button" onclick="loadPresetWebhook()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-orange-500 hover:bg-orange-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">🎣</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-800 border border-orange-200">OUTBOUND WEBHOOK</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-orange-700">CRM Lead Webhook (Zapier/Make)</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Dispatches captured lead name, phone, and requirements directly to your CRM.</div>
+                </button>
+
+                <!-- Preset 7: Human Email Dispatch -->
+                <button type="button" onclick="loadPresetEmailAlert()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-rose-500 hover:bg-rose-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">📧</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-800 border border-rose-200">HITL ESCALATION</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-rose-700">Human Support Email Alert</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Sends priority email notification to support reps when customer needs escalation.</div>
+                </button>
+
+                <!-- Preset 8: Web Knowledge Search -->
+                <button type="button" onclick="loadPresetWebSearch()" class="text-left p-4 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/20 transition-all group relative">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xl">🌐</span>
+                        <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">AUTONOMOUS SEARCH</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-900 group-hover:text-indigo-700">DuckDuckGo Knowledge Search</div>
+                    <div class="text-[11px] text-slate-500 mt-1 leading-relaxed">Autonomous real-time search engine for answering factual and business inquiries.</div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: AI & CURL 1-CLICK SMART IMPORTER -->
+    <div id="aiImporterModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <!-- Modal Header -->
+            <div class="flex items-start justify-between pb-4 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 flex items-center justify-center text-white text-lg shadow-md">
+                        ✨
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base font-bold text-slate-900">AI & cURL 1-Click Tool Creator</h3>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200">
+                                Copilot v3.0
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-0.5">Paste any raw cURL command, API docs, or plain English prompt to instantly generate an autonomous tool.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeAiImporterModal()" class="text-slate-400 hover:text-slate-700 text-lg">✕</button>
+            </div>
+
+            <!-- Tabs: cURL vs. Prompt vs. Docs -->
+            <div class="flex items-center gap-2 border-b border-slate-200/80 pb-2 mb-4">
+                <button type="button" onclick="switchImporterTab('curl')" id="tabBtnCurl" class="importer-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs transition-all">
+                    📋 Paste cURL Command
+                </button>
+                <button type="button" onclick="switchImporterTab('prompt')" id="tabBtnPrompt" class="importer-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                    🤖 Plain English AI Prompt
+                </button>
+                <button type="button" onclick="switchImporterTab('docs')" id="tabBtnDocs" class="importer-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                    📄 API Documentation / JSON
+                </button>
+            </div>
+
+            <!-- TAB 1: cURL Input -->
+            <div id="importerPanelCurl" class="space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <label class="block text-xs font-bold text-slate-700">Paste Raw cURL Command:</label>
+                    <div class="flex items-center gap-1.5 text-[11px]">
+                        <span class="text-slate-400">Quick Samples:</span>
+                        <button type="button" onclick="fillCurlExample('shiprocket')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">📦 Shiprocket</button>
+                        <button type="button" onclick="fillCurlExample('weather')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">🌤️ Weather</button>
+                        <button type="button" onclick="fillCurlExample('assistgroup')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">🏢 AssistGroup</button>
+                    </div>
+                </div>
+                <textarea id="aiImporterCurlInput" rows="5" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 resize-none" placeholder="curl -X GET &quot;https://api.example.com/v1/orders/{order_id}&quot; \
+  -H &quot;Authorization: Bearer YOUR_TOKEN&quot; \
+  -H &quot;Accept: application/json&quot;"></textarea>
+            </div>
+
+            <!-- TAB 2: AI Prompt Input -->
+            <div id="importerPanelPrompt" class="space-y-3 hidden">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                    <label class="block text-xs font-bold text-slate-700">Describe What Your Tool Should Do in Plain English:</label>
+                    <div class="flex items-center gap-1.5 text-[11px]">
+                        <span class="text-slate-400">Quick Prompts:</span>
+                        <button type="button" onclick="fillPromptExample('delhivery')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">📦 Delhivery Tracking</button>
+                        <button type="button" onclick="fillPromptExample('razorpay')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">💳 Razorpay Status</button>
+                        <button type="button" onclick="fillPromptExample('currency')" class="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 font-medium">💱 Currency Rate</button>
+                    </div>
+                </div>
+                <textarea id="aiImporterPromptInput" rows="4" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 resize-none" placeholder="e.g. Build an API tool to track an order shipment from Delhivery courier using customer waybill tracking number..."></textarea>
+            </div>
+
+            <!-- TAB 3: Docs Input -->
+            <div id="importerPanelDocs" class="space-y-3 hidden">
+                <label class="block text-xs font-bold text-slate-700">Paste API Documentation Snippet or Sample Response JSON:</label>
+                <textarea id="aiImporterDocsInput" rows="5" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 resize-none" placeholder="GET /v1/payments/{payment_id}
+Authorization: Bearer <token>
+Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captured&quot;, &quot;amount&quot;: 50000 }"></textarea>
+            </div>
+
+            <!-- Generation Trigger Action -->
+            <div class="mt-4 flex items-center justify-between pt-3 border-t border-slate-100">
+                <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Multi-Provider Synthesis (Groq / Gemini Function Calling Engine)</span>
+                </div>
+                <button type="button" id="btnAiGenerate" onclick="generateToolFromAI()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-md active:scale-[0.98] transition-all">
+                    <span>✨ Analyze & Generate Tool</span>
+                </button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="aiImporterLoading" class="py-8 text-center space-y-3 hidden">
+                <div class="inline-block animate-spin text-3xl">🌀</div>
+                <div class="text-xs font-bold text-slate-800" id="aiImporterLoadingText">Synthesizing Tool Definition with AI...</div>
+                <p class="text-[11px] text-slate-500 max-w-sm mx-auto">Extracting HTTP methods, parameters, and generating Gemini & Groq function calling schema.</p>
+            </div>
+
+            <!-- GENERATED PREVIEW CARD -->
+            <div id="aiImporterResult" class="mt-6 border border-slate-200 rounded-2xl p-5 bg-slate-50/70 hidden space-y-4">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span id="resToolCategory" class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 uppercase">REST API</span>
+                            <span id="resToolSource" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">AI Synthesized</span>
+                        </div>
+                        <h4 id="resDisplayName" class="text-sm font-bold text-slate-900">📦 Delhivery Shipment Tracker</h4>
+                        <div class="text-[11px] font-mono text-slate-400">slug: <span id="resToolSlug" class="text-slate-700 font-semibold">delhivery_track</span></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="testGeneratedTool()" id="btnTestGenerated" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 shadow-xs flex items-center gap-1 transition-colors">
+                            <span>🧪</span> Test Call
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <p id="resDescription" class="text-xs text-slate-600 leading-relaxed bg-white p-3 rounded-xl border border-slate-200/70"></p>
+
+                <!-- Execution Specs -->
+                <div class="bg-white p-3 rounded-xl border border-slate-200/70 space-y-2 text-xs font-mono">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span id="resMethod" class="px-2 py-0.5 rounded font-bold text-[10px] bg-slate-900 text-white">GET</span>
+                        <span id="resUrl" class="text-slate-700 break-all">https://api.example.com/...</span>
+                    </div>
+                    <div id="resHeadersBox" class="text-[11px] text-slate-500 truncate"></div>
+                </div>
+
+                <!-- Dynamic Parameters Table -->
+                <div class="bg-white rounded-xl border border-slate-200/70 overflow-hidden">
+                    <div class="p-2.5 bg-slate-100/70 border-b border-slate-200/70 text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Dynamic Function Parameters (<span id="resParamCount">0</span>)</span>
+                        <span class="text-[10px] text-slate-400">Compiled to Gemini Function Calling</span>
+                    </div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-[10px] font-bold text-slate-400 uppercase bg-slate-50/50">
+                            <tr>
+                                <th class="px-3 py-2">Parameter</th>
+                                <th class="px-3 py-2">Type</th>
+                                <th class="px-3 py-2">Description for AI</th>
+                                <th class="px-3 py-2 text-center">Required</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resParamsTableBody" class="divide-y divide-slate-100 font-mono text-[11px]"></tbody>
+                    </table>
+                </div>
+
+                <!-- Test Execution Sandbox Result (Live In-Modal) -->
+                <div id="importerTestBox" class="bg-slate-950 rounded-xl p-4 text-xs font-mono text-emerald-400 hidden space-y-2">
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800 pb-2">
+                        <span class="font-bold text-white flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Live Test Execution Result:
+                        </span>
+                        <span id="importerTestMeta" class="text-emerald-400 font-bold">200 OK (142ms)</span>
+                    </div>
+                    <pre id="importerTestOutput" class="max-h-48 overflow-y-auto whitespace-pre-wrap text-[11px]"></pre>
+                </div>
+
+                <!-- Bottom Actions -->
+                <div class="flex items-center justify-between pt-3 border-t border-slate-200/80">
+                    <button type="button" onclick="closeAiImporterModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg">
+                        Close
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="applyGeneratedToolToBuilder()" class="px-4 py-2 rounded-lg text-xs font-bold bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 shadow-xs">
+                            ✏️ Review in Manual Builder
+                        </button>
+                        <button type="button" onclick="saveGeneratedToolDirectly()" class="px-5 py-2 rounded-lg text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs">
+                            💾 Save & Activate Tool Now
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1122,6 +1353,341 @@
             document.getElementById('presetsModal').classList.add('hidden');
         };
 
+        // ==========================================
+        // AI & cURL 1-Click Importer Logic
+        // ==========================================
+        let activeImporterTab = 'curl';
+        let currentGeneratedTool = null;
+
+        window.openAiImporterModal = function() {
+            document.getElementById('aiImporterModal').classList.remove('hidden');
+            switchImporterTab('curl');
+            document.getElementById('aiImporterResult').classList.add('hidden');
+            document.getElementById('aiImporterLoading').classList.add('hidden');
+        };
+
+        window.closeAiImporterModal = function() {
+            document.getElementById('aiImporterModal').classList.add('hidden');
+        };
+
+        window.switchImporterTab = function(tab) {
+            activeImporterTab = tab;
+            ['curl', 'prompt', 'docs'].forEach(t => {
+                const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+                const panel = document.getElementById('importerPanel' + t.charAt(0).toUpperCase() + t.slice(1));
+                if (btn) {
+                    if (t === tab) {
+                        btn.className = 'importer-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs transition-all';
+                    } else {
+                        btn.className = 'importer-tab-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all';
+                    }
+                }
+                if (panel) {
+                    panel.classList.toggle('hidden', t !== tab);
+                }
+            });
+        };
+
+        window.fillCurlExample = function(type) {
+            const input = document.getElementById('aiImporterCurlInput');
+            if (type === 'shiprocket') {
+                input.value = `curl -X GET "https://apiv2.shiprocket.in/v1/external/courier/track/awb?awb_code=9876543210" \\
+  -H "Authorization: Bearer YOUR_SHIPROCKET_TOKEN" \\
+  -H "Accept: application/json"`;
+            } else if (type === 'weather') {
+                input.value = `curl -X GET "https://api.open-meteo.com/v1/forecast?latitude=25.59&longitude=85.14&current=temperature_2m,weather_code" \\
+  -H "Accept: application/json"`;
+            } else if (type === 'assistgroup') {
+                input.value = `curl -X GET "https://assistgroup.gt.tc/api/admin/v1/system" \\
+  -H "Authorization: Bearer ast_live_demo_token" \\
+  -H "Accept: application/json"`;
+            }
+        };
+
+        window.fillPromptExample = function(type) {
+            const input = document.getElementById('aiImporterPromptInput');
+            if (type === 'delhivery') {
+                input.value = 'Track courier delivery packages from Delhivery courier using customer waybill tracking number';
+            } else if (type === 'razorpay') {
+                input.value = 'Check live payment status and amount captured from Razorpay using payment_id';
+            } else if (type === 'currency') {
+                input.value = 'Query current live currency exchange rate from USD to INR using free exchangerate API';
+            }
+        };
+
+        window.generateToolFromAI = async function() {
+            const btn = document.getElementById('btnAiGenerate');
+            const loading = document.getElementById('aiImporterLoading');
+            const resultBox = document.getElementById('aiImporterResult');
+            const loadingText = document.getElementById('aiImporterLoadingText');
+
+            let rawContent = '';
+            let inputType = activeImporterTab;
+
+            if (activeImporterTab === 'curl') {
+                rawContent = document.getElementById('aiImporterCurlInput').value.trim();
+            } else if (activeImporterTab === 'prompt') {
+                rawContent = document.getElementById('aiImporterPromptInput').value.trim();
+            } else {
+                rawContent = document.getElementById('aiImporterDocsInput').value.trim();
+            }
+
+            if (!rawContent) {
+                alert('Please enter a cURL command, prompt, or API docs snippet first.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+            loading.classList.remove('hidden');
+            resultBox.classList.add('hidden');
+            document.getElementById('importerTestBox').classList.add('hidden');
+            loadingText.textContent = activeImporterTab === 'curl' 
+                ? 'Parsing cURL parameters & synthesizing schema...' 
+                : 'Synthesizing Tool Definition with AI Agent...';
+
+            try {
+                const res = await fetch('<?= e(base_url('api/tools/ai-generate-tool.php')) ?>', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ raw_content: rawContent, input_type: inputType }),
+                    credentials: 'same-origin'
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data.ok || !data.tool) {
+                    throw new Error(data.error || 'Failed to generate tool definition.');
+                }
+
+                currentGeneratedTool = data.tool;
+                renderGeneratedPreview(data.tool, data.source || 'AI Copilot');
+                resultBox.classList.remove('hidden');
+                resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } catch (err) {
+                alert('Generation Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+                loading.classList.add('hidden');
+            }
+        };
+
+        function renderGeneratedPreview(tool, source) {
+            document.getElementById('resToolCategory').textContent = (tool.category || 'rest_api').replace('_', ' ').toUpperCase();
+            document.getElementById('resToolSource').textContent = source;
+            document.getElementById('resDisplayName').textContent = tool.display_name || 'Custom Tool';
+            document.getElementById('resToolSlug').textContent = tool.tool_slug || 'custom_tool';
+            document.getElementById('resDescription').textContent = tool.description || '';
+
+            const exec = tool.execution_config || {};
+            document.getElementById('resMethod').textContent = (exec.method || 'GET').toUpperCase();
+            document.getElementById('resUrl').textContent = exec.url || exec.base_url || exec.target_url || '';
+
+            const headers = exec.headers || {};
+            const headersStr = Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join(' | ');
+            const hBox = document.getElementById('resHeadersBox');
+            if (headersStr) {
+                hBox.textContent = 'Headers: ' + headersStr;
+                hBox.classList.remove('hidden');
+            } else {
+                hBox.classList.add('hidden');
+            }
+
+            const params = Array.isArray(tool.parameters) ? tool.parameters : [];
+            document.getElementById('resParamCount').textContent = params.length;
+
+            const tbody = document.getElementById('resParamsTableBody');
+            tbody.innerHTML = '';
+            if (params.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-3 py-3 text-center text-slate-400">No dynamic parameters required for this endpoint.</td></tr>';
+            } else {
+                params.forEach(p => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/70';
+                    tr.innerHTML = `
+                        <td class="px-3 py-2 font-bold text-slate-900">${escapeHtml(p.name || '')}</td>
+                        <td class="px-3 py-2"><span class="px-1.5 py-0.5 rounded text-[9px] bg-slate-100 text-slate-700">${escapeHtml(p.type || 'STRING')}</span></td>
+                        <td class="px-3 py-2 text-slate-600 font-sans">${escapeHtml(p.description || '')}</td>
+                        <td class="px-3 py-2 text-center">${p.required ? '<span class="text-rose-600 font-bold">YES</span>' : '<span class="text-slate-400">NO</span>'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        window.testGeneratedTool = async function() {
+            if (!currentGeneratedTool) return;
+            const btn = document.getElementById('btnTestGenerated');
+            const testBox = document.getElementById('importerTestBox');
+            const testMeta = document.getElementById('importerTestMeta');
+            const testOutput = document.getElementById('importerTestOutput');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> Testing...';
+            testBox.classList.remove('hidden');
+            testMeta.textContent = 'Contacting server...';
+            testOutput.textContent = 'Executing server-side cURL proxy test...';
+
+            // Formulate sample args from parameters
+            const sampleArgs = {};
+            const params = Array.isArray(currentGeneratedTool.parameters) ? currentGeneratedTool.parameters : [];
+            params.forEach(p => {
+                const k = p.name || '';
+                if (k.includes('lat')) sampleArgs[k] = 25.5941;
+                else if (k.includes('lon')) sampleArgs[k] = 85.1376;
+                else if (k.includes('city') || k === 'q') sampleArgs[k] = 'Patna';
+                else if (k.includes('order')) sampleArgs[k] = 'ORD-98765';
+                else if (k.includes('waybill') || k.includes('awb')) sampleArgs[k] = '9876543210';
+                else if (k.includes('payment') || k.includes('pay_')) sampleArgs[k] = 'pay_test123';
+                else if (k.includes('phone')) sampleArgs[k] = '919507286092';
+                else if (k.includes('action')) sampleArgs[k] = 'system';
+                else sampleArgs[k] = 'test_value';
+            });
+
+            const startTime = performance.now();
+            try {
+                const res = await fetch('<?= e(base_url('api/tools/test-tool.php')) ?>', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: currentGeneratedTool.category || 'rest_api',
+                        execution_config: currentGeneratedTool.execution_config || {},
+                        args: sampleArgs
+                    }),
+                    credentials: 'same-origin'
+                });
+
+                const data = await res.json();
+                const latency = Math.round(performance.now() - startTime);
+
+                if (data.ok) {
+                    testMeta.className = 'text-emerald-400 font-bold';
+                    testMeta.textContent = `HTTP ${data.status || 200} OK (${data.latency_ms || latency}ms)`;
+                } else {
+                    testMeta.className = 'text-rose-400 font-bold';
+                    testMeta.textContent = `HTTP ${data.status || 400} Error (${data.latency_ms || latency}ms)`;
+                }
+
+                testOutput.textContent = JSON.stringify(data.data || data, null, 2);
+            } catch (err) {
+                testMeta.className = 'text-rose-400 font-bold';
+                testMeta.textContent = 'Network Error';
+                testOutput.textContent = 'Error: ' + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span>🧪</span> Test Call';
+            }
+        };
+
+        window.applyGeneratedToolToBuilder = function() {
+            if (!currentGeneratedTool) return;
+            closeAiImporterModal();
+            openAddToolModal();
+
+            document.getElementById('modalToolSlug').value = currentGeneratedTool.tool_slug || '';
+            document.getElementById('modalDisplayName').value = currentGeneratedTool.display_name || '';
+            document.getElementById('modalDescription').value = currentGeneratedTool.description || '';
+            document.getElementById('modalCategory').value = currentGeneratedTool.category || 'rest_api';
+            toggleCategoryFields(currentGeneratedTool.category || 'rest_api');
+
+            const exec = currentGeneratedTool.execution_config || {};
+            if (currentGeneratedTool.category === 'rest_api') {
+                document.getElementById('modalRestMethod').value = exec.method || 'GET';
+                document.getElementById('modalRestUrl').value = exec.url || '';
+                document.getElementById('modalRestAuth').value = exec.headers?.Authorization || '';
+                document.getElementById('modalRestPath').value = exec.response_path || '';
+            } else if (currentGeneratedTool.category === 'shared_env_api') {
+                document.getElementById('modalSharedLiveUrl').value = exec.base_url || '';
+                document.getElementById('modalSharedLiveToken').value = exec.bearer_token || '';
+            } else if (currentGeneratedTool.category === 'webhook') {
+                document.getElementById('modalWebhookUrl').value = exec.target_url || '';
+            }
+
+            const container = document.getElementById('parameterRowsContainer');
+            container.innerHTML = '';
+            const params = Array.isArray(currentGeneratedTool.parameters) ? currentGeneratedTool.parameters : [];
+            params.forEach(p => {
+                addParameterRow(p.name || '', p.type || 'STRING', p.description || '', !!p.required);
+            });
+        };
+
+        window.saveGeneratedToolDirectly = function() {
+            if (!currentGeneratedTool) return;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '<?= e(base_url('index.php?page=custom-tool-save')) ?>';
+
+            const addField = (name, val) => {
+                const inp = document.createElement('input');
+                inp.type = 'hidden';
+                inp.name = name;
+                inp.value = val;
+                form.appendChild(inp);
+            };
+
+            addField('csrf_token', '<?= e(csrf_token()) ?>');
+            addField('tool_id', '0');
+            addField('tool_slug', currentGeneratedTool.tool_slug || '');
+            addField('display_name', currentGeneratedTool.display_name || '');
+            addField('category', currentGeneratedTool.category || 'rest_api');
+            addField('description', currentGeneratedTool.description || '');
+            addField('is_active', '1');
+
+            const exec = currentGeneratedTool.execution_config || {};
+            if (currentGeneratedTool.category === 'rest_api') {
+                addField('rest_method', exec.method || 'GET');
+                addField('rest_url', exec.url || '');
+                if (exec.headers?.Authorization) {
+                    addField('rest_auth_header', exec.headers.Authorization);
+                }
+                addField('rest_response_path', exec.response_path || '');
+            } else if (currentGeneratedTool.category === 'shared_env_api') {
+                addField('shared_live_url', exec.base_url || '');
+                addField('shared_live_token', exec.bearer_token || '');
+            } else if (currentGeneratedTool.category === 'webhook') {
+                addField('webhook_url', exec.target_url || '');
+            }
+
+            const params = Array.isArray(currentGeneratedTool.parameters) ? currentGeneratedTool.parameters : [];
+            params.forEach(p => {
+                addField('param_name[]', p.name || '');
+                addField('param_type[]', p.type || 'STRING');
+                addField('param_desc[]', p.description || '');
+                if (p.required) {
+                    addField('param_required[]', '1');
+                } else {
+                    addField('param_required[]', '0');
+                }
+            });
+
+            addField('roles[]', 'guest');
+            addField('roles[]', 'customer');
+            addField('roles[]', 'admin');
+
+            document.body.appendChild(form);
+            form.submit();
+        };
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // ==========================================
+        // 8 App Store Preset Loaders
+        // ==========================================
+        window.loadPresetAssistGroup = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'assistgroup_crm';
+            document.getElementById('modalDisplayName').value = '🏢 AssistGroup Enterprise Suite';
+            document.getElementById('modalCategory').value = 'shared_env_api';
+            document.getElementById('modalDescription').value = 'Connects to AssistGroup Live CRM & Admin Suite to inspect system health, recent customer inquiries, and user status.';
+            toggleCategoryFields('shared_env_api');
+            document.getElementById('modalSharedLiveUrl').value = 'https://assistgroup.gt.tc/api/admin/v1';
+            document.getElementById('modalSharedLiveToken').value = '';
+            addParameterRow('action', 'STRING', 'CRM endpoint action: "system", "health", "inquiries", or "users"', true);
+        };
+
         window.loadPresetWeather = function() {
             closePresetsModal();
             openAddToolModal();
@@ -1149,6 +1715,34 @@
             addParameterRow('coin_id', 'STRING', 'Cryptocurrency id e.g. "bitcoin", "ethereum", "solana"', true);
         };
 
+        window.loadPresetEcommerce = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'track_shipment';
+            document.getElementById('modalDisplayName').value = '📦 Courier Shipment Tracker';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalDescription').value = 'Checks current delivery status, carrier location, and expected delivery date using courier tracking AWB or order ID.';
+            document.getElementById('modalRestUrl').value = 'https://apiv2.shiprocket.in/v1/external/courier/track/awb?awb_code={awb_code}';
+            document.getElementById('modalRestAuth').value = 'Bearer YOUR_COURIER_TOKEN';
+            document.getElementById('modalRestPath').value = 'tracking_data';
+            toggleCategoryFields('rest_api');
+            addParameterRow('awb_code', 'STRING', 'Courier waybill or tracking code (e.g. 9876543210)', true);
+        };
+
+        window.loadPresetRazorpay = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'check_razorpay_payment';
+            document.getElementById('modalDisplayName').value = '💳 Razorpay Payment Status';
+            document.getElementById('modalCategory').value = 'rest_api';
+            document.getElementById('modalDescription').value = 'Verifies live payment status, amount, and capture state from Razorpay using payment_id.';
+            document.getElementById('modalRestUrl').value = 'https://api.razorpay.com/v1/payments/{payment_id}';
+            document.getElementById('modalRestAuth').value = 'Basic YOUR_BASE64_KEY_SECRET';
+            document.getElementById('modalRestPath').value = '';
+            toggleCategoryFields('rest_api');
+            addParameterRow('payment_id', 'STRING', 'Razorpay payment ID (e.g. pay_29QQoUBi66xm2f)', true);
+        };
+
         window.loadPresetWebhook = function() {
             closePresetsModal();
             openAddToolModal();
@@ -1163,19 +1757,31 @@
             addParameterRow('notes', 'STRING', 'Summary of customer requirements', false);
         };
 
-        window.loadPresetSharedEnv = function() {
+        window.loadPresetEmailAlert = function() {
             closePresetsModal();
             openAddToolModal();
-            document.getElementById('modalToolSlug').value = 'custom_production_api';
-            document.getElementById('modalDisplayName').value = '🏢 Custom Production Backend';
-            document.getElementById('modalCategory').value = 'shared_env_api';
-            document.getElementById('modalDescription').value = 'Connects to your custom production backend API with dynamic action routes.';
-            toggleCategoryFields('shared_env_api');
-            document.getElementById('modalSharedLiveUrl').value = 'https://api.myproject.com/v1';
-            addParameterRow('action', 'STRING', 'Endpoint action to perform', true);
+            document.getElementById('modalToolSlug').value = 'draft_email';
+            document.getElementById('modalDisplayName').value = '📧 Human Support Email Alert';
+            document.getElementById('modalCategory').value = 'builtin';
+            document.getElementById('modalDescription').value = 'Prepares an email alert to the human support team when customer needs escalation or formal follow-up.';
+            toggleCategoryFields('builtin');
+            addParameterRow('recipient_email', 'STRING', 'Target email address for notification', true);
+            addParameterRow('subject', 'STRING', 'Subject line of email alert', true);
+            addParameterRow('body_text', 'STRING', 'Detailed customer notes or inquiry body', true);
         };
 
-        // Sandbox Simulator Modal
+        window.loadPresetWebSearch = function() {
+            closePresetsModal();
+            openAddToolModal();
+            document.getElementById('modalToolSlug').value = 'web_search';
+            document.getElementById('modalDisplayName').value = '🌐 DuckDuckGo Knowledge Search';
+            document.getElementById('modalCategory').value = 'builtin';
+            document.getElementById('modalDescription').value = 'Performs live web search on DuckDuckGo to answer questions regarding current events, product specs, or external facts.';
+            toggleCategoryFields('builtin');
+            addParameterRow('query', 'STRING', 'Search query string', true);
+        };
+
+        // Upgraded Sandbox Simulator Modal (Server-Side Proxy - Zero CORS block)
         let activeSandboxTool = null;
         window.handleToolTest = function(btn) {
             try {
@@ -1194,13 +1800,16 @@
             const sampleArgs = {};
             const props = tool.parameters_schema?.properties || {};
             for (const [k, v] of Object.entries(props)) {
-                if (k === 'latitude') sampleArgs[k] = 25.5941;
-                else if (k === 'longitude') sampleArgs[k] = 85.1376;
-                else if (k === 'city') sampleArgs[k] = 'Patna';
-                else if (k === 'query') sampleArgs[k] = 'Latest tech news';
-                else if (k === 'expression') sampleArgs[k] = '35000 * 0.82';
-                else if (k === 'coin_id') sampleArgs[k] = 'bitcoin';
-                else if (k === 'action') sampleArgs[k] = 'pricing_plans';
+                if (k.includes('lat')) sampleArgs[k] = 25.5941;
+                else if (k.includes('lon')) sampleArgs[k] = 85.1376;
+                else if (k.includes('city') || k === 'q') sampleArgs[k] = 'Patna';
+                else if (k.includes('query')) sampleArgs[k] = 'Latest tech news';
+                else if (k.includes('expression')) sampleArgs[k] = '35000 * 0.82';
+                else if (k.includes('coin')) sampleArgs[k] = 'bitcoin';
+                else if (k.includes('order')) sampleArgs[k] = 'ORD-12345';
+                else if (k.includes('action')) sampleArgs[k] = 'system';
+                else if (k.includes('payment') || k.includes('pay_')) sampleArgs[k] = 'pay_29QQoUBi66xm2f';
+                else if (k.includes('phone')) sampleArgs[k] = '919507286092';
                 else sampleArgs[k] = 'test_value';
             }
             document.getElementById('sandboxArgs').value = JSON.stringify(sampleArgs, null, 2);
@@ -1228,36 +1837,39 @@
             }
 
             btn.disabled = true;
-            btn.textContent = '⏳ Executing...';
+            btn.textContent = '⏳ Executing Live Server Test...';
             resultBox.classList.remove('hidden');
-            output.textContent = 'Contacting endpoint...';
+            output.textContent = 'Sending server-side execution request...';
 
             const startTime = performance.now();
             try {
-                if (activeSandboxTool.category === 'rest_api') {
-                    let targetUrl = activeSandboxTool.execution_config.url || '';
-                    for (const [k, v] of Object.entries(parsedArgs)) {
-                        targetUrl = targetUrl.replace(new RegExp('\\{' + k + '\\}', 'g'), encodeURIComponent(v));
-                    }
-                    const res = await fetch(targetUrl);
-                    const data = await res.json();
-                    const latency = Math.round(performance.now() - startTime);
-                    latencyEl.textContent = latency + 'ms (HTTP ' + res.status + ')';
-                    output.textContent = JSON.stringify(data, null, 2);
+                const res = await fetch('<?= e(base_url('api/tools/test-tool.php')) ?>', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: activeSandboxTool.category || 'rest_api',
+                        execution_config: activeSandboxTool.execution_config || {},
+                        args: parsedArgs
+                    }),
+                    credentials: 'same-origin'
+                });
+
+                const data = await res.json();
+                const latency = Math.round(performance.now() - startTime);
+
+                if (data.ok) {
+                    latencyEl.className = 'font-mono text-emerald-600 font-bold';
+                    latencyEl.textContent = `${data.latency_ms || latency}ms (HTTP ${data.status || 200})`;
                 } else {
-                    const latency = Math.round(performance.now() - startTime);
-                    latencyEl.textContent = latency + 'ms (Simulated)';
-                    output.textContent = JSON.stringify({
-                        status: 'success',
-                        tool: activeSandboxTool.tool_slug,
-                        category: activeSandboxTool.category,
-                        args_received: parsedArgs,
-                        note: 'Executed through dynamic tool executor.'
-                    }, null, 2);
+                    latencyEl.className = 'font-mono text-rose-600 font-bold';
+                    latencyEl.textContent = `${data.latency_ms || latency}ms (HTTP ${data.status || 400} Error)`;
                 }
+
+                output.textContent = JSON.stringify(data.data || data, null, 2);
             } catch (err) {
                 const latency = Math.round(performance.now() - startTime);
-                latencyEl.textContent = latency + 'ms (Error)';
+                latencyEl.className = 'font-mono text-rose-600 font-bold';
+                latencyEl.textContent = `${latency}ms (Network Error)`;
                 output.textContent = 'Test failed: ' + err.message;
             } finally {
                 btn.disabled = false;
