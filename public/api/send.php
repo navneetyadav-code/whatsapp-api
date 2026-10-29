@@ -40,7 +40,7 @@ if (!$rate['allowed']) {
 $data = request_json();
 
 // 1. Recipient extraction (supports standard 'to' / 'recipient' or Meta contacts)
-$rawTo = trim((string) ($data['to'] ?? $data['recipient'] ?? ''));
+$rawTo = trim((string) ($data['to'] ?? $data['recipient'] ?? $data['phone_number'] ?? $data['phone'] ?? ''));
 if ($rawTo === '' && !empty($data['contacts'][0]['wa_id'])) {
     $rawTo = trim((string) $data['contacts'][0]['wa_id']);
 }
@@ -75,6 +75,10 @@ if (isset($data['caption']) && is_string($data['caption'])) {
     $message = trim($data['caption']);
 } elseif (isset($data['message']) && is_string($data['message'])) {
     $message = trim($data['message']);
+} elseif (isset($data['message_content']) && is_string($data['message_content'])) {
+    $message = trim($data['message_content']);
+} elseif (isset($data['content']) && is_string($data['content'])) {
+    $message = trim($data['content']);
 } elseif (isset($data['text']) && is_array($data['text']) && isset($data['text']['body'])) {
     // Meta Cloud API text format
     $message = trim((string) $data['text']['body']);
