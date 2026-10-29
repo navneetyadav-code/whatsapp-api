@@ -25,8 +25,9 @@ import {
 } from './ai-agent.mjs';
 import { globalDebouncer } from './chat-debouncer.mjs';
 import { globalGreetingCache } from './chat-greeting-cache.mjs';
-import { resolveActiveSession, closeSession, isWakeupTrigger } from './chat-session-manager.mjs';
+import { resolveActiveSession, closeSession, isWakeupTrigger, isTopicResetTrigger } from './chat-session-manager.mjs';
 import { ChatMemoryEngine } from './chat-memory.mjs';
+import { ChatFactMemory } from './chat-fact-memory.mjs';
 import { ChatPresenceManager } from './chat-presence.mjs';
 import { ChatResolutionEngine } from './chat-resolution.mjs';
 import { detectIntents, composeSkillsAndTools } from './intent-router.mjs';
@@ -1589,6 +1590,38 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             continue;
           }
 
+          // Intercept topic reset triggers (/clear, /new, /reset, etc.): Wipes working context, starts a fresh topic session
+          if (rawInboundText && isTopicResetTrigger(rawInboundText)) {
+            logger.info({ userId, senderPhone, isPersonalMode }, '🧹 Topic reset command received (/clear, /new, /reset) - generating fresh session UUID');
+            currentSessionUuid = generateSessionUuid();
+            await db.execute(
+              'UPDATE chat_conversations SET session_uuid = ?, bot_paused = 0, status = "open", escalation_reason = NULL, awaiting_feedback = 0, consecutive_bot_replies = 0, last_message_at = NOW() WHERE user_id = ? AND phone = ?',
+              [currentSessionUuid, userId, senderPhone]
+            );
+            isBotPaused = 0;
+            convStatus = 'open';
+
+            const resetReplyText = isPersonalMode
+              ? `🧹 *Working Context Cleared!*\nStarting a fresh topic session. How can I assist you now, ${ownerName}?`
+              : '🧹 *Conversation Context Cleared!*\nHow can I help you with a fresh inquiry today?';
+            try {
+              await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: resetReplyText });
+              await db.execute(
+                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
+                [userId, conversationId, currentSessionUuid, resetReplyText]
+              );
+              await db.execute(
+                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
+                [resetReplyText.slice(0, 200), conversationId]
+              );
+              aiHandled = true;
+            } catch (sendErr) {
+              logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch topic reset confirmation');
+            }
+            continue;
+          }
+
           if (!feedbackHandled && isBotPaused !== 1 && convStatus === 'open') {
             if (rawInboundText) {
               try {
@@ -1621,8 +1654,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                           const activeSessionUuid = freshConv[0].session_uuid;
 
-                          // Step B: Retrieve recent multi-turn conversation memory
-                          const historyTurns = await ChatMemoryEngine.getRecentTurns(db, conv.id, activeSessionUuid, 8);
+                          // Step B: Retrieve recent multi-turn conversation memory (enforces 45-min rolling TTL decay)
+                          const historyTurns = await ChatMemoryEngine.getRecentTurns(db, conv.id, activeSessionUuid, 6, 45);
 
                           // Step C: Check for query resolution / customer satisfaction
                           // In Personal Assistant mode, customer feedback surveys and auto-closing are completely disabled!
@@ -1695,6 +1728,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                             // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
                             const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
+                            const userFacts = isPersonalMode ? await ChatFactMemory.loadUserFacts(db, userId) : { factsText: '' };
                             const { systemPrompt, userMessage } = buildPromptWithRag(
                               aiSettings.system_prompt,
                               relevantChunks,
@@ -1702,7 +1736,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               {
                                 agentMode: aiSettings.agent_mode || 'support',
                                 ownerName: aiSettings.owner_name || 'Boss',
-                                skillDirectives
+                                skillDirectives,
+                                factsText: userFacts.factsText
                               }
                             );
 

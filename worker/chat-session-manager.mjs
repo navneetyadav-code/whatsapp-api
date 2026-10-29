@@ -34,6 +34,17 @@ export function isWakeupTrigger(text) {
 }
 
 /**
+ * Check if incoming text is an explicit topic reset command (/clear, /new, /reset, etc.)
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isTopicResetTrigger(text) {
+  if (!text || typeof text !== 'string') return false;
+  const clean = text.trim().toLowerCase().replace(/[.!?]/g, '');
+  return /^(\/clear|clear|\/new|new|new topic|\/reset|reset|reset context|reset memory|clear memory|clear context)$/.test(clean);
+}
+
+/**
  * Resolve active session for incoming message or initialize fresh session
  * @param {Object} db - MySQL connection/pool
  * @param {number|string} userId

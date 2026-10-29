@@ -272,6 +272,10 @@ OPERATING DIRECTIVES:
 3. Formatting: Crisp, proactive, structured. Use *bold* highlights, clean bullet points, and appropriate emojis.
 4. Silence Feedback: You are a personal assistant, NOT a customer service line. NEVER ask for customer reviews, 5-star ratings, or feedback surveys.`;
 
+    if (options.factsText && options.factsText.trim()) {
+      microKernel += '\n\n' + options.factsText.trim();
+    }
+
     if (skillDirectives.length > 0) {
       microKernel += '\n\n' + skillDirectives.join('\n\n');
     }

@@ -16,6 +16,7 @@ const INTENT_PATTERNS = {
   email_draft: /\b(draft|mail|email|compose|write (an? )?(email|mail)|send (an? )?(email|mail))\b/i,
   email_confirm: /^(yes|send( it)?|proceed|approve(d)?|bhej do|bhejdo|ha(an)? bhej do|confirm(ed)?|ok send|yep|sure send|do it|okay send|ok|okay)\b/i,
   email_cancel: /\b(cancel|discard|don't send|dont send|abort|stop|mat bhejo|ignore draft|no don't send)\b/i,
+  memory: /\b(remember|note down|save this|keep in mind|yad rakhna|yaad rakhna|note karo)\b/i,
   escalation: /\b(human|manager|agent|support representative|escalate|talk to human)\b/i
 };
 
@@ -83,6 +84,7 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
   // Always make basic utility tools available in Personal Assistant mode if needed
   if (isPersonalMode) {
     activeToolSlugs.add('get_current_time');
+    activeToolSlugs.add('update_memory');
   }
 
   // State-Aware Draft Injection: If there is an active pending draft in this conversation,
@@ -144,6 +146,13 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
         activeToolSlugs.add('confirm_action');
         skillDirectives.push(
           `ACTION CANCELLATION PROTOCOL:\n• Boss requested to cancel/discard the pending draft.\n• Call confirm_action with action="cancel" to discard it safely.`
+        );
+        break;
+
+      case 'memory':
+        activeToolSlugs.add('update_memory');
+        skillDirectives.push(
+          `PERSISTENT MEMORY PROTOCOL:\n• Boss requested to remember or note down a fact, preference, or contact details.\n• Autonomously call update_memory with key and value to store it permanently.`
         );
         break;
 

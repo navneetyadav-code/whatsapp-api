@@ -13,6 +13,7 @@
 
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import { ChatFactMemory } from './chat-fact-memory.mjs';
 
 // ---------------------------------------------------------------------------
 // 1. BUILT-IN CORE UTILITIES
@@ -533,6 +534,43 @@ export async function handleConfirmAction(args, context) {
   return { success: false, error: `Unsupported action_type: ${draft.action_type}` };
 }
 
+/**
+ * Autonomous Memory Handler: Remembers durable facts in ai_user_memory
+ */
+export async function handleUpdateMemory(args, context) {
+  const { db, userId, conversationId } = context;
+  const key = args.key;
+  const value = args.value;
+  const memoryType = args.memory_type || 'fact';
+
+  if (!key || !value) {
+    return { error: 'Memory key and value are required.' };
+  }
+
+  const res = await ChatFactMemory.upsertUserFact(
+    db,
+    userId,
+    key,
+    value,
+    memoryType,
+    'whatsapp_chat',
+    conversationId
+  );
+
+  if (!res.success) {
+    return { error: `Failed to save memory: ${res.error}` };
+  }
+
+  return {
+    success: true,
+    remembered: true,
+    key: res.key,
+    value: res.value,
+    type: res.type,
+    message: `Stored fact permanently in notebook: "${res.key}" = "${res.value}"`
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 2. DYNAMIC PARAMETER INTERPOLATION & HTTP EXECUTOR
 // ---------------------------------------------------------------------------
@@ -1009,6 +1047,8 @@ export class UniversalToolsRegistry {
           result = await handleDraftEmail(args, context);
         } else if (handler === 'confirm_action') {
           result = await handleConfirmAction(args, context);
+        } else if (handler === 'update_memory') {
+          result = await handleUpdateMemory(args, context);
         } else {
           result = { error: `Unknown built-in handler: ${handler}` };
         }

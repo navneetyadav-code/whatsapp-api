@@ -3,19 +3,22 @@
  * -----------------------------------------------
  * Retrieves, windows, and structures recent conversation dialogue turns
  * from the database to give the AI engine human-like conversational memory.
- * Supports follow-up questions, pronoun resolution, and contextual continuity.
+ * Supports rolling Time-To-Live (TTL) decay to avoid 24/7 memory bloat.
  */
 
 export class ChatMemoryEngine {
   /**
-   * Fetch recent dialogue turns for the active session
+   * Fetch recent dialogue turns for the active working session
+   * Enforces rolling Time-To-Live (TTL) inactivity decay: if silence exceeds ttlMinutes,
+   * working memory resets to a fresh slate to prevent 24/7 context pollution.
    * @param {Object} db - MySQL connection/pool
    * @param {number|string} conversationId
    * @param {string} [sessionUuid]
-   * @param {number} [maxTurns=8] - Max historical messages to include
+   * @param {number} [maxTurns=6] - Max historical messages to include
+   * @param {number} [ttlMinutes=45] - Inactivity decay window in minutes (default 45)
    * @returns {Promise<Array<{ senderType: string, body: string, role: string }>>}
    */
-  static async getRecentTurns(db, conversationId, sessionUuid = null, maxTurns = 8) {
+  static async getRecentTurns(db, conversationId, sessionUuid = null, maxTurns = 6, ttlMinutes = 45) {
     if (!conversationId) return [];
 
     let query = `
@@ -31,6 +34,11 @@ export class ChatMemoryEngine {
     if (sessionUuid) {
       query += ' AND (session_uuid = ? OR session_uuid IS NULL)';
       params.push(sessionUuid);
+    }
+
+    if (ttlMinutes && Number(ttlMinutes) > 0) {
+      query += ' AND created_at >= NOW() - INTERVAL ? MINUTE';
+      params.push(Number(ttlMinutes));
     }
 
     query += ' ORDER BY id DESC LIMIT ?';
@@ -95,7 +103,6 @@ export class ChatMemoryEngine {
     // Ensure the current message is the final user turn
     const lastTurn = contents[contents.length - 1];
     if (lastTurn && lastTurn.role === 'user') {
-      // If last turn was already user, combine
       lastTurn.parts[0].text += `\n${currentMessage}`;
     } else {
       contents.push({
