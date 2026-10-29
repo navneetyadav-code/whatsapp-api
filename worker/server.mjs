@@ -1491,9 +1491,34 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             }
           }
 
+          // Pre-fetch active AI agent settings to resolve persona mode & admin caller role
+          const [aiSettingsRows] = await db.execute(
+            'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
+            [userId]
+          );
+          const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
+          const isPersonalMode = aiSettings?.agent_mode === 'personal';
+          const ownerName = aiSettings?.owner_name || 'Boss';
+
+          let toolsConfig = null;
+          if (aiSettings?.tools_config) {
+            try {
+              toolsConfig = typeof aiSettings.tools_config === 'string'
+                ? JSON.parse(aiSettings.tools_config)
+                : aiSettings.tools_config;
+            } catch (e) {}
+          }
+          const adminPhones = Array.isArray(toolsConfig?.admin_phones) && toolsConfig.admin_phones.length > 0
+            ? toolsConfig.admin_phones
+            : (process.env.ADMIN_WHITELIST_PHONES ? process.env.ADMIN_WHITELIST_PHONES.split(',').map(s => s.trim()) : []);
+          const cleanPhone = (senderPhone || '').replace(/[^\d]/g, '');
+          const isAdminCaller = isPersonalMode || adminPhones.some(p => cleanPhone.includes(p.replace(/[^\d]/g, '')));
+
           // 6. Escalation & Frustration check
+          // STRICT RESTRICTION: In Personal Assistant mode OR when communicating with the Admin/Boss,
+          // customer support desk escalation is 100% strictly disabled!
           let wasEscalated = false;
-          if (!feedbackHandled && senderPhone) {
+          if (!feedbackHandled && senderPhone && !isPersonalMode && !isAdminCaller) {
             const escCheck = detectFrustrationAndEscalation(norm.body);
             if (escCheck.shouldEscalate) {
               wasEscalated = true;
@@ -1544,15 +1569,6 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
           // 7. Enterprise AI Agent with Debouncer, Memory, Typing Presence, & Auto-Resolution
           let aiHandled = false;
           const rawInboundText = (norm.body || '').trim();
-
-          // Fetch active AI agent settings first to determine mode & persona
-          const [aiSettingsRows] = await db.execute(
-            'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
-            [userId]
-          );
-          const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
-          const isPersonalMode = aiSettings?.agent_mode === 'personal';
-          const ownerName = aiSettings?.owner_name || 'Boss';
 
           // Intercept wake-up trigger (/start or start): ALWAYS resets bot_paused, starts a fresh session ticket, and sends dynamic greeting
           if (rawInboundText && isWakeupTrigger(rawInboundText)) {
@@ -1741,23 +1757,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               }
                             );
 
-                            // Parse tools configuration and resolve caller role
-                            let toolsConfig = null;
-                            if (aiSettings.tools_config) {
-                              try {
-                                toolsConfig = typeof aiSettings.tools_config === 'string'
-                                  ? JSON.parse(aiSettings.tools_config)
-                                  : aiSettings.tools_config;
-                              } catch (e) {}
-                            }
-
-                            const adminPhones = Array.isArray(toolsConfig?.admin_phones) && toolsConfig.admin_phones.length > 0
-                              ? toolsConfig.admin_phones
-                              : (process.env.ADMIN_WHITELIST_PHONES ? process.env.ADMIN_WHITELIST_PHONES.split(',').map(s => s.trim()) : []);
-                            const cleanPhone = (senderPhone || '').replace(/[^\d]/g, '');
-
                             let callerRole = 'guest';
-                            if (isPersonalMode || adminPhones.some(p => cleanPhone.includes(p.replace(/[^\d]/g, '')))) {
+                            if (isAdminCaller) {
                               callerRole = 'admin';
                             } else {
                               const [custRows] = await db.execute(

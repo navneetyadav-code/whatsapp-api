@@ -166,11 +166,15 @@ export function detectFrustrationAndEscalation(text) {
   const signals = [];
   let score = 0;
 
-  // 1. Explicit human handoff keywords
+  // 1. Explicit human handoff intent phrases (requires explicit handoff intent, not bare generic words like "person" or "agent")
   const HUMAN_KEYWORDS = [
-    'human', 'agent', 'support team', 'representative', 'customer service',
-    'person', 'operator', 'talk to someone', 'talk to agent', 'speak to human',
-    'real person', 'executive', 'manager', 'boss', 'advisor', 'insaan', 'kisi se baat', 'transfer', 'tranfer', 'call transfer', 'human agent', 'connect me', 'call lagao', 'baat karao', 'phone pe baat', 'real human'
+    'talk to human', 'speak to human', 'human agent', 'real human', 'need a human', 'want a human', 'human support',
+    'talk to a person', 'speak to a person', 'real person', 'actual person', 'need a person', 'live person',
+    'talk to agent', 'speak to agent', 'connect to agent', 'connect me to an agent', 'live agent', 'human representative',
+    'support team', 'customer service representative', 'customer care',
+    'talk to someone', 'speak to someone', 'talk to operator', 'speak to operator',
+    'transfer to human', 'call transfer', 'transfer me', 'talk to manager', 'speak to manager',
+    'insaan se baat', 'kisi se baat', 'baat karao', 'call lagao', 'phone pe baat'
   ];
   for (const kw of HUMAN_KEYWORDS) {
     const regex = new RegExp(`\\b${kw}\\b`, 'i');
