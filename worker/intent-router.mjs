@@ -136,7 +136,7 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
       case 'email_draft':
         activeToolSlugs.add('draft_email');
         skillDirectives.push(
-          `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• To email anyone, you MUST call draft_email.\n• Present the recipient, subject, and body clearly to Boss.\n• ALWAYS prompt Boss: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim the email is sent until confirmation succeeds.`
+          `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• Call draft_email with to, subject, body. Prompt: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim email is sent until confirm_action succeeds.\n• RECIPIENT RULES:\n  - If Boss says "to me" or asks for a report, recipient MUST be: info.assistgroupofficial@gmail.com.\n  - NEVER invent synthetic domain emails (e.g. <name>@assistgroup.com).\n  - Boss is Ankit (info.assistgroupofficial@gmail.com); Ankush is a team collaborator (ankushkumary113@gmail.com).`
         );
         break;
 

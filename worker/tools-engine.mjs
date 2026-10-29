@@ -369,10 +369,19 @@ export async function sendNodeSmtpEmail({ to, subject, body, cc }) {
  */
 export async function handleDraftEmail(args, context) {
   const { db, userId, conversationId } = context;
-  const to = String(args.to || '').trim();
+  let to = String(args.to || '').trim();
   const subject = String(args.subject || '').trim();
   const body = String(args.body || '').trim();
   const cc = args.cc ? String(args.cc).trim() : null;
+
+  // Resolve Boss's verified primary email fallback
+  const bossPrimaryEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'info.assistgroupofficial@gmail.com';
+
+  // Automatically correct recipient if user requested to send to self or if LLM hallucinated a synthetic domain email
+  const lowerTo = to.toLowerCase();
+  if (!to || ['me', 'myself', 'boss', 'admin', 'self', 'ankit', 'to me', 'detach to me', 'send to me'].includes(lowerTo) || lowerTo.endsWith('@assistgroup.com') || lowerTo.endsWith('@assistgroup.gt.tc')) {
+    to = bossPrimaryEmail;
+  }
 
   if (!to || !to.includes('@')) {
     return { error: 'Invalid recipient email address. Please specify a valid email (e.g. name@domain.com).' };
@@ -702,7 +711,8 @@ async function resolveProxyCookie(targetUrl) {
     const testRes = await fetch(targetUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
-      }
+      },
+      signal: AbortSignal.timeout(4000)
     });
     const html = await testRes.text();
     const regex = /var\s+a=toNumbers\("([0-9a-fA-F]+)"\),\s*b=toNumbers\("([0-9a-fA-F]+)"\),\s*c=toNumbers\("([0-9a-fA-F]+)"\)/;
@@ -887,9 +897,12 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
       data: data.data || data
     };
   } catch (err) {
+    const isTimeout = err.name === 'TimeoutError' || (err.message && err.message.includes('timeout'));
+    const isConnect = err.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' || (err.cause?.message && err.cause.message.includes('Timeout'));
+    const detail = (isTimeout || isConnect) ? 'Server connection timed out (host assistgroup.gt.tc is unreachable)' : (err.cause?.message || err.message);
     return {
       success: false,
-      error: `Production API request failed: ${err.message}`
+      error: `Production API request failed: ${detail}`
     };
   }
 }
