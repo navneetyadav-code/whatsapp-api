@@ -652,18 +652,10 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($category === 'shared_env_api') {
         $executionConfig = [
-            'active_env' => ($_POST['shared_active_env'] ?? 'local') === 'live' ? 'live' : 'local',
-            'environments' => [
-                'local' => [
-                    'base_url' => trim((string) ($_POST['shared_local_url'] ?? 'http://localhost/api/v1')),
-                    'bearer_token' => trim((string) ($_POST['shared_local_token'] ?? ''))
-                ],
-                'live' => [
-                    'base_url' => trim((string) ($_POST['shared_live_url'] ?? '')),
-                    'bearer_token' => trim((string) ($_POST['shared_live_token'] ?? ''))
-                ]
-            ],
-            'timeout_ms' => max(1000, min(30000, (int) ($_POST['shared_timeout_ms'] ?? 6000)))
+            'active_env' => 'production',
+            'base_url' => trim((string) ($_POST['shared_live_url'] ?? '')),
+            'bearer_token' => trim((string) ($_POST['shared_live_token'] ?? '')),
+            'timeout_ms' => max(1000, min(30000, (int) ($_POST['shared_timeout_ms'] ?? 8000)))
         ];
     } elseif ($category === 'webhook') {
         $executionConfig = [

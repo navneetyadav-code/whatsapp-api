@@ -595,7 +595,7 @@
                     Normal REST APIs
                 </button>
                 <button type="button" onclick="filterTools('shared_env_api', this)" class="tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
-                    Dual-Env Shared APIs
+                    Production APIs
                 </button>
                 <button type="button" onclick="filterTools('webhook', this)" class="tool-cat-btn px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all">
                     Webhooks
@@ -618,7 +618,7 @@
                         <div class="flex items-start justify-between gap-3 mb-2.5">
                             <div class="flex items-center gap-2">
                                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider <?= $cat === 'rest_api' ? 'bg-sky-50 text-sky-700 border border-sky-200' : ($cat === 'shared_env_api' ? 'bg-purple-50 text-purple-700 border border-purple-200' : ($cat === 'webhook' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-700 border border-slate-200')) ?>">
-                                    <?= $cat === 'rest_api' ? 'Normal REST' : ($cat === 'shared_env_api' ? 'Shared Dual-Env' : ($cat === 'webhook' ? 'Webhook' : 'Built-in')) ?>
+                                    <?= $cat === 'rest_api' ? 'Normal REST' : ($cat === 'shared_env_api' ? 'Production API' : ($cat === 'webhook' ? 'Webhook' : 'Built-in')) ?>
                                 </span>
                             </div>
 
@@ -646,11 +646,9 @@
                                     <span class="text-slate-600 font-mono truncate" title="<?= e($tool['execution_config']['url'] ?? '') ?>"><?= e($tool['execution_config']['url'] ?? '') ?></span>
                                 </div>
                             <?php elseif ($cat === 'shared_env_api'): ?>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-slate-500">Active Env:</span>
-                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold font-mono <?= ($tool['execution_config']['active_env'] ?? 'local') === 'live' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' ?>">
-                                        <?= strtoupper($tool['execution_config']['active_env'] ?? 'local') ?>
-                                    </span>
+                                <div class="flex items-center gap-1.5 text-slate-600 font-mono text-[11px] truncate">
+                                    <span class="px-1.5 py-0.2 rounded font-bold font-mono text-[9px] bg-emerald-100 text-emerald-800">PROD</span>
+                                    <span class="truncate" title="<?= e($tool['execution_config']['base_url'] ?? $tool['execution_config']['environments']['live']['base_url'] ?? '') ?>"><?= e($tool['execution_config']['base_url'] ?? $tool['execution_config']['environments']['live']['base_url'] ?? 'Production API') ?></span>
                                 </div>
                             <?php elseif ($cat === 'webhook'): ?>
                                 <div class="truncate text-slate-600 font-mono">
@@ -779,7 +777,7 @@
                         <label class="block text-xs font-bold text-slate-700 mb-1">Integration Category *</label>
                         <select name="category" id="modalCategory" onchange="toggleCategoryFields(this.value)" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
                             <option value="rest_api">Normal REST API (Single Endpoint)</option>
-                            <option value="shared_env_api">Shared Hosting Dual-Environment (Local vs Live)</option>
+                            <option value="shared_env_api">Production API (Action Routes & Bearer Auth)</option>
                             <option value="webhook">Outbound Webhook</option>
                             <option value="builtin">Built-in Utility</option>
                         </select>
@@ -828,38 +826,24 @@
                     </div>
                 </div>
 
-                <!-- CATEGORY FIELDS: SHARED HOSTING DUAL-ENV -->
+                <!-- CATEGORY FIELDS: PRODUCTION API -->
                 <div id="fieldsSharedEnv" class="space-y-3 p-3.5 bg-purple-50/50 rounded-xl border border-purple-200 hidden">
                     <div class="flex items-center justify-between">
-                        <div class="text-xs font-bold text-purple-950">🏢 Shared Hosting Dual-Environment Configuration</div>
-                        <div class="flex items-center gap-2">
-                            <label class="text-[11px] font-bold text-slate-700">Active:</label>
-                            <label class="inline-flex items-center gap-1 text-[11px] font-mono">
-                                <input type="radio" name="shared_active_env" value="local" id="modalEnvLocal" checked> Local
-                            </label>
-                            <label class="inline-flex items-center gap-1 text-[11px] font-mono">
-                                <input type="radio" name="shared_active_env" value="live" id="modalEnvLive"> Live
-                            </label>
+                        <div class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+                            <span>🏢</span> Production API Configuration
                         </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-100 text-emerald-800">
+                            PRODUCTION ONLY
+                        </span>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Localhost Base URL</label>
-                            <input type="text" name="shared_local_url" id="modalSharedLocalUrl" placeholder="http://localhost/assistgroup/api/admin/v1" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Production Base URL *</label>
+                            <input type="text" name="shared_live_url" id="modalSharedLiveUrl" placeholder="https://assistgroup.gt.tc/api/admin/v1" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Localhost Bearer Token</label>
-                            <input type="password" name="shared_local_token" id="modalSharedLocalToken" placeholder="ast_live_..." class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Live Shared Hosting Base URL</label>
-                            <input type="text" name="shared_live_url" id="modalSharedLiveUrl" placeholder="https://assistgroup.gt.tc/api/admin/v1" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Live Shared Hosting Bearer Token</label>
-                            <input type="password" name="shared_live_token" id="modalSharedLiveToken" placeholder="ast_live_..." class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
+                            <label class="block text-[11px] font-bold text-slate-600 mb-1">Production Bearer Token / API Key</label>
+                            <input type="password" name="shared_live_token" id="modalSharedLiveToken" placeholder="ast_live_..." class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500">
                         </div>
                     </div>
                 </div>
@@ -1108,15 +1092,8 @@
                 document.getElementById('modalRestAuth').value = tool.execution_config?.headers?.Authorization || '';
                 document.getElementById('modalRestPath').value = tool.execution_config?.response_path || '';
             } else if (tool.category === 'shared_env_api') {
-                const activeEnv = tool.execution_config?.active_env || 'local';
-                const elLoc = document.getElementById('modalEnvLocal');
-                const elLiv = document.getElementById('modalEnvLive');
-                if (elLoc) elLoc.checked = activeEnv === 'local';
-                if (elLiv) elLiv.checked = activeEnv === 'live';
-                document.getElementById('modalSharedLocalUrl').value = tool.execution_config?.environments?.local?.base_url || '';
-                document.getElementById('modalSharedLocalToken').value = tool.execution_config?.environments?.local?.bearer_token || '';
-                document.getElementById('modalSharedLiveUrl').value = tool.execution_config?.environments?.live?.base_url || '';
-                document.getElementById('modalSharedLiveToken').value = tool.execution_config?.environments?.live?.bearer_token || '';
+                document.getElementById('modalSharedLiveUrl').value = tool.execution_config?.base_url || tool.execution_config?.environments?.live?.base_url || tool.execution_config?.environments?.production?.base_url || '';
+                document.getElementById('modalSharedLiveToken').value = tool.execution_config?.bearer_token || tool.execution_config?.environments?.live?.bearer_token || tool.execution_config?.environments?.production?.bearer_token || '';
             } else if (tool.category === 'webhook') {
                 document.getElementById('modalWebhookUrl').value = tool.execution_config?.target_url || '';
             }
@@ -1189,13 +1166,12 @@
         window.loadPresetSharedEnv = function() {
             closePresetsModal();
             openAddToolModal();
-            document.getElementById('modalToolSlug').value = 'custom_shared_crm';
-            document.getElementById('modalDisplayName').value = '🏢 Custom Shared Hosting Backend';
+            document.getElementById('modalToolSlug').value = 'custom_production_api';
+            document.getElementById('modalDisplayName').value = '🏢 Custom Production Backend';
             document.getElementById('modalCategory').value = 'shared_env_api';
-            document.getElementById('modalDescription').value = 'Connects to your custom PHP/cPanel shared hosting backend or local development API.';
+            document.getElementById('modalDescription').value = 'Connects to your custom production backend API with dynamic action routes.';
             toggleCategoryFields('shared_env_api');
-            document.getElementById('modalSharedLocalUrl').value = 'http://localhost/myproject/api/v1';
-            document.getElementById('modalSharedLiveUrl').value = 'https://myproject.com/api/v1';
+            document.getElementById('modalSharedLiveUrl').value = 'https://api.myproject.com/v1';
             addParameterRow('action', 'STRING', 'Endpoint action to perform', true);
         };
 

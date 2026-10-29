@@ -4,18 +4,10 @@ require_once __DIR__ . '/../src/bootstrap.php';
 $pdo = Database::pdo();
 
 $executionConfig = [
-    'active_env' => 'local',
-    'timeout_ms' => 8000,
-    'environments' => [
-        'live' => [
-            'base_url' => 'https://assistgroup.gt.tc/api/admin/v1',
-            'bearer_token' => 'ast_live_99584846bd475b06705f88383b0b523e5a50f18b744729376e1501ca3320645f'
-        ],
-        'local' => [
-            'base_url' => 'http://localhost/assistgroup/api/admin/v1',
-            'bearer_token' => 'ast_live_99584846bd475b06705f88383b0b523e5a50f18b744729376e1501ca3320645f'
-        ]
-    ],
+    'active_env' => 'production',
+    'base_url' => 'https://assistgroup.gt.tc/api/admin/v1',
+    'bearer_token' => 'ast_live_99584846bd475b06705f88383b0b523e5a50f18b744729376e1501ca3320645f',
+    'timeout_ms' => 12000,
     'aliases' => [
         'metrics' => 'dashboard_metrics',
         'stats' => 'dashboard_metrics',
@@ -122,4 +114,4 @@ $stmt->execute([
     'assistgroup_crm'
 ]);
 
-echo "Successfully updated assistgroup_crm with config-driven action_routes!" . PHP_EOL;
+echo "Successfully updated assistgroup_crm: PRODUCTION ONLY! (Local development support removed)" . PHP_EOL;

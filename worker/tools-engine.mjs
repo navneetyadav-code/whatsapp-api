@@ -430,18 +430,69 @@ async function executeCustomRestApi(executionConfig, args = {}) {
   }
 }
 
+// Anti-bot / reverse-proxy AES challenge solver cache for production endpoints
+const sharedCookieJar = new Map();
+
+async function resolveProxyCookie(targetUrl) {
+  try {
+    const domain = new URL(targetUrl).hostname;
+    const cached = sharedCookieJar.get(domain);
+    if (cached && Date.now() < cached.expires) {
+      return cached.cookie;
+    }
+
+    const testRes = await fetch(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+      }
+    });
+    const html = await testRes.text();
+    const regex = /var\s+a=toNumbers\("([0-9a-fA-F]+)"\),\s*b=toNumbers\("([0-9a-fA-F]+)"\),\s*c=toNumbers\("([0-9a-fA-F]+)"\)/;
+    const match = html.match(regex);
+    if (!match) return null;
+
+    const key = Buffer.from(match[1], 'hex');
+    const iv = Buffer.from(match[2], 'hex');
+    const ciphertext = Buffer.from(match[3], 'hex');
+    const decipher = crypto.createDecipheriv('aes-128-cbc', key, iv);
+    decipher.setAutoPadding(false);
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    const cookieValue = decrypted.toString('hex');
+
+    const activateUrl = targetUrl.includes('?') ? `${targetUrl}&i=1` : `${targetUrl}?i=1`;
+    await fetch(activateUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Cookie': `__test=${cookieValue}`
+      }
+    }).catch(() => {});
+
+    sharedCookieJar.set(domain, {
+      cookie: cookieValue,
+      expires: Date.now() + 5 * 3600 * 1000
+    });
+    return cookieValue;
+  } catch (err) {
+    return null;
+  }
+}
+
 /**
- * Executes a Dual-Environment Shared Hosting API
+ * Executes a Production Shared API (Config-driven Action Routes)
  */
 async function executeSharedEnvApi(executionConfig, args = {}) {
-  const activeEnv = executionConfig.active_env || 'local';
-  const envData = executionConfig.environments?.[activeEnv] || {};
-
-  const baseUrl = envData.base_url || '';
-  const token = envData.bearer_token || '';
+  // Production-only resolution: direct base_url or production/live environment
+  const baseUrl = executionConfig.base_url
+    || executionConfig.environments?.production?.base_url
+    || executionConfig.environments?.live?.base_url
+    || '';
+  const token = executionConfig.bearer_token
+    || executionConfig.environments?.production?.bearer_token
+    || executionConfig.environments?.live?.bearer_token
+    || '';
 
   if (!baseUrl) {
-    return { error: `Base URL is not configured for active environment: ${activeEnv}` };
+    return { error: 'Production Base URL is not configured in tool execution settings.' };
   }
 
   // Determine endpoint, method, and payload from dynamic action_routes or fallback executionConfig
@@ -518,18 +569,19 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
 
   const headers = {
     'Accept': 'application/json',
-    'User-Agent': 'WhatsGateway-DualEnv-Engine/3.0',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
     ...(executionConfig.headers || {})
   };
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+    headers['X-API-KEY'] = token;
   }
 
   const reqOptions = {
     method,
     headers,
-    signal: AbortSignal.timeout(executionConfig.timeout_ms || 8000)
+    signal: AbortSignal.timeout(executionConfig.timeout_ms || 12000)
   };
 
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
@@ -538,27 +590,48 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
   }
 
   try {
-    const res = await fetch(finalUrl, reqOptions);
-    const data = await res.json().catch(() => null);
+    const testCookie = await resolveProxyCookie(finalUrl);
+    if (testCookie) {
+      headers['Cookie'] = `__test=${testCookie}`;
+    }
+
+    let res = await fetch(finalUrl, reqOptions);
+    let rawText = await res.text();
+    let data = null;
+
+    if (rawText.includes('toNumbers') && rawText.includes('slowAES')) {
+      const solved = await resolveProxyCookie(finalUrl);
+      if (solved) {
+        headers['Cookie'] = `__test=${solved}`;
+        res = await fetch(finalUrl, reqOptions);
+        rawText = await res.text();
+      }
+    }
+
+    try {
+      data = JSON.parse(rawText);
+    } catch (e) {
+      data = null;
+    }
 
     if (!res.ok || !data) {
       return {
         status: res.status,
         success: false,
-        error: data?.error || `Dual-env API returned status ${res.status}`
+        error: data?.error || `Production API returned status ${res.status}: ${rawText.slice(0, 150)}`
       };
     }
 
     return {
       status: res.status,
       success: true,
-      environment: activeEnv,
+      environment: 'production',
       data: data.data || data
     };
   } catch (err) {
     return {
       success: false,
-      error: `Dual-env API request failed (${activeEnv}): ${err.message}`
+      error: `Production API request failed: ${err.message}`
     };
   }
 }
