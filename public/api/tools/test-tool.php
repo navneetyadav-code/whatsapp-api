@@ -65,17 +65,41 @@ if ($category === 'rest_api') {
     if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
         $bodyData = $args;
-        if (!empty($executionConfig['body_template']) && is_array($executionConfig['body_template'])) {
-            $bodyData = $executionConfig['body_template'];
-            array_walk_recursive($bodyData, function (&$val) use ($args) {
-                if (is_string($val) && preg_match('/^\{([a-zA-Z0-9_]+)\}$/', $val, $m)) {
-                    $val = $args[$m[1]] ?? $val;
-                }
-            });
+        $rawTemplate = $executionConfig['body_template'] ?? null;
+        if (is_string($rawTemplate)) {
+            $decodedTpl = json_decode($rawTemplate, true);
+            $rawTemplate = (json_last_error() === JSON_ERROR_NONE) ? $decodedTpl : $rawTemplate;
         }
-        $formattedHeaders[] = 'Content-Type: application/json';
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $formattedHeaders);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($bodyData));
+
+        if (!empty($rawTemplate)) {
+            if (is_array($rawTemplate)) {
+                $bodyData = $rawTemplate;
+                array_walk_recursive($bodyData, function (&$val) use ($args) {
+                    if (is_string($val)) {
+                        foreach ($args as $ak => $av) {
+                            if ($val === '{' . $ak . '}') {
+                                $val = $av;
+                                return;
+                            }
+                            if (str_contains($val, '{' . $ak . '}')) {
+                                $val = str_replace('{' . $ak . '}', is_scalar($av) ? (string) $av : '', $val);
+                            }
+                        }
+                    }
+                });
+            } else {
+                $bodyData = (string) $rawTemplate;
+                foreach ($args as $ak => $av) {
+                    $bodyData = str_replace('{' . $ak . '}', is_scalar($av) ? (string) $av : '', (string) $bodyData);
+                }
+            }
+        }
+
+        if (!isset($headers['Content-Type']) && !isset($headers['content-type'])) {
+            $formattedHeaders[] = 'Content-Type: application/json';
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $formattedHeaders);
+        }
+        curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($bodyData) ? json_encode($bodyData) : (string) $bodyData);
     }
 
     $responseBody = curl_exec($ch);

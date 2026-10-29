@@ -648,8 +648,35 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             'timeout_ms' => max(1000, min(30000, (int) ($_POST['rest_timeout_ms'] ?? 5000))),
             'response_path' => trim((string) ($_POST['rest_response_path'] ?? ''))
         ];
+
+        // Process custom headers (JSON string or associative array)
+        $rawHeaders = $_POST['headers_json'] ?? $_POST['rest_headers'] ?? null;
+        if (!empty($rawHeaders)) {
+            $parsedHeaders = is_string($rawHeaders) ? json_decode($rawHeaders, true) : $rawHeaders;
+            if (is_array($parsedHeaders)) {
+                $executionConfig['headers'] = array_merge($executionConfig['headers'], $parsedHeaders);
+            }
+        }
+
+        // Process Authorization header
         if (!empty($_POST['rest_auth_header'])) {
             $executionConfig['headers']['Authorization'] = trim((string) $_POST['rest_auth_header']);
+        }
+
+        // Process Request Body Template (JSON string or array)
+        $rawBodyTemplate = $_POST['body_template'] ?? $_POST['rest_body_template'] ?? null;
+        if (!empty($rawBodyTemplate)) {
+            if (is_string($rawBodyTemplate)) {
+                $decoded = json_decode($rawBodyTemplate, true);
+                $executionConfig['body_template'] = (json_last_error() === JSON_ERROR_NONE) ? $decoded : $rawBodyTemplate;
+            } elseif (is_array($rawBodyTemplate)) {
+                $executionConfig['body_template'] = $rawBodyTemplate;
+            }
+        }
+
+        // Ensure Content-Type is set for write requests
+        if (in_array($executionConfig['method'], ['POST', 'PUT', 'PATCH'], true) && !isset($executionConfig['headers']['Content-Type'])) {
+            $executionConfig['headers']['Content-Type'] = 'application/json';
         }
     } elseif ($category === 'shared_env_api') {
         $executionConfig = [
@@ -668,6 +695,19 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $executionConfig = [
             'handler' => $toolSlug
         ];
+    }
+
+    // Preserve existing body_template if editing tool and body_template was not resubmitted
+    if ($toolId > 0 && empty($executionConfig['body_template'])) {
+        $existingStmt = $pdo->prepare('SELECT execution_config FROM ai_custom_tools WHERE id = ? AND user_id = ? LIMIT 1');
+        $existingStmt->execute([$toolId, $userId]);
+        $existingRow = $existingStmt->fetch();
+        if ($existingRow && !empty($existingRow['execution_config'])) {
+            $existingConfig = json_decode($existingRow['execution_config'], true);
+            if (is_array($existingConfig) && !empty($existingConfig['body_template'])) {
+                $executionConfig['body_template'] = $existingConfig['body_template'];
+            }
+        }
     }
 
     $rbacRoles = isset($_POST['roles']) && is_array($_POST['roles']) ? $_POST['roles'] : ['guest', 'customer', 'admin'];

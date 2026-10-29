@@ -11,7 +11,7 @@ class CurlImporter
     {
         // Normalize line continuations (\ or ^) and excessive whitespace
         $clean = preg_replace('/[\\^]\r?\n\s*/', ' ', $raw);
-        $clean = trim(preg_replace('/\s+/', ' ', (string) $clean));
+        $clean = trim((string) preg_replace('/\s+/', ' ', (string) $clean));
 
         if (!preg_match('/\bcurl\b/i', $clean)) {
             return null;
@@ -66,6 +66,7 @@ class CurlImporter
         // Generate clean tool slug candidate
         $pathSegments = array_values(array_filter(explode('/', $path)));
         $lastSegment = end($pathSegments) ?: 'endpoint';
+        $lastSegment = preg_replace('/\.php$/i', '', $lastSegment); // strip .php extension
         $slugCandidate = strtolower((string) preg_replace('/[^a-z0-9_]/', '_', $lastSegment));
         if (strlen($slugCandidate) < 3) {
             $slugCandidate = 'call_' . strtolower((string) preg_replace('/[^a-z0-9_]/', '_', explode('.', $host)[0]));
@@ -78,6 +79,7 @@ class CurlImporter
 
         // 6. Parameter Extraction & URL Template Formulation
         $parameters = [];
+        $usedParamNames = [];
         $templateUrl = $url;
 
         // Process URL Query Parameters
@@ -85,7 +87,8 @@ class CurlImporter
             parse_str($query, $queryParams);
             $cleanQueryParts = [];
             foreach ($queryParams as $qKey => $qVal) {
-                $paramKey = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) $qKey));
+                $paramKey = self::generateParamName((string) $qKey, $usedParamNames);
+                $usedParamNames[$paramKey] = true;
                 $parameters[] = [
                     'name' => $paramKey,
                     'type' => is_numeric($qVal) ? 'NUMBER' : 'STRING',
@@ -102,22 +105,30 @@ class CurlImporter
         $bodyTemplate = null;
         if ($body !== null) {
             $decodedBody = json_decode($body, true);
-            if (is_array($decodedBody)) {
-                $bodyTemplate = [];
-                foreach ($decodedBody as $bKey => $bVal) {
-                    $paramKey = preg_replace('/[^a-z0-9_]/', '_', strtolower((string) $bKey));
-                    $paramType = 'STRING';
-                    if (is_int($bVal)) $paramType = 'INTEGER';
-                    elseif (is_float($bVal) || is_numeric($bVal)) $paramType = 'NUMBER';
-                    elseif (is_bool($bVal)) $paramType = 'BOOLEAN';
-
-                    $parameters[] = [
-                        'name' => $paramKey,
-                        'type' => $paramType,
-                        'description' => "Payload field '{$bKey}'",
-                        'required' => true,
-                    ];
-                    $bodyTemplate[$bKey] = '{' . $paramKey . '}';
+            if (json_last_error() === JSON_ERROR_NONE && (is_array($decodedBody) || is_scalar($decodedBody))) {
+                // Recursive traversal preserving nested objects and static constants
+                $bodyTemplate = self::processJsonNode($decodedBody, '', $parameters, $usedParamNames);
+                if (!isset($headers['Content-Type']) && !isset($headers['content-type'])) {
+                    $headers['Content-Type'] = 'application/json';
+                }
+            } else {
+                // Non-JSON (e.g. form-urlencoded or raw text)
+                parse_str($body, $formBody);
+                if (is_array($formBody) && !empty($formBody) && count($formBody) > 1) {
+                    $bodyTemplate = [];
+                    foreach ($formBody as $fKey => $fVal) {
+                        $paramKey = self::generateParamName((string) $fKey, $usedParamNames);
+                        $usedParamNames[$paramKey] = true;
+                        $parameters[] = [
+                            'name' => $paramKey,
+                            'type' => is_numeric($fVal) ? 'NUMBER' : 'STRING',
+                            'description' => "Payload field '{$fKey}'" . ($fVal !== '' ? " (sample: {$fVal})" : ''),
+                            'required' => true,
+                        ];
+                        $bodyTemplate[$fKey] = '{' . $paramKey . '}';
+                    }
+                } else {
+                    $bodyTemplate = $body;
                 }
             }
         }
@@ -137,5 +148,125 @@ class CurlImporter
             'parameters' => $parameters,
             'rbac_roles' => ['guest', 'customer', 'admin']
         ];
+    }
+
+    /**
+     * Recursively traverses a JSON payload to extract dynamic parameters
+     * while preserving nested structure and static constants in body_template.
+     */
+    private static function processJsonNode(mixed $node, string $parentKey, array &$parameters, array &$usedParamNames): mixed
+    {
+        if (is_array($node)) {
+            $isAssoc = array_keys($node) !== range(0, count($node) - 1);
+            $processed = [];
+            foreach ($node as $key => $val) {
+                if ($isAssoc) {
+                    $processed[$key] = self::processJsonNode($val, (string) $key, $parameters, $usedParamNames);
+                } else {
+                    $processed[] = self::processJsonNode($val, $parentKey, $parameters, $usedParamNames);
+                }
+            }
+            return $processed;
+        }
+
+        // Check if value is a static constant/protocol flag
+        if (self::isStaticConstant($parentKey, $node)) {
+            return $node;
+        }
+
+        // Treat as a dynamic parameter
+        $paramName = self::generateParamName($parentKey, $usedParamNames);
+        $usedParamNames[$paramName] = true;
+
+        $paramType = 'STRING';
+        if (is_int($node)) {
+            $paramType = 'INTEGER';
+        } elseif (is_float($node)) {
+            $paramType = 'NUMBER';
+        } elseif (is_bool($node)) {
+            $paramType = 'BOOLEAN';
+        }
+
+        $desc = "Payload field '{$parentKey}'";
+        $lowerKey = strtolower($parentKey);
+        if (in_array($lowerKey, ['to', 'recipient', 'phone', 'phone_number', 'mobile', 'wa_id'], true)) {
+            $desc = "Recipient phone number with country code" . (is_scalar($node) && $node !== '' ? " (sample: {$node})" : '');
+        } elseif (in_array($lowerKey, ['body', 'message', 'content', 'text', 'caption'], true)) {
+            $desc = "Message text content to be sent";
+        } elseif (is_scalar($node) && $node !== '') {
+            $desc .= " (sample: {$node})";
+        }
+
+        $parameters[] = [
+            'name' => $paramName,
+            'type' => $paramType,
+            'description' => $desc,
+            'required' => true,
+        ];
+
+        return '{' . $paramName . '}';
+    }
+
+    /**
+     * Identifies static API protocol flags and configuration constants that
+     * must remain fixed literals in the body_template rather than dynamic parameters.
+     */
+    private static function isStaticConstant(string $key, mixed $val): bool
+    {
+        $k = strtolower(trim($key));
+
+        // Booleans are almost universally static configuration flags in REST payloads (e.g., preview_url: false)
+        if (is_bool($val)) {
+            return true;
+        }
+
+        // Null is not parameterized
+        if ($val === null) {
+            return true;
+        }
+
+        // Known static protocol / platform keys
+        $knownStaticKeys = [
+            'messaging_product',
+            'recipient_type',
+            'grant_type',
+            'response_type',
+            'version',
+            'api_version',
+            'format',
+            'mode'
+        ];
+        if (in_array($k, $knownStaticKeys, true)) {
+            return true;
+        }
+
+        // Message or object discriminator types (e.g. "type": "text", "object": "page")
+        if (($k === 'type' || $k === 'object') && is_string($val) && in_array(strtolower($val), [
+            'text', 'template', 'image', 'document', 'audio', 'video', 
+            'interactive', 'location', 'contacts', 'page', 'event', 'object', 'notification'
+        ], true)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Generates a safe, collision-free parameter identifier while preserving
+     * the exact field name whenever possible.
+     */
+    private static function generateParamName(string $key, array $usedParamNames): string
+    {
+        $base = strtolower((string) preg_replace('/[^a-z0-9_]/', '_', trim($key)));
+        if ($base === '' || is_numeric($base[0])) {
+            $base = 'param_' . $base;
+        }
+        $candidate = $base;
+        $counter = 2;
+        while (isset($usedParamNames[$candidate])) {
+            $candidate = $base . '_' . $counter;
+            $counter++;
+        }
+        return $candidate;
     }
 }

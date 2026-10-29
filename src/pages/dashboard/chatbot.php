@@ -828,6 +828,11 @@
                             <input type="text" name="rest_response_path" id="modalRestPath" placeholder="e.g. current or data.results" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg">
                         </div>
                     </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Request Body Template (JSON for POST/PUT/PATCH)</label>
+                        <textarea name="rest_body_template" id="modalRestBodyTemplate" rows="4" placeholder='{ "messaging_product": "whatsapp", "recipient_type": "individual", "to": "{to}", "type": "text", "text": { "preview_url": false, "body": "{body}" } }' class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg resize-y"></textarea>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Retains exact nested JSON payloads & protocol constants. Dynamic values match {param} tags.</p>
+                    </div>
                 </div>
 
                 <!-- CATEGORY FIELDS: PRODUCTION API -->
@@ -1133,6 +1138,10 @@ Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captu
                         <span id="resUrl" class="text-slate-700 break-all">https://api.example.com/...</span>
                     </div>
                     <div id="resHeadersBox" class="text-[11px] text-slate-500 truncate"></div>
+                    <div id="resBodyTemplateBox" class="text-[11px] text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 font-mono hidden">
+                        <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Payload Body Template:</div>
+                        <pre id="resBodyTemplatePre" class="whitespace-pre-wrap max-h-36 overflow-y-auto text-[11px] text-slate-800"></pre>
+                    </div>
                 </div>
 
                 <!-- Dynamic Parameters Table -->
@@ -1292,6 +1301,7 @@ Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captu
             document.getElementById('modalRestUrl').value = '';
             document.getElementById('modalRestAuth').value = '';
             document.getElementById('modalRestPath').value = '';
+            document.getElementById('modalRestBodyTemplate').value = '';
             document.getElementById('parameterRowsContainer').innerHTML = '';
             toggleCategoryFields('rest_api');
             document.getElementById('customToolModal').classList.remove('hidden');
@@ -1322,6 +1332,13 @@ Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captu
                 document.getElementById('modalRestUrl').value = tool.execution_config?.url || '';
                 document.getElementById('modalRestAuth').value = tool.execution_config?.headers?.Authorization || '';
                 document.getElementById('modalRestPath').value = tool.execution_config?.response_path || '';
+                if (tool.execution_config?.body_template) {
+                    document.getElementById('modalRestBodyTemplate').value = typeof tool.execution_config.body_template === 'string'
+                        ? tool.execution_config.body_template
+                        : JSON.stringify(tool.execution_config.body_template, null, 2);
+                } else {
+                    document.getElementById('modalRestBodyTemplate').value = '';
+                }
             } else if (tool.category === 'shared_env_api') {
                 document.getElementById('modalSharedLiveUrl').value = tool.execution_config?.base_url || tool.execution_config?.environments?.live?.base_url || tool.execution_config?.environments?.production?.base_url || '';
                 document.getElementById('modalSharedLiveToken').value = tool.execution_config?.bearer_token || tool.execution_config?.environments?.live?.bearer_token || tool.execution_config?.environments?.production?.bearer_token || '';
@@ -1493,6 +1510,16 @@ Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captu
                 hBox.classList.add('hidden');
             }
 
+            const bBox = document.getElementById('resBodyTemplateBox');
+            if (exec.body_template) {
+                document.getElementById('resBodyTemplatePre').textContent = typeof exec.body_template === 'string'
+                    ? exec.body_template
+                    : JSON.stringify(exec.body_template, null, 2);
+                bBox.classList.remove('hidden');
+            } else {
+                bBox.classList.add('hidden');
+            }
+
             const params = Array.isArray(tool.parameters) ? tool.parameters : [];
             document.getElementById('resParamCount').textContent = params.length;
 
@@ -1532,16 +1559,17 @@ Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captu
             const sampleArgs = {};
             const params = Array.isArray(currentGeneratedTool.parameters) ? currentGeneratedTool.parameters : [];
             params.forEach(p => {
-                const k = p.name || '';
-                if (k.includes('lat')) sampleArgs[k] = 25.5941;
-                else if (k.includes('lon')) sampleArgs[k] = 85.1376;
-                else if (k.includes('city') || k === 'q') sampleArgs[k] = 'Patna';
-                else if (k.includes('order')) sampleArgs[k] = 'ORD-98765';
-                else if (k.includes('waybill') || k.includes('awb')) sampleArgs[k] = '9876543210';
-                else if (k.includes('payment') || k.includes('pay_')) sampleArgs[k] = 'pay_test123';
-                else if (k.includes('phone')) sampleArgs[k] = '919507286092';
-                else if (k.includes('action')) sampleArgs[k] = 'system';
-                else sampleArgs[k] = 'test_value';
+                const k = (p.name || '').toLowerCase();
+                if (k.includes('lat')) sampleArgs[p.name] = 25.5941;
+                else if (k.includes('lon')) sampleArgs[p.name] = 85.1376;
+                else if (k.includes('city') || k === 'q') sampleArgs[p.name] = 'Patna';
+                else if (k.includes('order')) sampleArgs[p.name] = 'ORD-98765';
+                else if (k.includes('waybill') || k.includes('awb')) sampleArgs[p.name] = '9876543210';
+                else if (k.includes('payment') || k.includes('pay_')) sampleArgs[p.name] = 'pay_test123';
+                else if (k === 'to' || k.includes('phone') || k.includes('recipient') || k.includes('mobile')) sampleArgs[p.name] = '919507286092';
+                else if (k === 'body' || k.includes('message') || k.includes('content') || k.includes('text')) sampleArgs[p.name] = 'Hello from automated AI Tool!';
+                else if (k.includes('action')) sampleArgs[p.name] = 'system';
+                else sampleArgs[p.name] = 'test_value';
             });
 
             const startTime = performance.now();
@@ -1596,6 +1624,13 @@ Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captu
                 document.getElementById('modalRestUrl').value = exec.url || '';
                 document.getElementById('modalRestAuth').value = exec.headers?.Authorization || '';
                 document.getElementById('modalRestPath').value = exec.response_path || '';
+                if (exec.body_template) {
+                    document.getElementById('modalRestBodyTemplate').value = typeof exec.body_template === 'string'
+                        ? exec.body_template
+                        : JSON.stringify(exec.body_template, null, 2);
+                } else {
+                    document.getElementById('modalRestBodyTemplate').value = '';
+                }
             } else if (currentGeneratedTool.category === 'shared_env_api') {
                 document.getElementById('modalSharedLiveUrl').value = exec.base_url || '';
                 document.getElementById('modalSharedLiveToken').value = exec.bearer_token || '';
@@ -1639,6 +1674,12 @@ Response: { &quot;id&quot;: &quot;pay_123&quot;, &quot;status&quot;: &quot;captu
                 addField('rest_url', exec.url || '');
                 if (exec.headers?.Authorization) {
                     addField('rest_auth_header', exec.headers.Authorization);
+                }
+                if (exec.headers) {
+                    addField('headers_json', typeof exec.headers === 'string' ? exec.headers : JSON.stringify(exec.headers));
+                }
+                if (exec.body_template) {
+                    addField('body_template', typeof exec.body_template === 'string' ? exec.body_template : JSON.stringify(exec.body_template));
                 }
                 addField('rest_response_path', exec.response_path || '');
             } else if (currentGeneratedTool.category === 'shared_env_api') {

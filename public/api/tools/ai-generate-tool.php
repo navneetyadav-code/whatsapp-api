@@ -82,26 +82,78 @@ You are a Principal Integration Architect & API Engineer.
 Your task is to convert the provided cURL command, API documentation, or English description into a PRODUCTION-GRADE autonomous Tool Definition for an enterprise WhatsApp AI Agent.
 
 CRITICAL REQUIREMENTS:
-1. "tool_slug": MUST be lowercase alphanumeric with underscores only (e.g. "track_order", "check_weather", "verify_payment"). Maximum 32 characters.
-2. "display_name": Engaging, professional title with a relevant leading emoji (e.g. "📦 Order Tracker", "🌤️ Live Weather Forecaster", "💳 Payment Status").
+1. "tool_slug": MUST be lowercase alphanumeric with underscores only (e.g. "send_whatsapp", "track_order", "check_weather", "verify_payment"). Maximum 32 characters.
+2. "display_name": Engaging, professional title with a relevant leading emoji (e.g. "📱 WhatsApp Message Dispatcher", "📦 Order Tracker", "💳 Payment Status").
 3. "category": Must be one of: "rest_api", "shared_env_api", "webhook". Use "rest_api" for standard endpoints, "webhook" for one-way notifications.
 4. "description": A crystal-clear instruction explaining WHEN and WHY the WhatsApp AI bot should invoke this tool, what inputs it needs from the customer, and what it returns. This text is injected directly into LLM function calling declarations.
-5. "execution_config":
+5. STRICT ZERO-RENAMING OF API CONTRACT FIELDS:
+   - You MUST NOT invent, abstract, or rename parameter fields.
+   - If the API or cURL expects "to" and "body", the tool parameters MUST be named "to" and "body" - NEVER rename them to "phone_number", "message_content", "recipient", etc.!
+   - If the API expects "order_id", use "order_id", not "tracking_no".
+6. REQUEST BODY & "body_template" FOR WRITE OPERATIONS (POST, PUT, PATCH):
+   - "execution_config.body_template" is MANDATORY whenever the endpoint receives a JSON payload.
+   - PRESERVE the exact nested JSON object/array hierarchy of the target API.
+   - Only dynamic values should be replaced with {param_name} placeholders matching your "parameters" list.
+   - Retain ALL static constants, headers, and protocol flags (e.g. "messaging_product": "whatsapp", "type": "text", "recipient_type": "individual", "preview_url": false) EXACTLY as defined in the cURL or documentation. DO NOT turn static constants into dynamic parameters!
+7. "execution_config":
    - "method": "GET" | "POST" | "PUT" | "DELETE"
-   - "url": Target URL. ANY dynamic parameter MUST be wrapped in curly braces like {order_id} or {phone_number} or {city}.
-   - "headers": Object containing needed headers (e.g. {"Accept": "application/json", "Authorization": "Bearer ..."} if provided).
+   - "url": Target URL. ANY dynamic parameter in the URL MUST be wrapped in curly braces like {order_id} or {city}.
+   - "headers": Object containing needed headers (e.g. {"Content-Type": "application/json", "Authorization": "Bearer ...", "Accept": "application/json"}).
+   - "body_template": Object/Array representing the structured JSON payload with {param_name} placeholders (for POST/PUT/PATCH), or omit/null for GET.
    - "response_path": Optional sub-property in response JSON (e.g. "data" or "results" or leave empty "").
-6. "parameters": Array of objects:
-   - "name": parameter identifier matching the {placeholder} in the URL or payload.
+8. "parameters": Array of objects:
+   - "name": EXACT parameter identifier matching the {placeholder} in the URL or body_template.
    - "type": "STRING" | "NUMBER" | "INTEGER" | "BOOLEAN"
    - "description": Clear explanation of what this input is for the AI.
    - "required": true | false
-7. "rbac_roles": Default to ["guest", "customer", "admin"]. If the tool handles private internal operations (like deleting data or viewing employee records), set to ["admin"].
+9. "rbac_roles": Default to ["guest", "customer", "admin"]. If the tool handles private internal operations (like deleting data or viewing employee records), set to ["admin"].
 
 STRICT OUTPUT FORMAT:
 Output ONLY a valid JSON object matching this schema. Do NOT enclose in markdown backticks. Do NOT write conversational filler.
 
-Example schema:
+Example 1 (POST with nested body_template):
+{
+  "tool_slug": "send_whatsapp",
+  "display_name": "📱 WhatsApp Cloud Message",
+  "category": "rest_api",
+  "description": "Sends an outbound WhatsApp text message to a specific phone number using the Meta Cloud API format.",
+  "execution_config": {
+    "method": "POST",
+    "url": "https://api.example.com/v1/messages",
+    "headers": {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer wa_live_token"
+    },
+    "body_template": {
+      "messaging_product": "whatsapp",
+      "recipient_type": "individual",
+      "to": "{to}",
+      "type": "text",
+      "text": {
+        "preview_url": false,
+        "body": "{body}"
+      }
+    },
+    "response_path": ""
+  },
+  "parameters": [
+    {
+      "name": "to",
+      "type": "STRING",
+      "description": "Recipient phone number with country code (e.g. 919876543210)",
+      "required": true
+    },
+    {
+      "name": "body",
+      "type": "STRING",
+      "description": "Message text to be sent",
+      "required": true
+    }
+  ],
+  "rbac_roles": ["guest", "customer", "admin"]
+}
+
+Example 2 (GET with query parameters):
 {
   "tool_slug": "track_shipment",
   "display_name": "📦 Shipment Tracker",
@@ -271,6 +323,17 @@ if ($aiResult !== null) {
         'parameters' => is_array($aiResult['parameters'] ?? null) ? $aiResult['parameters'] : [],
         'rbac_roles' => is_array($aiResult['rbac_roles'] ?? null) ? $aiResult['rbac_roles'] : ['guest', 'customer', 'admin']
     ];
+
+    // Guarantee baseline cURL body_template and headers if omitted by AI
+    if ($parsedCurl !== null) {
+        if (!empty($parsedCurl['execution_config']['body_template']) && empty($finalTool['execution_config']['body_template'])) {
+            $finalTool['execution_config']['body_template'] = $parsedCurl['execution_config']['body_template'];
+        }
+        if (!empty($parsedCurl['execution_config']['headers'])) {
+            $finalTool['execution_config']['headers'] = array_merge($parsedCurl['execution_config']['headers'], $finalTool['execution_config']['headers'] ?? []);
+        }
+    }
+
     $sourceType = "AI Synthesized via {$usedProvider}";
 } elseif ($parsedCurl !== null) {
     // Use high-precision deterministic cURL parser
