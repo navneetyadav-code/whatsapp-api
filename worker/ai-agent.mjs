@@ -437,42 +437,104 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 }
 
 /**
- * Call Groq API (OpenAI compatible)
+ * Call Groq API (OpenAI compatible with full Function Calling loop)
  */
-async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = []) {
-  const modelName = model || 'openai/gpt-oss-20b';
+async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
+  const modelName = model || 'openai/gpt-oss-120b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
 
   const messages = ChatMemoryEngine.buildOpenAiMessages(systemPrompt, conversationHistory, userMessage);
 
-  const payload = {
-    model: modelName,
-    messages,
-    temperature: Number(temperature) || 0.4,
-    max_tokens: Math.max(Number(maxTokens) || 1200, 800)
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(15000)
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Groq API error [${response.status}]: ${errText.slice(0, 200)}`);
+  // Compile OpenAI-compatible tools
+  let openAiTools = [];
+  let userTools = [];
+  if (toolsContext && toolsContext.userId && toolsContext.db) {
+    try {
+      userTools = toolsContext.scopedTools || await UniversalToolsRegistry.loadUserTools(toolsContext.userId, toolsContext.db);
+      const callerRole = toolsContext.callerRole || 'guest';
+      const declarations = UniversalToolsRegistry.compileDeclarationsForRole(userTools, callerRole);
+      openAiTools = declarations.map(d => ({
+        type: 'function',
+        function: {
+          name: d.name,
+          description: d.description,
+          parameters: {
+            type: 'object',
+            properties: d.parameters?.properties || {},
+            required: d.parameters?.required || []
+          }
+        }
+      }));
+    } catch (e) {
+      console.error('[AI Agent] Failed to compile Groq tools:', e.message);
+    }
   }
 
-  const data = await response.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) {
-    throw new Error('Groq API returned empty text');
+  const maxTurns = 4;
+  let turn = 0;
+
+  while (turn < maxTurns) {
+    turn++;
+    const payload = {
+      model: modelName,
+      messages,
+      temperature: Number(temperature) || 0.4,
+      max_tokens: Math.max(Number(maxTokens) || 1200, 800)
+    };
+
+    if (openAiTools.length > 0 && turn < maxTurns) {
+      payload.tools = openAiTools;
+      payload.tool_choice = 'auto';
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20000)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Groq API error [${response.status}]: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const assistantMsg = data?.choices?.[0]?.message;
+    if (!assistantMsg) {
+      throw new Error('Groq API returned empty message');
+    }
+
+    // Check for tool calls
+    if (assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0 && turn < maxTurns) {
+      messages.push(assistantMsg);
+
+      for (const call of assistantMsg.tool_calls) {
+        const fnName = call.function?.name;
+        let fnArgs = {};
+        try {
+          fnArgs = JSON.parse(call.function?.arguments || '{}');
+        } catch (e) {}
+
+        const result = await UniversalToolsRegistry.executeTool(fnName, fnArgs, userTools, toolsContext);
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: typeof result === 'string' ? result : JSON.stringify(result)
+        });
+      }
+      // Continue next turn to synthesize final answer
+    } else {
+      const text = assistantMsg.content || '';
+      if (!text && !assistantMsg.tool_calls) {
+        throw new Error('Groq API returned empty text');
+      }
+      return text.trim();
+    }
   }
-  return text.trim();
 }
 
 /**
@@ -554,7 +616,8 @@ export async function generateAiReply(settings, systemPrompt, customerMessage, c
           customerMessage,
           settings.temperature,
           settings.max_tokens,
-          conversationHistory
+          conversationHistory,
+          toolsContext
         );
       }
       if (prov === 'openrouter' && settings.openrouter_api_key) {
@@ -565,7 +628,8 @@ export async function generateAiReply(settings, systemPrompt, customerMessage, c
           customerMessage,
           settings.temperature,
           settings.max_tokens,
-          conversationHistory
+          conversationHistory,
+          toolsContext
         );
       }
     } catch (err) {

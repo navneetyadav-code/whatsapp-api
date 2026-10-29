@@ -174,8 +174,14 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
     }
   }
 
-  // Filter tools strictly to the active subset
-  const filteredTools = allTools.filter(t => activeToolSlugs.has(t.tool_slug));
+  // Filter tools: active built-in utilities + ALL user-defined custom tools (rest_api, shared_env_api, webhook)
+  // Ensures that whenever a user adds or activates any custom tool, the bot gets immediate real-time access!
+  const filteredTools = allTools.filter(t => {
+    if (activeToolSlugs.has(t.tool_slug)) return true;
+    if (t.category === 'rest_api' || t.category === 'shared_env_api' || t.category === 'webhook') return true;
+    const builtinSlugs = ['get_current_time', 'update_memory', 'draft_email', 'confirm_action', 'assistgroup_crm', 'web_search', 'evaluate_math', 'escalate_to_human', 'get_weather'];
+    return !builtinSlugs.includes(t.tool_slug);
+  });
 
   return {
     activeIntents: intents,
