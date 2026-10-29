@@ -441,19 +441,74 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
     return { error: `Base URL is not configured for active environment: ${activeEnv}` };
   }
 
-  // Determine endpoint: check action or explicit endpoint
+  // Determine endpoint and method: check action or explicit endpoint
   let endpoint = executionConfig.endpoint || '';
+  let method = (executionConfig.method || 'GET').toUpperCase();
+  let bodyPayload = null;
+
   if (args.action) {
-    // Standardize action routing: e.g. "pricing_plans" -> "/pricing/plans"
-    if (args.action === 'pricing_plans') endpoint = '/pricing/plans';
-    else if (args.action === 'team_overview') endpoint = '/team';
-    else if (args.action === 'create_inquiry') endpoint = '/inquiries';
-    else if (args.action === 'dashboard_metrics') endpoint = '/dashboard/metrics';
-    else endpoint = `/${args.action.replace(/^\/+/, '')}`;
+    const act = String(args.action).toLowerCase().trim().replace(/[\s\-]/g, '_');
+    if (act === 'pricing_plans' || act === 'get_pricing' || act === 'plans') {
+      endpoint = '/pricing/plans';
+      method = 'GET';
+    } else if (act === 'team_overview' || act === 'get_team' || act === 'team') {
+      endpoint = '/team';
+      method = 'GET';
+    } else if (act === 'dashboard_metrics' || act === 'metrics' || act === 'stats') {
+      endpoint = '/dashboard/metrics';
+      method = 'GET';
+    } else if (act === 'dashboard_growth' || act === 'growth') {
+      endpoint = '/dashboard/growth';
+      method = 'GET';
+    } else if (act === 'dashboard_system' || act === 'system' || act === 'system_health') {
+      endpoint = '/dashboard/system';
+      method = 'GET';
+    } else if (act === 'list_inquiries' || act === 'inquiries' || act === 'leads') {
+      const q = args.query ? `?search=${encodeURIComponent(args.query)}` : '';
+      endpoint = `/inquiries${q}`;
+      method = 'GET';
+    } else if (act === 'get_inquiry' && args.inquiry_id) {
+      endpoint = `/inquiries/${args.inquiry_id}`;
+      method = 'GET';
+    } else if (act === 'create_inquiry' || act === 'add_lead') {
+      endpoint = '/inquiries';
+      method = 'POST';
+      bodyPayload = {
+        name: args.client_name || args.name || 'WhatsApp Client',
+        phone: args.client_phone || args.phone || '',
+        email: args.client_email || args.email || '',
+        service: args.service || 'General Inquiry',
+        message: args.requirement || args.message || 'WhatsApp Bot Inquiry'
+      };
+    } else if (act === 'update_inquiry_status' && args.inquiry_id) {
+      endpoint = `/inquiries/${args.inquiry_id}/status`;
+      method = 'PATCH';
+      bodyPayload = { status: args.status || 'in_progress' };
+    } else if (act === 'list_users' || act === 'users') {
+      const q = args.query ? `?search=${encodeURIComponent(args.query)}` : '';
+      endpoint = `/users${q}`;
+      method = 'GET';
+    } else if (act === 'get_user' && args.user_id) {
+      endpoint = `/users/${args.user_id}`;
+      method = 'GET';
+    } else if (act === 'god_mode_list' || act === 'god_mode') {
+      endpoint = '/pricing/god-mode';
+      method = 'GET';
+    } else if (act === 'list_files' || act === 'files' || act === 'storage') {
+      endpoint = '/files';
+      method = 'GET';
+    } else if (act === 'cloudinary_pool' || act === 'cloudinary') {
+      endpoint = '/cloudinary';
+      method = 'GET';
+    } else if (act === 'audit_logs' || act === 'security_summary') {
+      endpoint = '/audit-logs/summary';
+      method = 'GET';
+    } else {
+      endpoint = `/${args.action.replace(/^\/+/, '')}`;
+    }
   }
 
   const finalUrl = `${baseUrl.replace(/\/+$/, '')}/${endpoint.replace(/^\/+/, '')}`;
-  const method = args.action === 'create_inquiry' ? 'POST' : (executionConfig.method || 'GET').toUpperCase();
 
   const headers = {
     'Accept': 'application/json',
@@ -468,12 +523,12 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
   const reqOptions = {
     method,
     headers,
-    signal: AbortSignal.timeout(executionConfig.timeout_ms || 6000)
+    signal: AbortSignal.timeout(executionConfig.timeout_ms || 8000)
   };
 
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
     headers['Content-Type'] = 'application/json';
-    reqOptions.body = JSON.stringify({
+    reqOptions.body = JSON.stringify(bodyPayload || {
       name: args.client_name || args.name || 'WhatsApp Client',
       phone: args.client_phone || args.phone || '',
       service: args.service || 'General Inquiry',
