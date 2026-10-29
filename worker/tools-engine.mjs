@@ -712,7 +712,7 @@ async function resolveProxyCookie(targetUrl) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
       },
-      signal: AbortSignal.timeout(4000)
+      signal: AbortSignal.timeout(7000)
     });
     const html = await testRes.text();
     const regex = /var\s+a=toNumbers\("([0-9a-fA-F]+)"\),\s*b=toNumbers\("([0-9a-fA-F]+)"\),\s*c=toNumbers\("([0-9a-fA-F]+)"\)/;
