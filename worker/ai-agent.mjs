@@ -354,12 +354,25 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
       payload.tools = [{ functionDeclarations: toolDeclarations }];
     }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(35000)
-    });
+    let response;
+    let attempts = 0;
+    while (attempts < 2) {
+      attempts++;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(35000)
+        });
+        break;
+      } catch (fetchErr) {
+        if (attempts >= 2) throw fetchErr;
+        const reason = fetchErr.cause?.message || fetchErr.message;
+        console.warn(`[AI Agent] Gemini fetch attempt ${attempts} failed: ${reason}. Retrying in 1s...`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -538,7 +551,8 @@ export async function generateAiReply(settings, systemPrompt, customerMessage, c
         );
       }
     } catch (err) {
-      console.warn(`[AI Agent] Provider '${prov}' failed: ${err.message}. Cascading to next provider...`);
+      const errDetail = err.cause?.message ? `${err.message} (${err.cause.message})` : err.message;
+      console.warn(`[AI Agent] Provider '${prov}' failed: ${errDetail}. Cascading to next provider...`);
       lastError = err;
     }
   }

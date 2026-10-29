@@ -1691,7 +1691,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                             // Hybrid Intent Routing & Dynamic Tool/Skill Composition
                             const detectedIntents = await detectIntents(consolidatedText, { pendingDraft });
                             const allUserTools = await UniversalToolsRegistry.loadUserTools(userId, db);
-                            const { activeIntents, filteredTools, skillDirectives } = composeSkillsAndTools(detectedIntents, allUserTools, isPersonalMode);
+                            const { activeIntents, filteredTools, skillDirectives } = composeSkillsAndTools(detectedIntents, allUserTools, isPersonalMode, { pendingDraft });
 
                             // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
                             const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);

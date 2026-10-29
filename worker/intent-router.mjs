@@ -31,17 +31,19 @@ export async function detectIntents(text, context = {}) {
   // Check if there is an active pending draft waiting for approval in this conversation
   const hasPendingDraft = Boolean(context.pendingDraft);
 
-  // If Boss replies with a confirmation word while a draft is pending, immediately route to email_confirm!
+  // If Boss replies while a draft is pending, evaluate state-aware confirmation or revision
   if (hasPendingDraft) {
-    if (INTENT_PATTERNS.email_confirm.test(clean)) {
-      return ['email_confirm'];
-    }
     if (INTENT_PATTERNS.email_cancel.test(clean)) {
       return ['email_cancel'];
     }
-    // If Boss says "change subject to X" or "add Y", route to email_draft modification
     if (/\b(change|add|update|revise|edit|modify|instead of)\b/i.test(clean)) {
       return ['email_draft'];
+    }
+    if (
+      INTENT_PATTERNS.email_confirm.test(clean) ||
+      /\b(send|dispatch|bhej|approve|confirm|proceed|go ahead|try again|resend|retry|send again|try to send|kardo|kar do)\b/i.test(clean)
+    ) {
+      return ['email_confirm'];
     }
   }
 
@@ -74,13 +76,28 @@ export async function detectIntents(text, context = {}) {
 /**
  * Dynamic Skill & Tool Composer: Filters tools & injects micro-plugins on-demand
  */
-export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = true) {
+export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = true, context = {}) {
   const activeToolSlugs = new Set();
   const skillDirectives = [];
 
   // Always make basic utility tools available in Personal Assistant mode if needed
   if (isPersonalMode) {
     activeToolSlugs.add('get_current_time');
+  }
+
+  // State-Aware Draft Injection: If there is an active pending draft in this conversation,
+  // ALWAYS keep confirm_action and draft_email in scope so the LLM can seamlessly confirm or revise!
+  if (context?.pendingDraft) {
+    activeToolSlugs.add('confirm_action');
+    activeToolSlugs.add('draft_email');
+    if (!intents.includes('email_confirm') && !intents.includes('email_cancel') && !intents.includes('email_draft')) {
+      skillDirectives.push(
+        `PENDING ACTION APPROVAL (${context.pendingDraft.draft_code}):\n` +
+        `• There is a pending email draft awaiting approval (Recipient: ${context.pendingDraft.recipient}, Subject: "${context.pendingDraft.subject}").\n` +
+        `• Boss can confirm (call confirm_action), modify (call draft_email), or cancel (call confirm_action with action="cancel").\n` +
+        `• If Boss indicates to send, retry sending, or approves, immediately call confirm_action with draft_code="${context.pendingDraft.draft_code}".`
+      );
+    }
   }
 
   for (const intent of intents) {
