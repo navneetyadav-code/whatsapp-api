@@ -116,18 +116,21 @@ async function runTests() {
     { tool_slug: 'web_search', tool_name: 'web_search' }
   ];
 
-  const emailDraftScope = composeSkillsAndTools(['email_draft'], mockAllTools, true);
-  const emailToolSlugs = emailDraftScope.filteredTools.map(t => t.tool_slug);
-  assert(emailToolSlugs.includes('draft_email'), 'draft_email must be in scope');
-  assert(!emailToolSlugs.includes('assistgroup_crm'), 'assistgroup_crm must NOT be in email_draft scope');
+  // Support mode: strictly scoped to detected intent
+  const supportEmailScope = composeSkillsAndTools(['email_draft'], mockAllTools, false);
+  const supportToolSlugs = supportEmailScope.filteredTools.map(t => t.tool_slug);
+  assert(supportToolSlugs.includes('draft_email'), 'draft_email must be in scope');
+  assert(!supportToolSlugs.includes('assistgroup_crm'), 'assistgroup_crm must NOT be in support email_draft scope');
 
-  const compoundScope = composeSkillsAndTools(['crm_read', 'email_draft'], mockAllTools, true);
-  const compoundToolSlugs = compoundScope.filteredTools.map(t => t.tool_slug);
-  assert(compoundToolSlugs.includes('assistgroup_crm'), 'assistgroup_crm must be in compound scope');
-  assert(compoundToolSlugs.includes('draft_email'), 'draft_email must be in compound scope');
-  console.log(`   Email Scope: [${emailToolSlugs.join(', ')}]`);
-  console.log(`   Compound Scope: [${compoundToolSlugs.join(', ')}]`);
-  console.log('   ✅ Tool scoping successfully eliminates unnecessary schema overhead');
+  // Personal mode: Boss has all tools available + dynamic skill directives
+  const personalScope = composeSkillsAndTools(['email_draft'], mockAllTools, true);
+  const personalToolSlugs = personalScope.filteredTools.map(t => t.tool_slug);
+  assert(personalToolSlugs.includes('draft_email'), 'draft_email must be in personal scope');
+  assert(personalToolSlugs.includes('confirm_action'), 'confirm_action must be in personal scope');
+  assert(personalScope.skillDirectives.some(d => d.includes('EMAIL DRAFTING PROTOCOL')), 'Must include email drafting directive');
+  console.log(`   Support Scope: [${supportToolSlugs.join(', ')}]`);
+  console.log(`   Personal Executive Scope: [${personalToolSlugs.join(', ')}]`);
+  console.log('   ✅ Tool scoping & personal executive coverage verified');
 
   // ----------------------------------------------------
   // TEST 6: Two-Phase Database HITL Operations (Draft & Cancel)

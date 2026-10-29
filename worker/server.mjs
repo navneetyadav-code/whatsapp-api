@@ -25,7 +25,7 @@ import {
 } from './ai-agent.mjs';
 import { globalDebouncer } from './chat-debouncer.mjs';
 import { globalGreetingCache } from './chat-greeting-cache.mjs';
-import { resolveActiveSession, closeSession, isWakeupTrigger, isTopicResetTrigger } from './chat-session-manager.mjs';
+import { generateSessionUuid, resolveActiveSession, closeSession, isWakeupTrigger, isTopicResetTrigger } from './chat-session-manager.mjs';
 import { ChatMemoryEngine } from './chat-memory.mjs';
 import { ChatFactMemory } from './chat-fact-memory.mjs';
 import { ChatPresenceManager } from './chat-presence.mjs';

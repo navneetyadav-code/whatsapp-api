@@ -14,7 +14,7 @@ const INTENT_PATTERNS = {
   crm_read: /\b(crm|metrics|inquir(y|ies)|lead(s)?|user(s)?|pricing plan(s)?|god mode|storage files|cloudinary|audit log(s)?)\b/i,
   crm_write: /\b(update inquiry|change status|add inquiry|create inquiry|new lead)\b/i,
   email_draft: /\b(draft|mail|email|compose|write (an? )?(email|mail)|send (an? )?(email|mail))\b/i,
-  email_confirm: /^(yes|send( it)?|proceed|approve(d)?|bhej do|bhejdo|ha(an)? bhej do|confirm(ed)?|ok send|yep|sure send|do it|okay send|ok|okay)\b/i,
+  email_confirm: /^(yes+|yeah|yep|ya|send( it)?|proceed|approve(d)?|bhej do|bhejdo|ha(an)? bhej do|confirm(ed)?|ok send|sure send|do it|okay send|ok|okay)\b/i,
   email_cancel: /\b(cancel|discard|don't send|dont send|abort|stop|mat bhejo|ignore draft|no don't send)\b/i,
   memory: /\b(remember|note down|save this|keep in mind|yad rakhna|yaad rakhna|note karo)\b/i,
   escalation: /\b(human|manager|agent|support representative|escalate|talk to human)\b/i
@@ -81,10 +81,15 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
   const activeToolSlugs = new Set();
   const skillDirectives = [];
 
-  // Always make basic utility tools available in Personal Assistant mode if needed
+  // In Personal Assistant mode, all executive tools are available to Boss at all times
   if (isPersonalMode) {
     activeToolSlugs.add('get_current_time');
     activeToolSlugs.add('update_memory');
+    activeToolSlugs.add('draft_email');
+    activeToolSlugs.add('confirm_action');
+    activeToolSlugs.add('assistgroup_crm');
+    activeToolSlugs.add('web_search');
+    activeToolSlugs.add('evaluate_math');
   }
 
   // State-Aware Draft Injection: If there is an active pending draft in this conversation,

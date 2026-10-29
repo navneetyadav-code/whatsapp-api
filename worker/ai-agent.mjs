@@ -319,12 +319,10 @@ OPERATING DIRECTIVES:
  * Call Google Gemini API with Autonomous Multi-Turn Function Calling Support
  */
 async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
-  let modelName = model || 'gemini-3.5-flash-lite';
-  if (modelName === 'gemini-1.5-flash' || modelName === 'gemini-2.5-flash') {
-    modelName = 'gemini-3.5-flash-lite';
+  let modelName = model || 'gemini-3.5-flash';
+  if (modelName === 'gemini-2.5-flash' || modelName === 'gemini-1.5-flash' || modelName === 'gemini-3.8-flash') {
+    modelName = 'gemini-3.5-flash';
   }
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
   // Dynamically load active custom & built-in tools for this user from ai_custom_tools
@@ -343,6 +341,9 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   const maxTurns = 4; // Up to 3 autonomous tool turns + final synthesis
   let turn = 0;
 
+  // Primary model with resilient fallback cascade for transient Google 503/429 spikes
+  const candidateModels = Array.from(new Set([modelName, 'gemini-3.5-flash', 'gemini-3.5-flash-lite']));
+
   while (turn < maxTurns) {
     turn++;
     const payload = {
@@ -360,20 +361,33 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 
     let response;
     let attempts = 0;
-    while (attempts < 2) {
+    while (attempts < candidateModels.length) {
+      const activeModel = candidateModels[attempts];
+      const activeUrl = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
       attempts++;
+
       try {
-        response = await fetch(url, {
+        response = await fetch(activeUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(35000)
         });
+
+        // If Google returns 503 (High Demand) or 429 (Rate Limit), failover to next model in cascade
+        if (!response.ok && (response.status === 503 || response.status === 429 || response.status === 500)) {
+          const errPreview = (await response.text()).slice(0, 120);
+          console.warn(`[AI Agent] Gemini (${activeModel}) status ${response.status}: ${errPreview}. Cascading model...`);
+          if (attempts < candidateModels.length) {
+            await new Promise(r => setTimeout(r, 800));
+            continue;
+          }
+        }
         break;
       } catch (fetchErr) {
-        if (attempts >= 2) throw fetchErr;
+        if (attempts >= candidateModels.length) throw fetchErr;
         const reason = fetchErr.cause?.message || fetchErr.message;
-        console.warn(`[AI Agent] Gemini fetch attempt ${attempts} failed: ${reason}. Retrying in 1s...`);
+        console.warn(`[AI Agent] Gemini (${activeModel}) fetch attempt failed: ${reason}. Retrying next model in 1s...`);
         await new Promise(r => setTimeout(r, 1000));
       }
     }
