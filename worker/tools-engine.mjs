@@ -318,26 +318,29 @@ export async function triggerHumanEscalation(reason, context) {
 // ---------------------------------------------------------------------------
 
 /**
- * Replaces {variable} placeholders in strings or nested objects
+ * Replaces {variable} or {var1|var2} placeholders in strings or nested objects
  */
-function interpolateVariables(template, variables = {}) {
+function interpolateVariables(template, variables = {}, isUrl = false) {
   if (typeof template === 'string') {
-    return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, key) => {
-      if (variables[key] !== undefined && variables[key] !== null) {
-        return encodeURIComponent(String(variables[key]));
+    return template.replace(/\{([a-zA-Z0-9_|]+)\}/g, (match, expression) => {
+      const keys = expression.split('|');
+      for (const key of keys) {
+        if (variables[key] !== undefined && variables[key] !== null && String(variables[key]).trim() !== '') {
+          return isUrl ? encodeURIComponent(String(variables[key])) : String(variables[key]);
+        }
       }
-      return match;
+      return '';
     });
   }
 
   if (Array.isArray(template)) {
-    return template.map(item => interpolateVariables(item, variables));
+    return template.map(item => interpolateVariables(item, variables, isUrl));
   }
 
   if (template && typeof template === 'object') {
     const output = {};
     for (const [k, v] of Object.entries(template)) {
-      output[k] = interpolateVariables(v, variables);
+      output[k] = interpolateVariables(v, variables, isUrl);
     }
     return output;
   }
@@ -355,7 +358,7 @@ async function executeCustomRestApi(executionConfig, args = {}) {
   }
 
   // 1. Interpolate URL parameters
-  const finalUrl = interpolateVariables(rawUrl, args);
+  const finalUrl = interpolateVariables(rawUrl, args, true);
 
   // Security guardrail: Validate protocol
   if (!/^https?:\/\//i.test(finalUrl)) {
@@ -379,7 +382,7 @@ async function executeCustomRestApi(executionConfig, args = {}) {
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
     headers['Content-Type'] = 'application/json';
     if (executionConfig.body_template) {
-      reqOptions.body = JSON.stringify(interpolateVariables(executionConfig.body_template, args));
+      reqOptions.body = JSON.stringify(interpolateVariables(executionConfig.body_template, args, false));
     } else {
       reqOptions.body = JSON.stringify(args);
     }
@@ -441,70 +444,73 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
     return { error: `Base URL is not configured for active environment: ${activeEnv}` };
   }
 
-  // Determine endpoint and method: check action or explicit endpoint
-  let endpoint = executionConfig.endpoint || '';
-  let method = (executionConfig.method || 'GET').toUpperCase();
-  let bodyPayload = null;
+  // Determine endpoint, method, and payload from dynamic action_routes or fallback executionConfig
+  const actionRoutes = executionConfig.action_routes || {};
+  let route = null;
 
   if (args.action) {
     const act = String(args.action).toLowerCase().trim().replace(/[\s\-]/g, '_');
-    if (act === 'pricing_plans' || act === 'get_pricing' || act === 'plans') {
-      endpoint = '/pricing/plans';
-      method = 'GET';
-    } else if (act === 'team_overview' || act === 'get_team' || act === 'team') {
-      endpoint = '/team';
-      method = 'GET';
-    } else if (act === 'dashboard_metrics' || act === 'metrics' || act === 'stats') {
-      endpoint = '/dashboard/metrics';
-      method = 'GET';
-    } else if (act === 'dashboard_growth' || act === 'growth') {
-      endpoint = '/dashboard/growth';
-      method = 'GET';
-    } else if (act === 'dashboard_system' || act === 'system' || act === 'system_health') {
-      endpoint = '/dashboard/system';
-      method = 'GET';
-    } else if (act === 'list_inquiries' || act === 'inquiries' || act === 'leads') {
-      const q = args.query ? `?search=${encodeURIComponent(args.query)}` : '';
-      endpoint = `/inquiries${q}`;
-      method = 'GET';
-    } else if (act === 'get_inquiry' && args.inquiry_id) {
-      endpoint = `/inquiries/${args.inquiry_id}`;
-      method = 'GET';
-    } else if (act === 'create_inquiry' || act === 'add_lead') {
-      endpoint = '/inquiries';
-      method = 'POST';
-      bodyPayload = {
-        name: args.client_name || args.name || 'WhatsApp Client',
-        phone: args.client_phone || args.phone || '',
-        email: args.client_email || args.email || '',
-        service: args.service || 'General Inquiry',
-        message: args.requirement || args.message || 'WhatsApp Bot Inquiry'
-      };
-    } else if (act === 'update_inquiry_status' && args.inquiry_id) {
-      endpoint = `/inquiries/${args.inquiry_id}/status`;
-      method = 'PATCH';
-      bodyPayload = { status: args.status || 'in_progress' };
-    } else if (act === 'list_users' || act === 'users') {
-      const q = args.query ? `?search=${encodeURIComponent(args.query)}` : '';
-      endpoint = `/users${q}`;
-      method = 'GET';
-    } else if (act === 'get_user' && args.user_id) {
-      endpoint = `/users/${args.user_id}`;
-      method = 'GET';
-    } else if (act === 'god_mode_list' || act === 'god_mode') {
-      endpoint = '/pricing/god-mode';
-      method = 'GET';
-    } else if (act === 'list_files' || act === 'files' || act === 'storage') {
-      endpoint = '/files';
-      method = 'GET';
-    } else if (act === 'cloudinary_pool' || act === 'cloudinary') {
-      endpoint = '/cloudinary';
-      method = 'GET';
-    } else if (act === 'audit_logs' || act === 'security_summary') {
-      endpoint = '/audit-logs/summary';
-      method = 'GET';
+    if (actionRoutes[act]) {
+      route = actionRoutes[act];
     } else {
-      endpoint = `/${args.action.replace(/^\/+/, '')}`;
+      const aliasesMap = executionConfig.aliases || {};
+      const targetAct = aliasesMap[act];
+      if (targetAct && actionRoutes[targetAct]) {
+        route = actionRoutes[targetAct];
+      } else {
+        for (const [rKey, rCfg] of Object.entries(actionRoutes)) {
+          if (Array.isArray(rCfg.aliases) && rCfg.aliases.includes(act)) {
+            route = rCfg;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  let endpoint = '';
+  let method = 'GET';
+  let bodyPayload = null;
+
+  if (route) {
+    endpoint = interpolateVariables(route.endpoint || '', args, true);
+    method = (route.method || 'GET').toUpperCase();
+
+    // Dynamically interpolate and append query parameters if configured
+    if (route.query_params && typeof route.query_params === 'object') {
+      const qp = new URLSearchParams();
+      for (const [paramKey, paramTpl] of Object.entries(route.query_params)) {
+        const val = interpolateVariables(paramTpl, args, false);
+        if (val && !val.startsWith('{')) {
+          qp.append(paramKey, val);
+        } else if (args[paramKey] !== undefined && args[paramKey] !== null && String(args[paramKey]).trim() !== '') {
+          qp.append(paramKey, String(args[paramKey]));
+        }
+      }
+      const queryString = qp.toString();
+      if (queryString) {
+        endpoint += (endpoint.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+
+    // Dynamic body payload for write methods
+    if (['POST', 'PUT', 'PATCH'].includes(method)) {
+      if (route.body_template && typeof route.body_template === 'object') {
+        bodyPayload = interpolateVariables(route.body_template, args, false);
+      } else {
+        const { action: _act, ...restArgs } = args;
+        bodyPayload = restArgs;
+      }
+    }
+  } else {
+    // Universal fallback: use configured endpoint or requested action as path
+    endpoint = executionConfig.endpoint
+      ? interpolateVariables(executionConfig.endpoint, args, true)
+      : (args.action ? `/${args.action.replace(/^\/+/, '')}` : '');
+    method = (executionConfig.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'PATCH'].includes(method)) {
+      const { action: _act, ...restArgs } = args;
+      bodyPayload = restArgs;
     }
   }
 
@@ -528,12 +534,7 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
 
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
     headers['Content-Type'] = 'application/json';
-    reqOptions.body = JSON.stringify(bodyPayload || {
-      name: args.client_name || args.name || 'WhatsApp Client',
-      phone: args.client_phone || args.phone || '',
-      service: args.service || 'General Inquiry',
-      message: args.requirement || args.message || 'WhatsApp Bot Inquiry'
-    });
+    reqOptions.body = JSON.stringify(bodyPayload || {});
   }
 
   try {

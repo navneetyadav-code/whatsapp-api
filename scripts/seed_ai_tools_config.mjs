@@ -43,7 +43,7 @@ async function main() {
 
   const defaultConfig = {
     enabled: true,
-    admin_phones: ['+918581065107', '+919507286092', '8581065107', '9507286092'],
+    admin_phones: process.env.ADMIN_WHITELIST_PHONES ? process.env.ADMIN_WHITELIST_PHONES.split(',').map(s => s.trim()) : [],
     tools: {
       web_search: {
         enabled: true,

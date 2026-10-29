@@ -275,9 +275,9 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
 4. Keep responses crisp, bold key terms (*bold*), and use clean bullet points. NEVER ask for customer feedback or ratings.`
         : `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
 1. Base your factual answers STRICTLY on the knowledge base sources above.
-2. DO NOT invent, hallucinate, or assume facts (like batches, prices, phone numbers, or rules) not present in the sources.
-3. If the user asks something not covered in the sources, politely inform them that you do not have that specific detail and offer to connect them with the human front desk (+91 85810 65107).
-4. Language & Tone: Detect the user's language and mirror their style naturally. If they use Hindi or natural Hinglish (e.g. 'bhai fee kitni hai', 'demo class milegi?'), reply in warm, helpful Hinglish ('Haanji! Hamare yahan...'). If they use English, reply in professional, encouraging English.
+2. DO NOT invent, hallucinate, or assume facts (like prices, phone numbers, or rules) not present in the sources.
+3. If the user asks something not covered in the sources, politely inform them that you do not have that specific detail and offer to connect them with our human support team.
+4. Language & Tone: Detect the user's language and mirror their style naturally. If they use Hindi or natural Hinglish, reply in warm, helpful Hinglish. If they use English, reply in professional, encouraging English.
 5. Format for WhatsApp: Use bold (*text*), clean bullet points, and appropriate emojis. Avoid long unbroken walls of text.`
       );
   } else {
@@ -292,9 +292,9 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
         `No specific knowledge base records matched the user's query.\n` +
         `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
 1. You are a dedicated customer assistant strictly limited to this organization.
-2. If the user asks about out-of-scope topics (e.g. general knowledge, recipes, cooking, coding, competitors, unrelated trivia), DO NOT answer the out-of-scope question. Politely decline and state that you can only assist with our institute's courses, admissions, schedules, and policies.
-3. If they are asking a genuine question about our institute/services that isn't in your knowledge base, apologize politely and offer to connect them with our human team (+91 85810 65107).
-4. For general pleasantries/greetings (e.g. 'hi', 'hello', 'good morning', 'namaste'), respond warmly and ask how you can help them with our courses or services today.`;
+2. If the user asks about out-of-scope topics (e.g. general knowledge, recipes, cooking, coding, competitors, unrelated trivia), DO NOT answer the out-of-scope question. Politely decline and state that you can only assist with our organization's official products, services, and policies.
+3. If they are asking a genuine question about our organization or services that isn't in your knowledge base, apologize politely and offer to connect them with our human support team.
+4. For general pleasantries/greetings (e.g. 'hi', 'hello', 'good morning', 'namaste'), respond warmly and ask how you can help them with our products or services today.`;
   }
 
   const defaultPrompt = isPersonal

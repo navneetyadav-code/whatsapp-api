@@ -575,7 +575,7 @@
                         </h3>
                         <p class="text-xs text-slate-500 mt-0.5">WhatsApp numbers permitted to execute privileged administrative actions (e.g. system metrics, CRM lookup):</p>
                         <div class="mt-2 flex gap-2">
-                            <input type="text" name="admin_phones" value="<?= e(implode(', ', $toolsConfig['admin_phones'] ?? [])) ?>" class="flex-1 text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="+918581065107, +919507286092">
+                            <input type="text" name="admin_phones" value="<?= e(implode(', ', $toolsConfig['admin_phones'] ?? [])) ?>" class="flex-1 text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="+14155552671, +919876543210">
                             <button type="submit" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors shadow-xs active:scale-[0.98]">
                                 Save Numbers
                             </button>
