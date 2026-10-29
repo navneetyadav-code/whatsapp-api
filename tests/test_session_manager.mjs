@@ -18,35 +18,35 @@ if (existsSync(envPath)) {
 async function runTest() {
   console.log('=== Running ChatSessionManager Unit Tests ===\n');
 
-  // Test 1: UUID format
-  const uuid = generateSessionUuid();
-  console.log('[Test 1] Generated Session UUID:', uuid);
-  if (/^SES-\d{8}-[0-9A-F]{6}$/.test(uuid)) {
-    console.log('✔ Test 1 Passed: Format matches SES-YYYYMMDD-XXXX\n');
-  } else {
-    console.error('❌ Test 1 Failed on format:', uuid);
-    process.exit(1);
-  }
-
-  // Test 2: Database lifecycle
-  const db = await mysql.createConnection({
+  const db = await mysql.createPool({
     host: process.env.DB_HOST || '127.0.0.1',
+    port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'whatsapp_api',
-    port: parseInt(process.env.DB_PORT || '3306', 10),
+    database: process.env.DB_NAME || 'whatsapp_api'
   });
 
-  const testPhone = '919999988888';
   const userId = 1;
+  const testPhone = '919999988888';
 
-  // Cleanup test row
+  // Cleanup before test
   await db.execute('DELETE FROM chat_messages WHERE conversation_id IN (SELECT id FROM chat_conversations WHERE user_id = ? AND phone = ?)', [userId, testPhone]);
   await db.execute('DELETE FROM chat_conversations WHERE user_id = ? AND phone = ?', [userId, testPhone]);
 
-  // Step A: New inquiry
+  // 1. Session UUID generator format
+  const uuid = generateSessionUuid();
+  console.log('[Test 1] Generated Session UUID:', uuid);
+  if (/^SES-\d{8}-[A-F0-9]{6}$/.test(uuid)) {
+    console.log('✔ Test 1 Passed: Format matches SES-YYYYMMDD-XXXX\n');
+  } else {
+    console.error('❌ Test 1 Failed: Bad UUID format', uuid);
+    process.exit(1);
+  }
+
+  // 2. Lifecycle simulation
+  // Step A: First inquiry
   console.log('[Test 2A] Initial incoming inquiry from new customer...');
-  const s1 = await resolveActiveSession(db, userId, testPhone, 'Test User', 'Hello initial inquiry');
+  const s1 = await resolveActiveSession(db, userId, testPhone, 'Test User', 'Hello I need info on your website');
   console.log('Session 1:', s1);
   if (s1.isNewSession && s1.status === 'open') {
     console.log('✔ Test 2A Passed: Created new open session.\n');
@@ -78,14 +78,24 @@ async function runTest() {
     process.exit(1);
   }
 
-  // Step D: Customer returns next week (fresh inquiry)
-  console.log('[Test 2D] Customer returns later with a new inquiry...');
-  const s3 = await resolveActiveSession(db, userId, testPhone, 'Test User', 'Hi I have another question');
-  console.log('Session 3:', s3);
-  if (s3.isNewSession && s3.sessionUuid !== s1.sessionUuid && s3.status === 'open') {
-    console.log('✔ Test 2D Passed: New distinct session established cleanly!\n');
+  // Step D: Customer sends message while closed without wakeup trigger
+  console.log('[Test 2D] Customer sends message while closed without wakeup trigger...');
+  const sClosed = await resolveActiveSession(db, userId, testPhone, 'Test User', 'Hi I have another question');
+  if (!sClosed.isNewSession && sClosed.status === 'closed' && sClosed.botPaused) {
+    console.log('✔ Test 2D Passed: Chat stays closed and bot paused when no /start sent.\n');
   } else {
     console.error('❌ Test 2D Failed!');
+    process.exit(1);
+  }
+
+  // Step E: Customer sends /start -> wakes up into new distinct session
+  console.log('[Test 2E] Customer sends /start to wake up bot...');
+  const s3 = await resolveActiveSession(db, userId, testPhone, 'Test User', '/start');
+  console.log('Session 3:', s3);
+  if (s3.isNewSession && s3.sessionUuid !== s1.sessionUuid && s3.status === 'open' && s3.wokeUp) {
+    console.log('✔ Test 2E Passed: New distinct session established cleanly on /start!\n');
+  } else {
+    console.error('❌ Test 2E Failed!');
     process.exit(1);
   }
 

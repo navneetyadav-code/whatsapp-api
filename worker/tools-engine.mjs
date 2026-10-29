@@ -12,6 +12,7 @@
  */
 
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 // ---------------------------------------------------------------------------
 // 1. BUILT-IN CORE UTILITIES
@@ -311,6 +312,225 @@ export async function triggerHumanEscalation(reason, context) {
       error: `Failed to record escalation: ${err.message}`
     };
   }
+}
+
+/**
+ * Native SMTP Mail Dispatcher
+ */
+export async function sendNodeSmtpEmail({ to, subject, body, cc }) {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER || '';
+  const pass = process.env.SMTP_PASS || '';
+  const from = process.env.SMTP_FROM || user || 'noreply@localhost';
+  const fromName = process.env.SMTP_FROM_NAME || 'WhatsGateway';
+
+  if (!host || !user || !pass) {
+    return {
+      success: false,
+      error: 'SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS) are not configured in system environment.'
+    };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false }
+    });
+
+    const mailOptions = {
+      from: `"${fromName}" <${from}>`,
+      to,
+      subject,
+      text: body
+    };
+
+    if (cc) mailOptions.cc = cc;
+
+    const info = await transporter.sendMail(mailOptions);
+    return {
+      success: true,
+      messageId: info.messageId
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err.message
+    };
+  }
+}
+
+/**
+ * Two-Phase Action Handler: Draft Email (Phase 1)
+ */
+export async function handleDraftEmail(args, context) {
+  const { db, userId, conversationId } = context;
+  const to = String(args.to || '').trim();
+  const subject = String(args.subject || '').trim();
+  const body = String(args.body || '').trim();
+  const cc = args.cc ? String(args.cc).trim() : null;
+
+  if (!to || !to.includes('@')) {
+    return { error: 'Invalid recipient email address. Please specify a valid email (e.g. name@domain.com).' };
+  }
+  if (!subject) {
+    return { error: 'Email subject is required.' };
+  }
+  if (!body) {
+    return { error: 'Email body content is required.' };
+  }
+
+  // Generate unique human-friendly draft code
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  const draftCode = `DRAFT-${randomSuffix}`;
+
+  try {
+    if (db && userId) {
+      await db.execute(
+        `INSERT INTO ai_action_drafts
+         (user_id, conversation_id, draft_code, action_type, recipient, subject, body_content, metadata, status, expires_at)
+         VALUES (?, ?, ?, 'send_email', ?, ?, ?, ?, 'pending', DATE_ADD(NOW(), INTERVAL 24 HOUR))`,
+        [
+          userId,
+          conversationId || 0,
+          draftCode,
+          to,
+          subject,
+          body,
+          JSON.stringify({ cc })
+        ]
+      );
+    }
+
+    return {
+      success: true,
+      draft_code: draftCode,
+      recipient: to,
+      cc: cc || undefined,
+      subject: subject,
+      body: body,
+      status: 'pending_approval',
+      instruction: `Draft ${draftCode} created. Display this preview to Boss and prompt: "Reply *'Send'* or *'Yes'* to dispatch this email, or tell me what you would like to edit." NEVER claim the email has been sent yet.`
+    };
+  } catch (err) {
+    return { error: `Failed to record email draft: ${err.message}` };
+  }
+}
+
+/**
+ * Two-Phase Action Handler: Confirm & Dispatch / Cancel (Phase 2)
+ */
+export async function handleConfirmAction(args, context) {
+  const { db, userId, conversationId, callerRole } = context;
+  const action = (args.action || 'confirm').toLowerCase().trim();
+  let draftCode = (args.draft_code || '').trim();
+
+  if (!db || !userId) {
+    return { error: 'Database context unavailable for action confirmation.' };
+  }
+
+  // Auto-resolve latest pending draft if code not explicitly provided
+  if (!draftCode) {
+    const [rows] = await db.execute(
+      `SELECT draft_code FROM ai_action_drafts
+       WHERE user_id = ? AND conversation_id = ? AND status = 'pending'
+       ORDER BY id DESC LIMIT 1`,
+      [userId, conversationId || 0]
+    );
+    if (rows && rows.length > 0) {
+      draftCode = rows[0].draft_code;
+    } else {
+      return {
+        success: false,
+        error: 'No active pending email draft found to confirm or cancel. Please draft an email first.'
+      };
+    }
+  }
+
+  const [drafts] = await db.execute(
+    `SELECT id, draft_code, action_type, recipient, subject, body_content, metadata, status, expires_at
+     FROM ai_action_drafts
+     WHERE user_id = ? AND draft_code = ? LIMIT 1`,
+    [userId, draftCode]
+  );
+
+  if (!drafts || drafts.length === 0) {
+    return { success: false, error: `Draft "${draftCode}" was not found.` };
+  }
+
+  const draft = drafts[0];
+
+  if (draft.status !== 'pending') {
+    return {
+      success: false,
+      error: `Draft "${draftCode}" has already been ${draft.status}. It cannot be processed again.`
+    };
+  }
+
+  // Handle Cancellation
+  if (action === 'cancel' || action === 'discard') {
+    await db.execute(
+      `UPDATE ai_action_drafts SET status = 'cancelled' WHERE id = ?`,
+      [draft.id]
+    );
+    return {
+      success: true,
+      draft_code: draftCode,
+      status: 'cancelled',
+      message: `Draft ${draftCode} has been cancelled and discarded. Nothing was sent.`
+    };
+  }
+
+  // Verify Admin / Boss authorization for execution
+  if (callerRole !== 'admin') {
+    return {
+      success: false,
+      denied: true,
+      error: 'Permission Denied: Only an authorized Boss or Admin can approve email dispatch.'
+    };
+  }
+
+  // Dispatch Email via SMTP
+  if (draft.action_type === 'send_email') {
+    const to = draft.recipient;
+    const subject = draft.subject;
+    const body = draft.body_content;
+    const meta = typeof draft.metadata === 'string' ? JSON.parse(draft.metadata || '{}') : (draft.metadata || {});
+
+    const sendResult = await sendNodeSmtpEmail({
+      to,
+      subject,
+      body,
+      cc: meta.cc
+    });
+
+    if (!sendResult.success) {
+      return {
+        success: false,
+        error: `SMTP dispatch failed: ${sendResult.error}`
+      };
+    }
+
+    await db.execute(
+      `UPDATE ai_action_drafts SET status = 'sent' WHERE id = ?`,
+      [draft.id]
+    );
+
+    return {
+      success: true,
+      draft_code: draftCode,
+      status: 'sent',
+      recipient: to,
+      subject: subject,
+      messageId: sendResult.messageId,
+      message: `🚀 Email successfully dispatched to ${to} via SMTP!`
+    };
+  }
+
+  return { success: false, error: `Unsupported action_type: ${draft.action_type}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -785,6 +1005,10 @@ export class UniversalToolsRegistry {
           result = getCurrentCustomTime(tool.execution_config, context);
         } else if (handler === 'escalate_to_human') {
           result = await triggerHumanEscalation(args.reason, context);
+        } else if (handler === 'draft_email') {
+          result = await handleDraftEmail(args, context);
+        } else if (handler === 'confirm_action') {
+          result = await handleConfirmAction(args, context);
         } else {
           result = { error: `Unknown built-in handler: ${handler}` };
         }

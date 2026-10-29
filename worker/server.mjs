@@ -29,6 +29,8 @@ import { resolveActiveSession, closeSession, isWakeupTrigger } from './chat-sess
 import { ChatMemoryEngine } from './chat-memory.mjs';
 import { ChatPresenceManager } from './chat-presence.mjs';
 import { ChatResolutionEngine } from './chat-resolution.mjs';
+import { detectIntents, composeSkillsAndTools } from './intent-router.mjs';
+import { UniversalToolsRegistry } from './tools-engine.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv(resolve(__dirname, '..', '.env'));
@@ -1669,6 +1671,28 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                           let replyText = null;
                           try {
+                            // Check for active pending draft in this conversation (for 2-phase confirmation routing)
+                            let pendingDraft = null;
+                            try {
+                              const [draftRows] = await db.execute(
+                                `SELECT id, draft_code, action_type, recipient, subject, body_content, status
+                                 FROM ai_action_drafts
+                                 WHERE user_id = ? AND conversation_id = ? AND status = 'pending' AND expires_at > NOW()
+                                 ORDER BY id DESC LIMIT 1`,
+                                [userId, conv.id]
+                              );
+                              if (draftRows && draftRows.length > 0) {
+                                pendingDraft = draftRows[0];
+                              }
+                            } catch (draftErr) {
+                              console.warn('[Server] Failed to query pending drafts:', draftErr.message);
+                            }
+
+                            // Hybrid Intent Routing & Dynamic Tool/Skill Composition
+                            const detectedIntents = await detectIntents(consolidatedText, { pendingDraft });
+                            const allUserTools = await UniversalToolsRegistry.loadUserTools(userId, db);
+                            const { activeIntents, filteredTools, skillDirectives } = composeSkillsAndTools(detectedIntents, allUserTools, isPersonalMode);
+
                             // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
                             const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
                             const { systemPrompt, userMessage } = buildPromptWithRag(
@@ -1677,7 +1701,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               consolidatedText,
                               {
                                 agentMode: aiSettings.agent_mode || 'support',
-                                ownerName: aiSettings.owner_name || 'Boss'
+                                ownerName: aiSettings.owner_name || 'Boss',
+                                skillDirectives
                               }
                             );
 
@@ -1717,7 +1742,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               callerRole,
                               agentMode: aiSettings.agent_mode || 'support',
                               ownerName: aiSettings.owner_name || 'Boss',
-                              toolsConfig
+                              toolsConfig,
+                              scopedTools: filteredTools
                             };
 
                             replyText = await generateAiReply(aiSettings, systemPrompt, userMessage, historyTurns, toolsContext);

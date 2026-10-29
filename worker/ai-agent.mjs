@@ -261,46 +261,49 @@ export function detectFrustrationAndEscalation(text) {
 export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessage, options = {}) {
   const isPersonal = options.agentMode === 'personal';
   const ownerName = options.ownerName || 'Boss';
+  const skillDirectives = Array.isArray(options.skillDirectives) ? options.skillDirectives : [];
+
+  if (isPersonal) {
+    // Ultra-lean Micro-Kernel Architecture (~120 tokens)
+    let microKernel = `You are the 24/7 dedicated Personal Executive Assistant to Boss (${ownerName}).
+OPERATING DIRECTIVES:
+1. Strict Grounding: State facts ONLY from verified executed tool results. Never invent records, prices, phone numbers, or dates.
+2. Two-Phase Action Safety: Consequential operations (sending emails, mutating records) MUST be drafted and approved by Boss before dispatch. Never claim an email is sent until confirm_action succeeds.
+3. Formatting: Crisp, proactive, structured. Use *bold* highlights, clean bullet points, and appropriate emojis.
+4. Silence Feedback: You are a personal assistant, NOT a customer service line. NEVER ask for customer reviews, 5-star ratings, or feedback surveys.`;
+
+    if (skillDirectives.length > 0) {
+      microKernel += '\n\n' + skillDirectives.join('\n\n');
+    }
+
+    return {
+      systemPrompt: microKernel,
+      userMessage: customerMessage
+    };
+  }
 
   let contextBlock = '';
   if (retrievedChunks && retrievedChunks.length > 0) {
     contextBlock = `\n\n--- OFFICIAL VERIFIED KNOWLEDGE BASE ---\n` +
       retrievedChunks.map((c, i) => `[Source ${i + 1}: ${c.title}]\n${c.content}`).join('\n\n') +
       `\n---------------------------------------\n` +
-      (isPersonal
-        ? `PERSONAL ASSISTANT DIRECTIVES:
-1. Use the knowledge sources above as helpful background context when assisting your Boss (${ownerName}).
-2. You are NOT restricted to only these sources: answer any general questions, research tasks, calculations, or coding requests freely.
-3. Proactively call tools (web_search, get_weather, evaluate_math, get_current_time) whenever real-time data or calculations are needed.
-4. Keep responses crisp, bold key terms (*bold*), and use clean bullet points. NEVER ask for customer feedback or ratings.`
-        : `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
+      `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
 1. Base your factual answers STRICTLY on the knowledge base sources above.
 2. DO NOT invent, hallucinate, or assume facts (like prices, phone numbers, or rules) not present in the sources.
 3. If the user asks something not covered in the sources, politely inform them that you do not have that specific detail and offer to connect them with our human support team.
 4. Language & Tone: Detect the user's language and mirror their style naturally. If they use Hindi or natural Hinglish, reply in warm, helpful Hinglish. If they use English, reply in professional, encouraging English.
-5. Format for WhatsApp: Use bold (*text*), clean bullet points, and appropriate emojis. Avoid long unbroken walls of text.`
-      );
+5. Format for WhatsApp: Use bold (*text*), clean bullet points, and appropriate emojis. Avoid long unbroken walls of text.`;
   } else {
-    contextBlock = isPersonal
-      ? `\n\n--- PERSONAL ASSISTANT OPERATING DIRECTIVES ---
-1. You are the dedicated 24/7 Personal Executive Assistant to ${ownerName}.
-2. Full General Intelligence: You assist with ANY topic requested (tasks, to-dos, reminders, web search, weather, coding, math, writing, brainstorming).
-3. Tools: Autonomously call web_search, get_weather, evaluate_math, and get_current_time whenever needed.
-4. NO Feedback/Reviews: Never ask for 5-star ratings or customer feedback surveys.
-5. Tone: Respectful, loyal, efficient, and proactive. Use concise WhatsApp formatting with bold highlights and clean lists.`
-      : `\n\n--- KNOWLEDGE RETRIEVAL NOTE ---\n` +
-        `No specific knowledge base records matched the user's query.\n` +
-        `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
+    contextBlock = `\n\n--- KNOWLEDGE RETRIEVAL NOTE ---\n` +
+      `No specific knowledge base records matched the user's query.\n` +
+      `STRICT INSTRUCTIONS FOR THE AI ASSISTANT:
 1. You are a dedicated customer assistant strictly limited to this organization.
 2. If the user asks about out-of-scope topics (e.g. general knowledge, recipes, cooking, coding, competitors, unrelated trivia), DO NOT answer the out-of-scope question. Politely decline and state that you can only assist with our organization's official products, services, and policies.
 3. If they are asking a genuine question about our organization or services that isn't in your knowledge base, apologize politely and offer to connect them with our human support team.
 4. For general pleasantries/greetings (e.g. 'hi', 'hello', 'good morning', 'namaste'), respond warmly and ask how you can help them with our products or services today.`;
   }
 
-  const defaultPrompt = isPersonal
-    ? `You are the personal AI executive assistant to ${ownerName}. You assist 24/7 with tasks, research, calculations, live weather, reminders, and daily management.`
-    : 'You are a helpful customer support assistant on WhatsApp.';
-
+  const defaultPrompt = 'You are a helpful customer support assistant on WhatsApp.';
   const fullSystem = (systemPersona || defaultPrompt) + contextBlock;
   return {
     systemPrompt: fullSystem,
@@ -325,7 +328,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   let userTools = [];
   if (toolsContext && toolsContext.userId && toolsContext.db) {
     try {
-      userTools = await UniversalToolsRegistry.loadUserTools(toolsContext.userId, toolsContext.db);
+      userTools = toolsContext.scopedTools || await UniversalToolsRegistry.loadUserTools(toolsContext.userId, toolsContext.db);
       const callerRole = toolsContext.callerRole || 'guest';
       toolDeclarations = UniversalToolsRegistry.compileDeclarationsForRole(userTools, callerRole);
     } catch (e) {
