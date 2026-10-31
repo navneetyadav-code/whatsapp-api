@@ -64,25 +64,34 @@ if ($appEnv === 'production' && (strlen($workerToken) < 32 || $workerToken === '
 
 $dbHost = config_env('DB_HOST', '127.0.0.1');
 $dbPort = config_env('DB_PORT', '3306');
-$dbName = config_env('DB_NAME', 'whatsapp_api');
-$defaultDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
-$dbDsn = config_env('DB_DSN', $defaultDsn);
-
 if (!ctype_digit((string) $dbPort) || (int) $dbPort < 1 || (int) $dbPort > 65535) {
     throw new RuntimeException('DB_PORT must be a valid TCP port number.');
 }
 
+$rawDsn = config_env('DB_DSN', '');
 $dsnHost = $dbHost;
 $dsnPort = (string) $dbPort;
-$dsnHostMatch = [];
-$dsnPortMatch = [];
-preg_match('/(?:^|;)host=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $dbDsn), $dsnHostMatch);
-preg_match('/(?:^|;)port=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $dbDsn), $dsnPortMatch);
-if (!empty($dsnHostMatch[1])) {
-    $dsnHost = $dsnHostMatch[1];
+if ($rawDsn !== '') {
+    if (preg_match('/(?:^|;)host=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $rawDsn), $hostMatch)) {
+        $dsnHost = $hostMatch[1];
+    }
+    if (preg_match('/(?:^|;)port=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $rawDsn), $portMatch)) {
+        $dsnPort = $portMatch[1];
+    }
 }
-if (!empty($dsnPortMatch[1])) {
-    $dsnPort = $dsnPortMatch[1];
+
+$isTiDB = str_contains(strtolower((string) $dsnHost), 'tidbcloud.com') || (string) $dsnPort === '4000';
+$configuredDbName = config_env('DB_NAME');
+if ($isTiDB && ($configuredDbName === null || $configuredDbName === '' || $configuredDbName === 'whatsapp_api')) {
+    $dbName = 'test';
+} else {
+    $dbName = $configuredDbName ?? ($isTiDB ? 'test' : 'whatsapp_api');
+}
+
+$defaultDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
+$dbDsn = $rawDsn !== '' ? $rawDsn : $defaultDsn;
+if ($isTiDB && preg_match('/dbname=whatsapp_api(?=[;]|$)/i', $dbDsn)) {
+    $dbDsn = preg_replace('/dbname=whatsapp_api(?=[;]|$)/i', 'dbname=test', $dbDsn);
 }
 
 return [
@@ -90,7 +99,7 @@ return [
         'dsn' => $dbDsn,
         'user' => config_env('DB_USER', 'root'),
         'password' => config_env('DB_PASSWORD', ''),
-        'ssl' => str_contains(strtolower($dsnHost), 'tidbcloud.com') || $dsnPort === '4000' || config_bool('DB_SSL'),
+        'ssl' => $isTiDB || config_bool('DB_SSL'),
         'ssl_ca' => config_env('DB_SSL_CA', ''),
     ],
     'app' => [
