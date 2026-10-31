@@ -32,32 +32,43 @@ a2enconf render-env 2>/dev/null || true
 echo "[docker-entrypoint] Verifying database connectivity at ${DB_HOST:-127.0.0.1}:${DB_PORT:-3306}..."
 MAX_RETRIES=30
 RETRY_COUNT=0
-until php -r "
-  require_once '/var/www/html/src/bootstrap.php';
-  try {
-    Database::pdo();
-    exit(0);
-  } catch (Throwable \$e) {
-    exit(1);
-  }
-" >/dev/null 2>&1; do
-  RETRY_COUNT=$((RETRY_COUNT + 1))
-  if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-    echo "[docker-entrypoint] ERROR: Database connection failed after $MAX_RETRIES attempts."
-    # Run once without redirect to output diagnostic error log
-    php -r "require_once '/var/www/html/src/bootstrap.php'; Database::pdo();" || true
-    exit 1
+DB_READY=false
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  if php -r "require_once '/var/www/html/src/bootstrap.php'; Database::pdo();" >/dev/null 2>&1; then
+    DB_READY=true
+    break
   fi
-  echo "[docker-entrypoint] Waiting for database readiness (${RETRY_COUNT}/${MAX_RETRIES})... retrying in 2s"
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  echo "[docker-entrypoint] Waiting for database (${RETRY_COUNT}/${MAX_RETRIES})... retrying in 2s"
   sleep 2
 done
+
+if [ "$DB_READY" != "true" ]; then
+  echo "[docker-entrypoint] ERROR: Database connection failed after $MAX_RETRIES attempts."
+  php -r "require_once '/var/www/html/src/bootstrap.php'; Database::pdo();" || true
+  exit 1
+fi
+
 echo "[docker-entrypoint] Database connection established."
 
-# 6. Run database migrations to ensure all application tables exist
+# 6. Synchronize active database name to .env so both worker and PHP match
+ACTIVE_DB=$(php -r "require_once '/var/www/html/src/bootstrap.php'; echo (string)Database::pdo()->query('SELECT DATABASE()')->fetchColumn();" 2>/dev/null || echo "")
+if [ -n "$ACTIVE_DB" ]; then
+  echo "[docker-entrypoint] Active database schema: ${ACTIVE_DB}"
+  export DB_NAME="${ACTIVE_DB}"
+  if grep -q "^DB_NAME=" /var/www/html/.env 2>/dev/null; then
+    sed -i "s/^DB_NAME=.*/DB_NAME=${ACTIVE_DB}/" /var/www/html/.env
+  else
+    echo "DB_NAME=${ACTIVE_DB}" >> /var/www/html/.env
+  fi
+fi
+
+# 7. Run database migrations to ensure all application tables exist
 echo "[docker-entrypoint] Running database migrations..."
 php /var/www/html/scripts/migrate.php
 
-# 7. Optional initial administrator account provisioning
+# 8. Optional initial administrator account provisioning
 if [[ -n "${INITIAL_ADMIN_EMAIL:-}" && -n "${INITIAL_ADMIN_PASSWORD:-}" ]]; then
     echo "[docker-entrypoint] Checking initial administrator account..."
     export INITIAL_ADMIN_EMAIL INITIAL_ADMIN_PASSWORD INITIAL_ADMIN_NAME
