@@ -52,34 +52,102 @@ final class Database
                 self::$config['password'],
                 $options
             );
+            return self::$pdo;
         } catch (PDOException $e) {
             $code = (int) ($e->errorInfo[1] ?? 0);
-            if ($code === 1049 && preg_match('/dbname=([^;]+)/i', (string) (self::$config['dsn'] ?? ''), $matches)) {
-                $dbName = trim($matches[1]);
-                $serverDsn = preg_replace('/dbname=[^;]+;?/i', '', (string) self::$config['dsn']);
+            if ($code !== 1049) {
+                throw $e;
+            }
+
+            // Database was unknown (error 1049).
+            $requestedDb = 'whatsapp_api';
+            if (preg_match('/dbname=([^;]+)/i', (string) (self::$config['dsn'] ?? ''), $matches)) {
+                $requestedDb = trim($matches[1]);
+            }
+
+            // Candidate connection DSNs to reach the server:
+            // 1. Connect pointing to 'test' (default schema on TiDB Cloud Serverless)
+            // 2. Connect with dbname stripped entirely
+            $candidates = [
+                preg_replace('/dbname=[^;]+/i', 'dbname=test', (string) self::$config['dsn']),
+                preg_replace('/dbname=[^;]+;?/i', '', (string) self::$config['dsn']),
+            ];
+
+            $probePdo = null;
+            $probeConnectedDb = null;
+            foreach ($candidates as $candidateDsn) {
                 try {
-                    $rootPdo = new PDO(
-                        $serverDsn,
+                    $probePdo = new PDO(
+                        $candidateDsn,
                         self::$config['user'],
                         self::$config['password'],
                         $options
                     );
-                    $rootPdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-                    unset($rootPdo);
-                    self::$pdo = new PDO(
-                        self::$config['dsn'],
-                        self::$config['user'],
-                        self::$config['password'],
-                        $options
-                    );
-                    return self::$pdo;
+                    $probeConnectedDb = (string) $probePdo->query('SELECT DATABASE()')->fetchColumn();
+                    break;
                 } catch (Throwable) {
-                    throw $e;
+                    continue;
                 }
             }
+
+            if (!$probePdo instanceof PDO) {
+                throw $e;
+            }
+
+            // 1. Attempt to create the requested database
+            try {
+                $probePdo->exec("CREATE DATABASE IF NOT EXISTS `{$requestedDb}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                self::$pdo = new PDO(
+                    self::$config['dsn'],
+                    self::$config['user'],
+                    self::$config['password'],
+                    $options
+                );
+                return self::$pdo;
+            } catch (Throwable) {
+                // CREATE DATABASE denied or failed on serverless cluster
+            }
+
+            // 2. Discover accessible databases via SHOW DATABASES
+            try {
+                $databases = $probePdo->query('SHOW DATABASES')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                $systemDbs = ['information_schema', 'performance_schema', 'mysql', 'sys', 'metrics_schema'];
+                $userDbs = array_values(array_filter($databases, function ($db) use ($systemDbs) {
+                    return !in_array(strtolower((string) $db), $systemDbs, true);
+                }));
+
+                // Fallback to 'test' if present (standard TiDB Cloud default schema)
+                if (in_array('test', $userDbs, true)) {
+                    $targetDsn = preg_replace('/dbname=[^;]+/i', 'dbname=test', (string) self::$config['dsn']);
+                    self::$pdo = new PDO($targetDsn, self::$config['user'], self::$config['password'], $options);
+                    self::$config['dsn'] = $targetDsn;
+                    putenv('DB_NAME=test');
+                    $_ENV['DB_NAME'] = 'test';
+                    return self::$pdo;
+                }
+
+                // Fallback to first available user database
+                if (!empty($userDbs[0])) {
+                    $firstDb = (string) $userDbs[0];
+                    $targetDsn = preg_replace('/dbname=[^;]+/i', 'dbname=' . $firstDb, (string) self::$config['dsn']);
+                    self::$pdo = new PDO($targetDsn, self::$config['user'], self::$config['password'], $options);
+                    self::$config['dsn'] = $targetDsn;
+                    putenv("DB_NAME={$firstDb}");
+                    $_ENV['DB_NAME'] = $firstDb;
+                    return self::$pdo;
+                }
+            } catch (Throwable) {
+                // Schema inspection failed
+            }
+
+            if ($probeConnectedDb !== '' && $probeConnectedDb !== null) {
+                self::$pdo = $probePdo;
+                putenv("DB_NAME={$probeConnectedDb}");
+                $_ENV['DB_NAME'] = $probeConnectedDb;
+                return self::$pdo;
+            }
+
             throw $e;
         }
-
-        return self::$pdo;
     }
 }
