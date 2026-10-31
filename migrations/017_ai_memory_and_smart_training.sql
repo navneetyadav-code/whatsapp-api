@@ -2,11 +2,11 @@
 -- Description: Dual-Tier Contact-Scoped AI Memory, Auto-Expiry TTL, and Few-Shot Golden Training & Negative Constraints
 
 -- 1. Upgrade ai_user_memory for Contact-Level Partitioning & Auto-Expiry TTL
-ALTER TABLE `ai_user_memory` ADD COLUMN `contact_phone` VARCHAR(30) NOT NULL DEFAULT '' AFTER `user_id`;
-ALTER TABLE `ai_user_memory` ADD COLUMN `is_durable` TINYINT(1) NOT NULL DEFAULT 1 AFTER `confidence_score`;
-ALTER TABLE `ai_user_memory` ADD COLUMN `expires_at` TIMESTAMP NULL DEFAULT NULL AFTER `is_durable`;
-ALTER TABLE `ai_user_memory` ADD COLUMN `access_count` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `expires_at`;
-ALTER TABLE `ai_user_memory` ADD COLUMN `last_accessed_at` TIMESTAMP NULL DEFAULT NULL AFTER `access_count`;
+ALTER TABLE `ai_user_memory` ADD COLUMN `contact_phone` VARCHAR(30) NOT NULL DEFAULT '';
+ALTER TABLE `ai_user_memory` ADD COLUMN `is_durable` TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE `ai_user_memory` ADD COLUMN `expires_at` TIMESTAMP NULL DEFAULT NULL;
+ALTER TABLE `ai_user_memory` ADD COLUMN `access_count` INT UNSIGNED NOT NULL DEFAULT 0;
+ALTER TABLE `ai_user_memory` ADD COLUMN `last_accessed_at` TIMESTAMP NULL DEFAULT NULL;
 
 -- Update unique key to allow contact-scoped facts
 ALTER TABLE `ai_user_memory` DROP INDEX `idx_user_mem_key`;
