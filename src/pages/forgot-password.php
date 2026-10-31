@@ -181,8 +181,16 @@ It expires in 15 minutes.";
         $otp = trim((string) ($data['otp'] ?? ''));
         $newPassword = (string) ($data['new_password'] ?? '');
 
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            json_response(['ok' => false, 'error' => 'Invalid email address.'], 400);
+        }
+
         if (login_lockout_seconds($email) > 0) {
             json_response(['ok' => false, 'error' => 'Too many failed attempts. Account is temporarily locked. Please try again later.'], 429);
+        }
+
+        if (!preg_match('/^[0-9]{6}$/', $otp)) {
+            json_response(['ok' => false, 'error' => 'OTP must be a 6-digit number.'], 400);
         }
 
         if (strlen($newPassword) < 8) {
@@ -214,6 +222,9 @@ It expires in 15 minutes.";
 
         $stmt = $pdo->prepare("DELETE FROM password_resets WHERE email = ?");
         $stmt->execute([$email]);
+
+        // Ensure security flag is set
+        $pdo->prepare("INSERT INTO user_security (user_id, password_set) SELECT id, 1 FROM users WHERE email = ? ON DUPLICATE KEY UPDATE password_set = 1")->execute([$email]);
 
         clear_failed_logins($email);
         session_regenerate_id(true);
