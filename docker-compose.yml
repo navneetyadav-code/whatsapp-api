@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # MySQL Database Service
+  # MySQL 8.0 Database Service
   db:
     image: mysql:8.0
     container_name: whatsgateway_db
@@ -17,9 +17,10 @@ services:
       - "3306:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secure_password"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   # WhatsGateway Unified App & Worker Container
   app:
@@ -35,17 +36,27 @@ services:
       - "8080:80"
     environment:
       APP_ENV: production
+      APP_NAME: "WhatsGateway"
       APP_PUBLIC_URL: http://localhost:8080
+      APP_BASE_PATH: ""
       DB_HOST: db
       DB_PORT: 3306
       DB_NAME: whatsapp_gateway
       DB_USER: gateway_user
       DB_PASSWORD: gateway_user_password
-      DEFAULT_COUNTRY_CODE: in
+      DB_SSL: "false"
+      DEFAULT_COUNTRY_CODE: "91"
       WORKER_PORT: 3107
+      WORKER_TOKEN: "whatsgateway_production_secret_token_at_least_32_chars"
+      INITIAL_ADMIN_EMAIL: "admin@example.com"
+      INITIAL_ADMIN_PASSWORD: "AdminSecurePassword2026!"
+      INITIAL_ADMIN_NAME: "Administrator"
+      ENABLE_REGISTRATION: "false"
     volumes:
       - whatsgateway_sessions:/var/www/html/whatsapp-api-data/sessions
+      - whatsgateway_uploads:/var/www/html/public/uploads
 
 volumes:
   whatsgateway_mysql_data:
   whatsgateway_sessions:
+  whatsgateway_uploads:
