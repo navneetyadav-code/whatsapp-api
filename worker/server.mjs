@@ -8,7 +8,7 @@ import dns from 'dns/promises';
 import net from 'net';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
 import { rm } from 'fs/promises';
-import { dirname, join, resolve, basename } from 'path';
+import { dirname, join, resolve, basename, sep } from 'path';
 import { fileURLToPath } from 'url';
 import makeWASocket, {
   Browsers,
