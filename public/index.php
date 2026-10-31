@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET'
 }
 
 $publicPages = ['login', 'register', 'docs', 'forgot-password', 'google-auth', 'google-contacts', 'privacy', 'privacy-policy', 'terms', 'terms-of-service', 'tos', 'home', 'api', 'send', 'messages', 'api-contacts', 'contacts-api', 'api-contacts-batch', 'contacts-batch', 'api-contacts-delete', 'contacts-delete'];
-$dashboardPages = ['dashboard', 'live-chat', 'message', 'device', 'api-keys', 'queue', 'contacts', 'feedback', 'webhooks', 'campaigns', 'audit', 'chatbot', 'rules', 'keyword-rules', 'security'];
+$dashboardPages = ['dashboard', 'live-chat', 'message', 'device', 'api-keys', 'queue', 'contacts', 'feedback', 'webhooks', 'campaigns', 'audit', 'chatbot', 'ai-agent', 'knowledge', 'tools', 'app-store', 'presets', 'escalations', 'rules', 'keyword-rules', 'security', 'ai-credentials', 'ai-keys', 'memory'];
 
 if ($page === 'logout' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
@@ -71,8 +71,12 @@ if ($page === 'credentials' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();
     $name = trim((string) ($_POST['name'] ?? 'API key'));
-    $_SESSION['new_api_credentials'] = create_api_key((int) $user['id'], $name);
-    flash('success', 'New API key and secret generated. Copy them now; the secret is shown once.');
+    $creds = create_api_key((int) $user['id'], $name);
+    if (isset($_POST['rate_per_minute']) || isset($_POST['rate_per_hour']) || isset($_POST['rate_per_day']) || isset($_POST['ip_allowlist']) || isset($_POST['allow_humanize'])) {
+        update_api_key_limits((int) $user['id'], (int) $creds['id'], $_POST);
+    }
+    $_SESSION['new_api_credentials'] = $creds;
+    flash('success', 'New API key generated successfully. Copy it now; the secret is shown once.');
     redirect_to('index.php?page=api-keys');
 }
 
@@ -554,9 +558,29 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $groqKey = trim((string) ($_POST['groq_api_key'] ?? ''));
     $openrouterKey = trim((string) ($_POST['openrouter_api_key'] ?? ''));
 
-    $geminiModel = trim((string) ($_POST['gemini_model'] ?? 'gemini-1.5-flash')) ?: 'gemini-1.5-flash';
-    $groqModel = trim((string) ($_POST['groq_model'] ?? 'llama-3.3-70b-versatile')) ?: 'llama-3.3-70b-versatile';
-    $openrouterModel = trim((string) ($_POST['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free')) ?: 'meta-llama/llama-3.3-70b-instruct:free';
+    // Safe Key Masking: Never overwrite saved production keys with UI mask asterisks
+    if ($geminiKey === '********' || preg_match('/^\*+$/', $geminiKey)) {
+        $geminiKey = '';
+    }
+    if ($groqKey === '********' || preg_match('/^\*+$/', $groqKey)) {
+        $groqKey = '';
+    }
+    if ($openrouterKey === '********' || preg_match('/^\*+$/', $openrouterKey)) {
+        $openrouterKey = '';
+    }
+
+    $geminiModel = preg_replace('/^models\//', '', trim((string) ($_POST['gemini_model'] ?? '')));
+    $groqModel = trim((string) ($_POST['groq_model'] ?? ''));
+    $openrouterModel = trim((string) ($_POST['openrouter_model'] ?? ''));
+
+    // Preserve existing models if blank
+    $currSettingsStmt = $pdo->prepare('SELECT gemini_model, groq_model, openrouter_model FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
+    $currSettingsStmt->execute([$userId]);
+    $currRow = $currSettingsStmt->fetch() ?: [];
+
+    $saveGeminiModel = $geminiModel !== '' ? $geminiModel : ($currRow['gemini_model'] ?? 'gemini-3.5-flash');
+    $saveGroqModel = $groqModel !== '' ? $groqModel : ($currRow['groq_model'] ?? 'openai/gpt-oss-120b');
+    $saveOpenrouterModel = $openrouterModel !== '' ? $openrouterModel : ($currRow['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free');
 
     $stmt = $pdo->prepare(
         'INSERT INTO ai_agent_settings (user_id, enabled, provider_priority, gemini_api_key, groq_api_key, openrouter_api_key, gemini_model, groq_model, openrouter_model, system_prompt, temperature, max_tokens, auto_reply_enabled, agent_mode, feedback_enabled, is_always_on, owner_name)
@@ -567,9 +591,9 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
            gemini_api_key = IF(VALUES(gemini_api_key) != "", VALUES(gemini_api_key), gemini_api_key),
            groq_api_key = IF(VALUES(groq_api_key) != "", VALUES(groq_api_key), groq_api_key),
            openrouter_api_key = IF(VALUES(openrouter_api_key) != "", VALUES(openrouter_api_key), openrouter_api_key),
-           gemini_model = VALUES(gemini_model),
-           groq_model = VALUES(groq_model),
-           openrouter_model = VALUES(openrouter_model),
+           gemini_model = IF(VALUES(gemini_model) != "", VALUES(gemini_model), gemini_model),
+           groq_model = IF(VALUES(groq_model) != "", VALUES(groq_model), groq_model),
+           openrouter_model = IF(VALUES(openrouter_model) != "", VALUES(openrouter_model), openrouter_model),
            system_prompt = VALUES(system_prompt),
            temperature = VALUES(temperature),
            max_tokens = VALUES(max_tokens),
@@ -581,14 +605,22 @@ if ($page === 'ai-agent-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     );
     $stmt->execute([
         $userId, $enabled, $providerPriority, $geminiKey, $groqKey, $openrouterKey,
-        $geminiModel, $groqModel, $openrouterModel, $systemPrompt, $temperature, $maxTokens, $autoReplyEnabled,
+        $saveGeminiModel, $saveGroqModel, $saveOpenrouterModel, $systemPrompt, $temperature, $maxTokens, $autoReplyEnabled,
         $agentMode, $feedbackEnabled, $isAlwaysOn, $ownerName
     ]);
 
+    if ($agentMode === 'personal') {
+        // STRICT ISOLATION: Unpause conversations and auto-resolve any active escalations
+        $pdo->prepare("UPDATE chat_conversations SET status = 'open', bot_paused = 0, escalation_reason = NULL, awaiting_feedback = 0 WHERE user_id = ? AND (status = 'escalated' OR bot_paused = 1)")
+            ->execute([$userId]);
+        $pdo->prepare("UPDATE chat_escalations SET status = 'resolved', resolved_at = NOW(), resolved_by = 'Switched to Personal Mode' WHERE user_id = ? AND status = 'active'")
+            ->execute([$userId]);
+    }
+
     flash('success', $agentMode === 'personal'
-        ? '⚡ Personal AI Assistant activated! Operating 24/7 with customer feedback reviews closed.'
+        ? '⚡ Personal AI Assistant activated! Operating 24/7 with zero escalation and feedback reviews closed.'
         : '🏢 AI Support Agent configuration updated successfully.');
-    redirect_to('index.php?page=chatbot&tab=ai-agent');
+    redirect_to('index.php?page=chatbot');
 }
 
 if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -609,20 +641,24 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($toolSlug === '' || $displayName === '' || $description === '') {
         flash('error', 'Tool identifier, display title, and AI prompt description are required.');
-        redirect_to('index.php?page=chatbot&tab=tools');
+        redirect_to('index.php?page=tools');
     }
 
     // Compile parameters schema from builder inputs or JSON
     $props = [];
     $req = [];
-    if (!empty($_POST['param_name']) && is_array($_POST['param_name'])) {
-        foreach ($_POST['param_name'] as $idx => $pName) {
+    $pNames = $_POST['param_names'] ?? $_POST['param_name'] ?? [];
+    $pTypes = $_POST['param_types'] ?? $_POST['param_type'] ?? [];
+    $pDescs = $_POST['param_descriptions'] ?? $_POST['param_desc'] ?? [];
+    $pReqs = (array) ($_POST['param_requireds'] ?? $_POST['param_required'] ?? []);
+
+    if (!empty($pNames) && is_array($pNames)) {
+        foreach ($pNames as $idx => $pName) {
             $pName = trim((string) $pName);
             if ($pName === '') continue;
-            $pType = strtoupper(trim((string) ($_POST['param_type'][$idx] ?? 'STRING')));
-            $pDesc = trim((string) ($_POST['param_desc'][$idx] ?? ''));
-            $reqRaw = (array) ($_POST['param_required'] ?? []);
-            $isReq = !empty($reqRaw[$idx]) || in_array($pName, $reqRaw, true) || in_array((string) $idx, $reqRaw, true);
+            $pType = strtoupper(trim((string) ($pTypes[$idx] ?? 'STRING')));
+            $pDesc = trim((string) ($pDescs[$idx] ?? ''));
+            $isReq = !empty($pReqs[$idx]) || in_array($pName, $pReqs, true) || in_array((string) $idx, $pReqs, true);
             $props[$pName] = [
                 'type' => in_array($pType, ['STRING', 'NUMBER', 'INTEGER', 'BOOLEAN', 'OBJECT', 'ARRAY'], true) ? $pType : 'STRING',
                 'description' => $pDesc
@@ -753,7 +789,7 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('success', 'Custom Tool "' . $displayName . '" registered and active.');
     }
 
-    redirect_to('index.php?page=chatbot&tab=tools');
+    redirect_to('index.php?page=tools');
 }
 
 if ($page === 'custom-tool-toggle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -766,7 +802,7 @@ if ($page === 'custom-tool-toggle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$toolId, $userId]);
 
     flash('success', 'Tool activation status updated.');
-    redirect_to('index.php?page=chatbot&tab=tools');
+    redirect_to('index.php?page=tools');
 }
 
 if ($page === 'custom-tool-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -779,7 +815,91 @@ if ($page === 'custom-tool-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$toolId, $userId]);
 
     flash('success', 'Tool removed from account catalog.');
-    redirect_to('index.php?page=chatbot&tab=tools');
+    redirect_to('index.php?page=tools');
+}
+
+if ($page === 'app-store-install' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $pdo = Database::pdo();
+    $presetSlug = trim((string) ($_POST['preset_slug'] ?? ''));
+
+    require_once dirname(__DIR__) . '/src/data/dashboard/app-store.data.php';
+
+    $chosenPreset = null;
+    foreach ($appStorePresets as $p) {
+        if ($p['slug'] === $presetSlug) {
+            $chosenPreset = $p;
+            break;
+        }
+    }
+
+    if (!$chosenPreset) {
+        flash('error', 'Preset not found in App Store catalog.');
+        redirect_to('index.php?page=app-store');
+    }
+
+    // Convert parameters array to Gemini Schema format
+    $properties = [];
+    $required = [];
+    foreach ($chosenPreset['parameters'] as $param) {
+        $properties[$param['name']] = [
+            'type' => strtolower($param['type'] ?? 'string'),
+            'description' => $param['description'] ?? ''
+        ];
+        if (!empty($param['required'])) {
+            $required[] = $param['name'];
+        }
+    }
+    $parametersSchema = [
+        'type' => 'OBJECT',
+        'properties' => $properties,
+        'required' => $required
+    ];
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO ai_custom_tools 
+         (user_id, tool_slug, display_name, category, description, parameters_schema, execution_config, rbac_roles, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+         ON DUPLICATE KEY UPDATE
+         display_name = VALUES(display_name),
+         category = VALUES(category),
+         description = VALUES(description),
+         parameters_schema = VALUES(parameters_schema),
+         execution_config = VALUES(execution_config),
+         rbac_roles = VALUES(rbac_roles),
+         is_active = 1'
+    );
+    $stmt->execute([
+        $userId,
+        $chosenPreset['slug'],
+        $chosenPreset['title'],
+        $chosenPreset['category'],
+        $chosenPreset['description'],
+        json_encode($parametersSchema, JSON_UNESCAPED_SLASHES),
+        json_encode($chosenPreset['execution_config'], JSON_UNESCAPED_SLASHES),
+        json_encode($chosenPreset['rbac_roles'])
+    ]);
+
+    flash('success', 'Tool "' . $chosenPreset['title'] . '" installed and activated successfully!');
+    $returnTo = !empty($_POST['return_to']) ? (string) $_POST['return_to'] : 'index.php?page=app-store';
+    redirect_to($returnTo);
+}
+
+if ($page === 'app-store-uninstall' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $pdo = Database::pdo();
+    $toolSlug = trim((string) ($_POST['tool_slug'] ?? ''));
+
+    $stmt = $pdo->prepare('DELETE FROM ai_custom_tools WHERE user_id = ? AND tool_slug = ?');
+    $stmt->execute([$userId, $toolSlug]);
+
+    flash('success', 'Tool uninstalled from your dashboard.');
+    $returnTo = !empty($_POST['return_to']) ? (string) $_POST['return_to'] : 'index.php?page=app-store';
+    redirect_to($returnTo);
 }
 
 if ($page === 'ai-tools-config-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -801,7 +921,7 @@ if ($page === 'ai-tools-config-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $updateStmt->execute([json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), $userId]);
 
     flash('success', 'Admin whitelisted phone numbers saved successfully.');
-    redirect_to('index.php?page=chatbot&tab=tools');
+    redirect_to('index.php?page=tools');
 }
 
 if ($page === 'ai-knowledge-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -815,14 +935,14 @@ if ($page === 'ai-knowledge-create' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($title === '' || $content === '') {
         flash('error', 'Title and content are required.');
-        redirect_to('index.php?page=chatbot&tab=knowledge');
+        redirect_to('index.php?page=knowledge');
     }
 
     $stmt = $pdo->prepare('INSERT INTO ai_knowledge_chunks (user_id, title, content, is_active) VALUES (?, ?, ?, 1)');
     $stmt->execute([$userId, $title, $content]);
 
     flash('success', 'Knowledge chunk added to RAG database.');
-    redirect_to('index.php?page=chatbot&tab=knowledge');
+    redirect_to('index.php?page=knowledge');
 }
 
 if ($page === 'ai-knowledge-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -835,7 +955,7 @@ if ($page === 'ai-knowledge-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute([$id, $userId]);
 
     flash('success', 'Knowledge chunk deleted.');
-    redirect_to('index.php?page=chatbot&tab=knowledge');
+    redirect_to('index.php?page=knowledge');
 }
 
 if ($page === 'ai-knowledge-update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -854,7 +974,7 @@ if ($page === 'ai-knowledge-update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             json_response(['success' => false, 'error' => 'Title and content are required.'], 422);
         }
         flash('error', 'Title and content are required.');
-        redirect_to('index.php?page=chatbot&tab=knowledge');
+        redirect_to('index.php?page=knowledge');
     }
 
     $stmt = Database::pdo()->prepare(
@@ -878,7 +998,21 @@ if ($page === 'ai-knowledge-update' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     flash('success', 'Knowledge document updated successfully.');
-    redirect_to('index.php?page=chatbot&tab=knowledge');
+    redirect_to('index.php?page=knowledge');
+}
+
+if ($page === 'escalation-resolve' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+    $id = (int) ($_POST['id'] ?? 0);
+    $pdo = Database::pdo();
+
+    $stmt = $pdo->prepare("UPDATE chat_escalations SET status = 'resolved', resolved_at = NOW(), resolved_by = ? WHERE id = ? AND user_id = ?");
+    $stmt->execute([$user['name'] ?? 'Admin', $id, $userId]);
+
+    flash('success', 'Escalation incident marked as resolved.');
+    redirect_to('index.php?page=escalations');
 }
 
 if ($page === 'session-auto-sleep' && $_SERVER['REQUEST_METHOD'] === 'POST') {

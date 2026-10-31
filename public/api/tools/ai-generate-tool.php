@@ -29,7 +29,8 @@ $pdo = Database::pdo();
 // Read JSON input
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $rawContent = trim((string) ($input['raw_content'] ?? ''));
-$inputType = trim((string) ($input['input_type'] ?? 'auto')); // auto | curl | prompt | docs
+$inputType = trim((string) ($input['input_type'] ?? 'auto')); // auto | curl | prompt | docs | shared | shared_hosting
+$isSharedHosting = in_array($inputType, ['shared', 'shared_hosting'], true);
 
 if ($rawContent === '') {
     json_response([
@@ -73,9 +74,15 @@ $aiResult = null;
 $usedProvider = null;
 
 if ($hasAiKeys) {
-    $contextHint = $isCurl 
-        ? "The user has provided a raw cURL command:\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT)
-        : "The user has provided the following requirement, prompt, or API documentation:\n\"{$rawContent}\"";
+    if ($isSharedHosting) {
+        $contextHint = $isCurl 
+            ? "The user has provided a Shared Hosting API cURL (e.g. cPanel / ByetHost / InfinityFree / Apache virtual host / AssistGroup):\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT) . "\nEnsure the tool is fully configured for shared hosting execution without aes errors, preserving Accept: application/json and all query/route parameters."
+            : "The user has provided the following Shared Hosting requirement or API documentation:\n\"{$rawContent}\"";
+    } else {
+        $contextHint = $isCurl 
+            ? "The user has provided a raw cURL command:\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT)
+            : "The user has provided the following requirement, prompt, or API documentation:\n\"{$rawContent}\"";
+    }
 
     $systemInstruction = <<<PROMPT
 You are a Principal Integration Architect & API Engineer.
@@ -338,7 +345,12 @@ if ($aiResult !== null) {
 } elseif ($parsedCurl !== null) {
     // Use high-precision deterministic cURL parser
     $finalTool = $parsedCurl;
-    $sourceType = 'cURL Engine Fast Parser';
+    if ($isSharedHosting) {
+        if (!isset($finalTool['execution_config']['headers']['Accept']) && !isset($finalTool['execution_config']['headers']['accept'])) {
+            $finalTool['execution_config']['headers']['Accept'] = 'application/json';
+        }
+    }
+    $sourceType = $isSharedHosting ? 'Shared Hosting Engine Copilot' : 'cURL Engine Fast Parser';
 } else {
     // If not a cURL and no AI response was available, formulate a clean generic template
     $slug = strtolower((string) preg_replace('/[^a-z0-9_]/', '_', substr($rawContent, 0, 24)));

@@ -23,7 +23,7 @@ declare(strict_types=1);
                 <?php if ($isDeviceConnected): ?>
                     <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-[11px] font-semibold truncate" title="WhatsApp Device Connected">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                        <span class="truncate font-mono font-bold"><?= e(!empty($chatDeviceSession['push_name']) ? $chatDeviceSession['push_name'] : '+' . ($chatDeviceSession['phone'] ?? '91')) ?></span>
+                        <span class="truncate font-mono font-bold"><?= e(!empty($chatDeviceSession['push_name']) ? $chatDeviceSession['push_name'] : '+' . ($chatDeviceSession['phone'] ?? default_country_dial_code())) ?></span>
                     </div>
                 <?php else: ?>
                     <a href="<?= e(base_url('index.php?page=device')) ?>" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-semibold hover:bg-amber-100 transition-colors" title="Device Offline — Click to Connect">
@@ -35,7 +35,7 @@ declare(strict_types=1);
 
             <!-- Action Buttons: Buzzer Toggle + New Chat & Refresh -->
             <div class="flex items-center gap-1 shrink-0">
-                <button id="btnNewChat" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all active:scale-[0.98]" title="Start a new chat with an Indian or international number">
+                <button id="btnNewChat" type="button" class="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all active:scale-[0.98]" title="Start a new chat with a phone number">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                     <span>New Chat</span>
                 </button>
@@ -51,7 +51,8 @@ declare(strict_types=1);
                 <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
-                <input type="text" id="chatSearchInput" placeholder="Search phone (+91...) or name" class="w-full pl-8 pr-7 py-1.5 bg-slate-100 border border-slate-200/90 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-all font-medium placeholder-slate-400">
+                <?php $chatDefaultDial = default_country_dial_code(); ?>
+                <input type="text" id="chatSearchInput" placeholder="Search phone (+<?= e($chatDefaultDial) ?>...) or name" class="w-full pl-8 pr-7 py-1.5 bg-slate-100 border border-slate-200/90 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-all font-medium placeholder-slate-400">
                 <button id="chatSearchClear" type="button" class="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 hidden">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
@@ -205,16 +206,16 @@ declare(strict_types=1);
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
-        <p class="text-xs text-slate-500 mb-4">Enter a 10-digit Indian mobile number or international phone number with country code.</p>
+        <p class="text-xs text-slate-500 mb-4">Enter a phone number with or without country code.</p>
         
         <form id="newChatForm" onsubmit="return false;" class="space-y-3">
             <div>
-                <label class="block text-[11px] font-bold text-slate-600 mb-1">Phone Number (default country code: 91)</label>
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">Phone Number (default country code: <?= e($chatDefaultDial) ?>)</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center text-xs font-mono font-bold text-slate-400 pointer-events-none">+</span>
-                    <input type="text" id="newChatPhone" value="91" placeholder="919876543210 or 9876543210" required class="w-full pl-6 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-slate-900 focus:outline-none">
+                    <input type="text" id="newChatPhone" value="<?= e($chatDefaultDial) ?>" placeholder="<?= e($chatDefaultDial) ?>9876543210 or 9876543210" required class="w-full pl-6 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-slate-900 focus:outline-none">
                 </div>
-                <p class="text-[10px] text-slate-400 mt-1">If 10 digits are entered, 91 is automatically prefixed.</p>
+                <p class="text-[10px] text-slate-400 mt-1">If 10 digits are entered, <?= e($chatDefaultDial) ?> is automatically prefixed.</p>
             </div>
             <div>
                 <label class="block text-[11px] font-bold text-slate-600 mb-1">Contact Name (optional)</label>

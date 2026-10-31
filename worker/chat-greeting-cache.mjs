@@ -18,6 +18,9 @@ export class GreetingCache {
 
     // Standard low-entropy greeting pattern (supports "hi", "hello there", "namaste ji", etc.)
     this.greetingRegex = /^(h+i+|h+e+y+|h+e+l+l+o+|namaste+|hola+|s+u+p+|yo+|kem\s*cho|salaam|pranam|good\s*(morning|afternoon|evening|day))(\s+(there|sir|madam|ji|bhai|dear|friend|buddy|bro|team))?[\s\.\!\?\:\)\-\_]*$/i;
+
+    // Low-entropy acknowledgment and closing pattern (supports "thanks", "ok", "got it", "bye", etc.)
+    this.ackRegex = /^(t+h+a+n+k+s*|t+h+x+|thank\s+you(\s+so\s+much|\s+a\s+lot)?|shukriya|dhanyawad|o+k+a*y*|k+|alright|got\s+it|understood|noted|perfect|awesome|great|cool|superb|b+y+e+|goodbye|cya|take\s+care)(\s+(there|sir|madam|ji|bhai|dear|friend|buddy|bro|team))?[\s\.\!\?\:\)\-\_]*$/i;
   }
 
   /**
@@ -33,7 +36,19 @@ export class GreetingCache {
   }
 
   /**
-   * Evaluate whether to intercept repeated greeting and save tokens
+   * Check if text is solely a low-entropy acknowledgment or closing
+   * @param {string} text
+   * @returns {boolean}
+   */
+  isAcknowledgmentOnly(text) {
+    if (!text || typeof text !== 'string') return false;
+    const clean = text.trim();
+    if (clean.length > 35) return false;
+    return this.ackRegex.test(clean);
+  }
+
+  /**
+   * Evaluate whether to intercept repeated greeting or acknowledgment and save tokens
    * @param {string|number} userId
    * @param {string} senderPhone
    * @param {string} text
@@ -42,6 +57,30 @@ export class GreetingCache {
    * @returns {{ shouldIntercept: boolean, replyText: string|null }}
    */
   evaluate(userId, senderPhone, text, sessionUuid = null, options = {}) {
+    const isPersonal = options.isPersonalMode === true;
+    const owner = options.ownerName || 'Boss';
+
+    // 1. Intercept low-entropy acknowledgments & closings (saves 100% LLM tokens)
+    if (!options.hasPendingDraft && this.isAcknowledgmentOnly(text)) {
+      const clean = text.trim();
+      let ackReply;
+      if (/^(b+y+e+|goodbye|cya|take\s+care)/i.test(clean)) {
+        ackReply = isPersonal
+          ? `Take care, ${owner}! Have a great day ahead! 👋`
+          : 'Goodbye! Have a wonderful day ahead! 👋';
+      } else if (/^(t+h+a+n+k|t+h+x|shukriya|dhanyawad)/i.test(clean)) {
+        ackReply = isPersonal
+          ? `You're very welcome, ${owner}! Always here whenever you need me. 👍`
+          : "You're very welcome! Feel free to reach out anytime if you need more help. 😊";
+      } else {
+        ackReply = isPersonal
+          ? `Noted, ${owner}! 👍 Let me know whenever you need anything.`
+          : 'Understood! Let us know if you need anything else. 👍';
+      }
+      return { shouldIntercept: true, replyText: ackReply };
+    }
+
+    // 2. Intercept repeated greetings
     if (!this.isGreetingOnly(text)) {
       return { shouldIntercept: false, replyText: null };
     }
@@ -68,9 +107,6 @@ export class GreetingCache {
     if (sessionUuid) {
       record.greetedSessions.add(sessionUuid);
     }
-
-    const isPersonal = options.isPersonalMode === true;
-    const owner = options.ownerName || 'Boss';
 
     // If within cooldown (e.g. 5 minutes) and user is spamming greetings
     if (timeSinceLast < this.cooldownMs) {

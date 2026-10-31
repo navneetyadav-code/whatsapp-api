@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Top Logo -->
         <div class="relative z-10 flex items-center gap-2.5">
-            <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/20">
+            <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-contain shadow-sm border border-white/20">
             <span class="font-semibold text-white tracking-wide text-sm">WhatsGateway</span>
         </div>
 
@@ -190,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <!-- Logo inside form (mobile branding) -->
             <div class="flex items-center gap-2 mb-4 lg:hidden">
-                <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-cover shadow-sm border border-gray-100">
+                <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-contain shadow-sm border border-gray-100">
                 <span class="font-bold text-gray-900 tracking-tight text-base">WhatsGateway</span>
             </div>
 

@@ -68,6 +68,19 @@ function redirect_to(string $path): never
     exit;
 }
 
+function default_country_dial_code(): string {
+    $default = strtolower((string) config_env('DEFAULT_COUNTRY_CODE', 'in'));
+    $isoMap = [
+        'in' => '91', 'us' => '1', 'ca' => '1', 'gb' => '44', 'uk' => '44',
+        'au' => '61', 'ae' => '971', 'pk' => '92', 'bd' => '880', 'ng' => '234',
+        'br' => '55', 'id' => '62', 'ph' => '63', 'my' => '60', 'sg' => '65',
+        'sa' => '966', 'de' => '49', 'fr' => '33', 'es' => '34', 'it' => '39',
+        'ru' => '7', 'za' => '27', 'ke' => '254', 'eg' => '20'
+    ];
+    $countryDial = $isoMap[$default] ?? preg_replace('/\D/', '', $default);
+    return $countryDial !== '' ? $countryDial : '91';
+}
+
 function normalize_phone(string $phone): string {
     $phone = trim($phone);
     if ($phone === '') {
@@ -77,15 +90,7 @@ function normalize_phone(string $phone): string {
         return $phone;
     }
 
-    $default = strtolower((string) config_env('DEFAULT_COUNTRY_CODE', 'in'));
-    $isoMap = [
-        'in' => '91', 'us' => '1', 'ca' => '1', 'gb' => '44', 'uk' => '44',
-        'au' => '61', 'ae' => '971', 'pk' => '92', 'bd' => '880', 'ng' => '234'
-    ];
-    $countryDial = $isoMap[$default] ?? preg_replace('/\D/', '', $default);
-    if ($countryDial === '') {
-        $countryDial = '91';
-    }
+    $countryDial = default_country_dial_code();
 
     $digits = preg_replace('/\D/', '', $phone);
     if (str_starts_with($phone, '+')) {

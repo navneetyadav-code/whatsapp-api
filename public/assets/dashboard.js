@@ -148,6 +148,12 @@ function renderStatus(data) {
         } else if (profileImage) {
             profileImage.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(session.pushName || 'W') + '&background=0D8ABC&color=fff';
         }
+
+        const pairCodeDisplay = document.getElementById('pairCodeDisplay');
+        if (pairCodeDisplay) {
+            pairCodeDisplay.classList.add('hidden');
+            delete pairCodeDisplay.dataset.sticky;
+        }
     } else {
         if (profileContainer) profileContainer.classList.add('hidden');
         if (qrContainer) qrContainer.classList.remove('hidden');
@@ -164,6 +170,14 @@ function renderStatus(data) {
         }
         if (sleepBtn) sleepBtn.classList.add('hidden');
         if (wakeupBtn) wakeupBtn.classList.add('hidden');
+
+        // Pairing Code Handling
+        const pairCodeDisplay = document.getElementById('pairCodeDisplay');
+        const pairCodeValue = document.getElementById('pairCodeValue');
+        if (session.pairingCode && pairCodeValue && pairCodeDisplay) {
+            pairCodeValue.textContent = session.pairingCode;
+            pairCodeDisplay.classList.remove('hidden');
+        }
 
         // QR Code Handling
         if (session.qr && qrImage && qrPlaceholder) {
@@ -257,6 +271,125 @@ testForm?.addEventListener('submit', async (event) => {
         testResult.textContent = 'Could not reach the worker.';
     }
 });
+
+// Pairing Tabs (QR vs Phone Code)
+const tabQrBtn = document.getElementById('tabQrBtn');
+const tabPairCodeBtn = document.getElementById('tabPairCodeBtn');
+const paneQr = document.getElementById('paneQr');
+const panePairCode = document.getElementById('panePairCode');
+
+if (tabQrBtn && tabPairCodeBtn && paneQr && panePairCode) {
+    tabQrBtn.addEventListener('click', () => {
+        tabQrBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all shadow-sm bg-white text-slate-900 flex items-center justify-center gap-1.5';
+        tabPairCodeBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
+        paneQr.classList.remove('hidden');
+        panePairCode.classList.add('hidden');
+    });
+
+    tabPairCodeBtn.addEventListener('click', () => {
+        tabPairCodeBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all shadow-sm bg-white text-slate-900 flex items-center justify-center gap-1.5';
+        tabQrBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
+        panePairCode.classList.remove('hidden');
+        paneQr.classList.add('hidden');
+    });
+}
+
+// Phone Number Pairing Form Submission
+const pairCodeForm = document.getElementById('pairCodeForm');
+const pairPhoneInput = document.getElementById('pairPhoneInput');
+const requestPairCodeBtn = document.getElementById('requestPairCodeBtn');
+const pairCodeBtnSpinner = document.getElementById('pairCodeBtnSpinner');
+const pairCodeBtnText = document.getElementById('pairCodeBtnText');
+
+if (pairCodeForm) {
+    pairCodeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const rawPhone = pairPhoneInput?.value || '';
+        const cleanPhone = rawPhone.replace(/\D/g, '');
+
+        if (!cleanPhone || cleanPhone.length < 8 || cleanPhone.length > 15) {
+            const err = 'Please enter a valid phone number with country code (8 to 15 digits).';
+            if (typeof window.showToast === 'function') window.showToast(err, 'error');
+            else alert(err);
+            return;
+        }
+
+        if (requestPairCodeBtn) requestPairCodeBtn.disabled = true;
+        if (pairCodeBtnSpinner) pairCodeBtnSpinner.classList.remove('hidden');
+        if (pairCodeBtnText) pairCodeBtnText.textContent = 'Requesting code...';
+
+        try {
+            const res = await callSession('pair-code', {
+                method: 'POST',
+                body: { phone: cleanPhone }
+            });
+
+            const code = res.code || res.formattedCode || res.session?.pairingCode;
+            const pairCodeValue = document.getElementById('pairCodeValue');
+            const pairCodeDisplay = document.getElementById('pairCodeDisplay');
+
+            if (code && pairCodeValue && pairCodeDisplay) {
+                pairCodeValue.textContent = code;
+                pairCodeDisplay.classList.remove('hidden');
+                pairCodeDisplay.dataset.sticky = 'true';
+            }
+
+            if (res.session) {
+                renderStatus(res);
+            }
+
+            if (typeof window.showToast === 'function') {
+                window.showToast('Pairing code generated! Enter it on WhatsApp on your phone.', 'success');
+            }
+        } catch (error) {
+            const msg = error.message || 'Failed to request pairing code.';
+            if (typeof window.showToast === 'function') window.showToast(msg, 'error');
+            else alert(msg);
+        } finally {
+            if (requestPairCodeBtn) requestPairCodeBtn.disabled = false;
+            if (pairCodeBtnSpinner) pairCodeBtnSpinner.classList.add('hidden');
+            if (pairCodeBtnText) pairCodeBtnText.textContent = 'Request New Code';
+        }
+    });
+}
+
+// Copy Pairing Code to Clipboard
+const copyPairCodeBtn = document.getElementById('copyPairCodeBtn');
+const copyIcon = document.getElementById('copyIcon');
+const copiedIcon = document.getElementById('copiedIcon');
+
+if (copyPairCodeBtn) {
+    copyPairCodeBtn.addEventListener('click', async () => {
+        const pairCodeValue = document.getElementById('pairCodeValue');
+        const text = (pairCodeValue?.textContent || '').trim().replace(/\s+/g, '');
+        if (!text || text === '--------') return;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            if (copyIcon && copiedIcon) {
+                copyIcon.classList.add('hidden');
+                copiedIcon.classList.remove('hidden');
+                setTimeout(() => {
+                    copyIcon.classList.remove('hidden');
+                    copiedIcon.classList.add('hidden');
+                }, 2000);
+            }
+            if (typeof window.showToast === 'function') {
+                window.showToast('Pairing code copied to clipboard!', 'success');
+            }
+        } catch (_) {
+            const temp = document.createElement('textarea');
+            temp.value = text;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            if (typeof window.showToast === 'function') {
+                window.showToast('Pairing code copied to clipboard!', 'success');
+            }
+        }
+    });
+}
 
 refreshStatus();
 setInterval(refreshStatus, 3000);
@@ -744,27 +877,27 @@ const initQueueLivePolling = () => {
                 if (!data.messages || data.messages.length === 0) {
                     recentBody.innerHTML = '<tr><td colspan="5" class="px-5 py-8 text-center text-slate-500">No messages have been queued yet.</td></tr>';
                 } else {
-                    recentBody.innerHTML = data.messages.slice(0, 5).map(msg => {
+                    recentBody.innerHTML = data.messages.slice(0, 8).map(msg => {
                         let badge = '';
                         if (msg.status === 'sent') {
-                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Sent</span>';
+                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/70 shadow-subtle font-mono"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Sent</span>';
                         } else if (msg.status === 'failed') {
-                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Failed</span>';
+                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-800 border border-rose-200/70 shadow-subtle font-mono"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Failed</span>';
                         } else if (msg.status === 'queued' || msg.status === 'processing') {
-                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Pending</span>';
+                            badge = '<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/70 shadow-subtle font-mono"><span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Pending</span>';
                         } else {
-                            badge = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200/60 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> ${msg.status.charAt(0).toUpperCase() + msg.status.slice(1)}</span>`;
+                            badge = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/70 shadow-subtle font-mono"><span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span> ${msg.status.charAt(0).toUpperCase() + msg.status.slice(1)}</span>`;
                         }
                         const safeBody = (msg.body || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                        const previewBody = safeBody.length > 40 ? safeBody.substring(0, 40) + '...' : safeBody;
+                        const previewBody = safeBody.length > 48 ? safeBody.substring(0, 48) + '...' : safeBody;
                         const time = msg.created_at ? msg.created_at.substring(11, 19) : '';
 
-                        return `<tr class="hover:bg-slate-50/80 transition-colors group cursor-default">
-                            <td class="px-5 py-3">${badge}</td>
-                            <td class="px-5 py-3"><div class="flex items-center gap-2.5"><span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60 shadow-sm">MSG</span><span class="font-mono text-slate-700 text-[12px] tracking-tight">Outgoing</span></div></td>
-                            <td class="px-5 py-3 text-slate-600 font-mono text-[12px] tracking-tight">${msg.recipient}</td>
-                            <td class="px-5 py-3 text-slate-500 hidden sm:table-cell font-medium truncate max-w-xs">${previewBody}</td>
-                            <td class="px-5 py-3 text-right text-slate-400 text-[12px] group-hover:text-slate-600 transition-colors">${time}</td>
+                        return `<tr class="hover:bg-slate-50/70 transition-colors group cursor-default">
+                            <td class="px-5 py-2.5">${badge}</td>
+                            <td class="px-5 py-2.5"><div class="flex items-center gap-2"><span class="text-[9px] font-bold font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/70">POST</span><span class="font-mono text-slate-700 text-[11px]">/api/send.php</span></div></td>
+                            <td class="px-5 py-2.5 text-slate-800 font-mono text-[12px] tabular-nums font-medium">${msg.recipient}</td>
+                            <td class="px-5 py-2.5 text-slate-600 hidden sm:table-cell font-normal truncate max-w-xs text-[12px]">${previewBody}</td>
+                            <td class="px-5 py-2.5 text-right text-slate-400 font-mono text-[11px] tabular-nums group-hover:text-slate-600 transition-colors">${time}</td>
                         </tr>`;
                     }).join('');
                 }

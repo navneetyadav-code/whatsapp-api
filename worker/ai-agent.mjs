@@ -273,11 +273,24 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
 OPERATING DIRECTIVES:
 1. Strict Grounding: State facts ONLY from verified executed tool results. Never invent records, prices, phone numbers, or dates.
 2. Two-Phase Action Safety: Consequential operations (sending emails, mutating records) MUST be drafted and approved by Boss before dispatch. Never claim an email is sent until confirm_action succeeds.
-3. Formatting: Crisp, proactive, structured. Use *bold* highlights, clean bullet points, and appropriate emojis.
-4. Silence Feedback: You are a personal assistant, NOT a customer service line. NEVER ask for customer reviews, 5-star ratings, or feedback surveys.`;
+3. Formatting & Brevity: Crisp, proactive, concise. Limit responses to 1-3 punchy sentences with *bold* highlights. Avoid filler greetings, preamble, or repetition.
+4. Silence Feedback: You are a personal assistant, NOT a customer service line. NEVER ask for customer reviews, 5-star ratings, or feedback surveys.
+5. ZERO HUMAN ESCALATION: You are Boss's 24/7 dedicated Personal Executive Assistant. There is NO customer support desk, external agent, or ticket queue. NEVER offer to transfer, connect, or escalate the conversation to a human agent, manager, or representative. NEVER call any escalation tool. If Boss asks for an agent or asks to escalate, inform Boss directly and politely that you are their private personal AI assistant and handle all tasks directly for them without human escalation.`;
 
     if (options.factsText && options.factsText.trim()) {
       microKernel += '\n\n' + options.factsText.trim();
+    }
+
+    if (options.sessionSummary && options.sessionSummary.trim()) {
+      microKernel += '\n\n[PREVIOUS SESSION CONTEXT: ' + options.sessionSummary.trim() + ']';
+    }
+
+    if (options.examplesText && options.examplesText.trim()) {
+      microKernel += '\n\n' + options.examplesText.trim();
+    }
+
+    if (options.constraintsText && options.constraintsText.trim()) {
+      microKernel += '\n\n' + options.constraintsText.trim();
     }
 
     if (skillDirectives.length > 0) {
@@ -300,7 +313,7 @@ OPERATING DIRECTIVES:
 2. DO NOT invent, hallucinate, or assume facts (like prices, phone numbers, or rules) not present in the sources.
 3. If the user asks something not covered in the sources, politely inform them that you do not have that specific detail and offer to connect them with our human support team.
 4. Language & Tone: Detect the user's language and mirror their style naturally. If they use Hindi or natural Hinglish, reply in warm, helpful Hinglish. If they use English, reply in professional, encouraging English.
-5. Format for WhatsApp: Use bold (*text*), clean bullet points, and appropriate emojis. Avoid long unbroken walls of text.`;
+5. WhatsApp Brevity & Formatting: Keep replies concise (under 2-3 sentences). State answers directly with bold (*text*), clean bullet points, and appropriate emojis. Eliminate conversational filler or long pleasantries.`;
   } else {
     contextBlock = `\n\n--- KNOWLEDGE RETRIEVAL NOTE ---\n` +
       `No specific knowledge base records matched the user's query.\n` +
@@ -309,6 +322,26 @@ OPERATING DIRECTIVES:
 2. If the user asks about out-of-scope topics (e.g. general knowledge, recipes, cooking, coding, competitors, unrelated trivia), DO NOT answer the out-of-scope question. Politely decline and state that you can only assist with our organization's official products, services, and policies.
 3. If they are asking a genuine question about our organization or services that isn't in your knowledge base, apologize politely and offer to connect them with our human support team.
 4. For general pleasantries/greetings (e.g. 'hi', 'hello', 'good morning', 'namaste'), respond warmly and ask how you can help them with our products or services today.`;
+  }
+
+  if (options.factsText && options.factsText.trim()) {
+    contextBlock += '\n\n' + options.factsText.trim();
+  }
+
+  if (options.sessionSummary && options.sessionSummary.trim()) {
+    contextBlock += '\n\n[PREVIOUS SESSION CONTEXT: ' + options.sessionSummary.trim() + ']';
+  }
+
+  if (options.examplesText && options.examplesText.trim()) {
+    contextBlock += '\n\n' + options.examplesText.trim();
+  }
+
+  if (options.constraintsText && options.constraintsText.trim()) {
+    contextBlock += '\n\n' + options.constraintsText.trim();
+  }
+
+  if (skillDirectives.length > 0) {
+    contextBlock += '\n\n' + skillDirectives.join('\n\n');
   }
 
   const defaultPrompt = 'You are a helpful customer support assistant on WhatsApp.';
@@ -323,9 +356,9 @@ OPERATING DIRECTIVES:
  * Call Google Gemini API with Autonomous Multi-Turn Function Calling Support
  */
 async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
-  let modelName = model || 'gemini-3.5-flash';
-  if (modelName === 'gemini-2.5-flash' || modelName === 'gemini-1.5-flash' || modelName === 'gemini-3.8-flash') {
-    modelName = 'gemini-3.5-flash';
+  let modelName = String(model || '').replace(/^models\//, '').trim();
+  if (!modelName) {
+    throw new Error('Gemini model name is not configured in backend settings.');
   }
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
@@ -345,8 +378,8 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   const maxTurns = 4; // Up to 3 autonomous tool turns + final synthesis
   let turn = 0;
 
-  // Primary model with resilient fallback cascade for transient Google 503/429 spikes
-  const candidateModels = Array.from(new Set([modelName, 'gemini-3.5-flash', 'gemini-3.5-flash-lite']));
+  // Strictly use configured model without hardcoded obsolete fallback models
+  const candidateModels = [modelName];
 
   while (turn < maxTurns) {
     turn++;
@@ -354,9 +387,16 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
       contents,
       generationConfig: {
         temperature: Number(temperature) || 0.4,
-        maxOutputTokens: Math.max(Number(maxTokens) || 1200, 1000)
+        maxOutputTokens: Math.min(Math.max(Number(maxTokens) || 280, 150), 500)
       }
     };
+
+    // Native Gemini prompt caching prefix
+    if (systemPrompt && systemPrompt.trim()) {
+      payload.systemInstruction = {
+        parts: [{ text: systemPrompt.trim() }]
+      };
+    }
 
     // Supply tools on turns < maxTurns; omit on final turn to guarantee text synthesis
     if (toolDeclarations.length > 0 && turn < maxTurns) {
@@ -398,7 +438,9 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Gemini API error [${response.status}]: ${errText.slice(0, 200)}`);
+      const err = new Error(`Gemini API error [${response.status}]: ${errText.slice(0, 200)}`);
+      err.status = response.status;
+      throw err;
     }
 
     const data = await response.json();
@@ -441,10 +483,55 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 }
 
 /**
+ * Normalizes tool parameter schemas from Gemini style (e.g. UPPERCASE types)
+ * to valid standard JSON Schema draft for OpenAI/Groq/OpenRouter.
+ */
+export function convertGeminiSchemaToOpenAi(schema) {
+  if (!schema || typeof schema !== 'object') {
+    return { type: 'object', properties: {} };
+  }
+
+  const properties = {};
+  if (schema.properties && typeof schema.properties === 'object') {
+    for (const [propName, propDef] of Object.entries(schema.properties)) {
+      if (!propDef || typeof propDef !== 'object') continue;
+      const cleanProp = {};
+      const rawType = String(propDef.type || 'string').toLowerCase();
+      cleanProp.type = rawType === 'integer' ? 'integer' : rawType === 'number' ? 'number' : rawType === 'boolean' ? 'boolean' : rawType === 'array' ? 'array' : rawType === 'object' ? 'object' : 'string';
+
+      if (propDef.description) {
+        cleanProp.description = String(propDef.description);
+      }
+      if (Array.isArray(propDef.enum)) {
+        cleanProp.enum = propDef.enum;
+      }
+      if (cleanProp.type === 'array' && propDef.items) {
+        cleanProp.items = convertGeminiSchemaToOpenAi(propDef.items);
+      }
+      if (cleanProp.type === 'object' && propDef.properties) {
+        cleanProp.properties = convertGeminiSchemaToOpenAi(propDef).properties;
+      }
+      properties[propName] = cleanProp;
+    }
+  }
+
+  const required = Array.isArray(schema.required) ? schema.required.filter(r => typeof r === 'string') : [];
+
+  return {
+    type: 'object',
+    properties,
+    required
+  };
+}
+
+/**
  * Call Groq API (OpenAI compatible with full Function Calling loop)
  */
 async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
-  const modelName = model || 'openai/gpt-oss-120b';
+  const modelName = String(model || '').trim();
+  if (!modelName) {
+    throw new Error('Groq model name is not configured in backend settings.');
+  }
   const url = 'https://api.groq.com/openai/v1/chat/completions';
 
   const messages = ChatMemoryEngine.buildOpenAiMessages(systemPrompt, conversationHistory, userMessage);
@@ -462,11 +549,7 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
         function: {
           name: d.name,
           description: d.description,
-          parameters: {
-            type: 'object',
-            properties: d.parameters?.properties || {},
-            required: d.parameters?.required || []
-          }
+          parameters: convertGeminiSchemaToOpenAi(d.parameters)
         }
       }));
     } catch (e) {
@@ -483,7 +566,7 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
       model: modelName,
       messages,
       temperature: Number(temperature) || 0.4,
-      max_tokens: Math.max(Number(maxTokens) || 1200, 800)
+      max_tokens: Math.min(Math.max(Number(maxTokens) || 280, 150), 500)
     };
 
     if (openAiTools.length > 0 && turn < maxTurns) {
@@ -503,7 +586,9 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Groq API error [${response.status}]: ${errText.slice(0, 200)}`);
+      const err = new Error(`Groq API error [${response.status}]: ${errText.slice(0, 200)}`);
+      err.status = response.status;
+      throw err;
     }
 
     const data = await response.json();
@@ -544,18 +629,45 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
 /**
  * Call OpenRouter API (OpenAI compatible fallback)
  */
-async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = []) {
-  const modelName = model || 'meta-llama/llama-3.3-70b-instruct:free';
+async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
+  const modelName = String(model || '').trim();
+  if (!modelName) {
+    throw new Error('OpenRouter model name is not configured in backend settings.');
+  }
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const messages = ChatMemoryEngine.buildOpenAiMessages(systemPrompt, conversationHistory, userMessage);
+
+  let openAiTools = [];
+  if (toolsContext && toolsContext.userId && toolsContext.db) {
+    try {
+      const userTools = toolsContext.scopedTools || await UniversalToolsRegistry.loadUserTools(toolsContext.userId, toolsContext.db);
+      const callerRole = toolsContext.callerRole || 'guest';
+      const declarations = UniversalToolsRegistry.compileDeclarationsForRole(userTools, callerRole);
+      openAiTools = declarations.map(d => ({
+        type: 'function',
+        function: {
+          name: d.name,
+          description: d.description,
+          parameters: convertGeminiSchemaToOpenAi(d.parameters)
+        }
+      }));
+    } catch (e) {
+      console.error('[AI Agent] Failed to compile OpenRouter tools:', e.message);
+    }
+  }
 
   const payload = {
     model: modelName,
     messages,
     temperature: Number(temperature),
-    max_tokens: Math.max(Number(maxTokens) || 1200, 800)
+    max_tokens: Math.min(Math.max(Number(maxTokens) || 280, 150), 500)
   };
+
+  if (openAiTools.length > 0) {
+    payload.tools = openAiTools;
+    payload.tool_choice = 'auto';
+  }
 
   const response = await fetch(url, {
     method: 'POST',
@@ -571,7 +683,9 @@ async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperat
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`OpenRouter API error [${response.status}]: ${errText.slice(0, 200)}`);
+    const err = new Error(`OpenRouter API error [${response.status}]: ${errText.slice(0, 200)}`);
+    err.status = response.status;
+    throw err;
   }
 
   const data = await response.json();
@@ -583,10 +697,79 @@ async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperat
 }
 
 /**
- * Execute Multi-Provider Generation Cascade
+ * Loads user-level AI API keys with priority ordering from ai_provider_keys.
+ * Zero-fallback to host system environment to guarantee tenant isolation.
+ */
+export async function loadUserAiKeys(userId, db, fallbackSettings = {}) {
+  const keysByProvider = {
+    gemini: [],
+    groq: [],
+    openrouter: []
+  };
+
+  if (db && userId) {
+    try {
+      const [rows] = await db.execute(
+        `SELECT id, user_id, provider, label, api_key, model, priority, is_active, status, fail_count, last_error
+         FROM ai_provider_keys
+         WHERE user_id = ? AND is_active = 1
+         ORDER BY priority ASC, id ASC`,
+        [userId]
+      );
+      if (rows && rows.length > 0) {
+        for (const row of rows) {
+          if (keysByProvider[row.provider]) {
+            keysByProvider[row.provider].push(row);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AI Agent] Failed to query ai_provider_keys:', e.message);
+    }
+  }
+
+  // Gracefully include legacy single keys from ai_agent_settings if no dedicated keys in ai_provider_keys
+  if (keysByProvider.gemini.length === 0 && fallbackSettings?.gemini_api_key) {
+    keysByProvider.gemini.push({
+      id: null,
+      label: 'Legacy Gemini Key',
+      api_key: fallbackSettings.gemini_api_key,
+      model: fallbackSettings.gemini_model || null,
+      priority: 1
+    });
+  }
+  if (keysByProvider.groq.length === 0 && fallbackSettings?.groq_api_key) {
+    keysByProvider.groq.push({
+      id: null,
+      label: 'Legacy Groq Key',
+      api_key: fallbackSettings.groq_api_key,
+      model: fallbackSettings.groq_model || null,
+      priority: 1
+    });
+  }
+  if (keysByProvider.openrouter.length === 0 && fallbackSettings?.openrouter_api_key) {
+    keysByProvider.openrouter.push({
+      id: null,
+      label: 'Legacy OpenRouter Key',
+      api_key: fallbackSettings.openrouter_api_key,
+      model: fallbackSettings.openrouter_model || null,
+      priority: 1
+    });
+  }
+
+  return keysByProvider;
+}
+
+/**
+ * Execute Multi-Provider & Multi-Key Auto-Failover Generation Cascade
+ * 1. Checks user's prioritized keys per provider.
+ * 2. If a key hits rate limit (429) or error, auto-rotates down the user's keys.
+ * 3. Updates key health status in real-time in ai_provider_keys.
+ * 4. Cascades across providers according to provider_priority.
+ * 5. Strictly isolated: ZERO host system environment fallback.
  */
 export async function generateAiReply(settings, systemPrompt, customerMessage, conversationHistory = [], toolsContext = null) {
-  const priority = settings.provider_priority || 'gemini';
+  const priority = settings?.provider_priority || 'gemini';
   const providers = [];
 
   if (priority === 'gemini') {
@@ -597,50 +780,118 @@ export async function generateAiReply(settings, systemPrompt, customerMessage, c
     providers.push('openrouter', 'gemini', 'groq');
   }
 
-  let lastError = null;
-  for (const prov of providers) {
+  const db = toolsContext?.db;
+  const userId = toolsContext?.userId || settings?.user_id;
+
+  // Dynamically load user's configured models from backend database if not already attached
+  let backendSettings = { ...(settings || {}) };
+  if (db && userId && (!backendSettings.gemini_model || !backendSettings.groq_model || !backendSettings.openrouter_model)) {
     try {
-      if (prov === 'gemini' && settings.gemini_api_key) {
-        return await callGemini(
-          settings.gemini_api_key,
-          settings.gemini_model,
-          systemPrompt,
-          customerMessage,
-          settings.temperature,
-          settings.max_tokens,
-          conversationHistory,
-          toolsContext
-        );
+      const [settingRows] = await db.execute(
+        `SELECT gemini_model, groq_model, openrouter_model, provider_priority, temperature, max_tokens 
+         FROM ai_agent_settings 
+         WHERE user_id = ? LIMIT 1`,
+        [userId]
+      );
+      if (settingRows && settingRows.length > 0) {
+        backendSettings = { ...settingRows[0], ...backendSettings };
       }
-      if (prov === 'groq' && settings.groq_api_key) {
-        return await callGroq(
-          settings.groq_api_key,
-          settings.groq_model,
-          systemPrompt,
-          customerMessage,
-          settings.temperature,
-          settings.max_tokens,
-          conversationHistory,
-          toolsContext
-        );
-      }
-      if (prov === 'openrouter' && settings.openrouter_api_key) {
-        return await callOpenRouter(
-          settings.openrouter_api_key,
-          settings.openrouter_model,
-          systemPrompt,
-          customerMessage,
-          settings.temperature,
-          settings.max_tokens,
-          conversationHistory,
-          toolsContext
-        );
-      }
-    } catch (err) {
-      const errDetail = err.cause?.message ? `${err.message} (${err.cause.message})` : err.message;
-      console.warn(`[AI Agent] Provider '${prov}' failed: ${errDetail}. Cascading to next provider...`);
-      lastError = err;
+    } catch (e) {
+      console.warn('[AI Agent] Failed to query backend ai_agent_settings models:', e.message);
     }
+  }
+
+  const userKeysByProvider = await loadUserAiKeys(userId, db, backendSettings);
+
+  let lastError = null;
+  let totalAttemptedKeys = 0;
+
+  for (const prov of providers) {
+    const candidateKeys = userKeysByProvider[prov] || [];
+    if (candidateKeys.length === 0) continue;
+
+    for (const keyRecord of candidateKeys) {
+      const activeApiKey = (keyRecord.api_key || '').trim();
+      if (!activeApiKey) continue;
+
+      totalAttemptedKeys++;
+      try {
+        let resultText = null;
+
+        if (prov === 'gemini') {
+          const activeModel = keyRecord.model || backendSettings.gemini_model;
+          resultText = await callGemini(
+            activeApiKey,
+            activeModel,
+            systemPrompt,
+            customerMessage,
+            backendSettings.temperature,
+            backendSettings.max_tokens,
+            conversationHistory,
+            toolsContext
+          );
+        } else if (prov === 'groq') {
+          const activeModel = keyRecord.model || backendSettings.groq_model;
+          resultText = await callGroq(
+            activeApiKey,
+            activeModel,
+            systemPrompt,
+            customerMessage,
+            backendSettings.temperature,
+            backendSettings.max_tokens,
+            conversationHistory,
+            toolsContext
+          );
+        } else if (prov === 'openrouter') {
+          const activeModel = keyRecord.model || backendSettings.openrouter_model;
+          resultText = await callOpenRouter(
+            activeApiKey,
+            activeModel,
+            systemPrompt,
+            customerMessage,
+            backendSettings.temperature,
+            backendSettings.max_tokens,
+            conversationHistory,
+            toolsContext
+          );
+        }
+
+        if (resultText && resultText.trim()) {
+          // If this was a database key, record successful usage and reset fail counters
+          if (keyRecord.id && db) {
+            db.execute(
+              `UPDATE ai_provider_keys 
+               SET last_used_at = NOW(), fail_count = 0, status = 'active', last_error = NULL 
+               WHERE id = ?`,
+              [keyRecord.id]
+            ).catch(() => {});
+          }
+          return resultText.trim();
+        }
+      } catch (err) {
+        const errDetail = err.cause?.message ? `${err.message} (${err.cause.message})` : err.message;
+        const isRateLimit = err.status === 429 || /rate limit|quota|resource exhausted/i.test(err.message);
+        const newStatus = isRateLimit ? 'rate_limited' : 'error';
+
+        console.warn(`[AI Agent] ${prov.toUpperCase()} key '${keyRecord.label}' (ID ${keyRecord.id || 'legacy'}) failed [${newStatus}]: ${errDetail}. Auto-rotating to next key in order...`);
+
+        if (keyRecord.id && db) {
+          db.execute(
+            `UPDATE ai_provider_keys 
+             SET status = ?, last_error = ?, fail_count = fail_count + 1 
+             WHERE id = ?`,
+            [newStatus, String(err.message).slice(0, 500), keyRecord.id]
+          ).catch(() => {});
+        }
+
+        lastError = err;
+        // Continue to next key in user's priority order!
+      }
+    }
+  }
+
+  if (totalAttemptedKeys === 0) {
+    throw new Error('No active AI API keys configured for your account. Please add your Gemini, Groq, or OpenRouter keys in AI Keys & SMTP.');
   }
 
   if (lastError) {

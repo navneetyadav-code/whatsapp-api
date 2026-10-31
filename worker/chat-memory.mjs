@@ -51,15 +51,31 @@ export class ChatMemoryEngine {
       // Reverse to chronological order (oldest to newest)
       const chronological = rows.reverse();
 
-      return chronological.map(r => {
+      // Enforce token-safe sliding window: max 500 chars per turn, max 1,600 chars total
+      let accumulatedChars = 0;
+      const safeTurns = [];
+
+      // Process from newest to oldest to preserve the most recent context
+      for (let i = chronological.length - 1; i >= 0; i--) {
+        const r = chronological[i];
+        let body = (r.body || '').trim();
+        if (body.length > 500) {
+          body = body.slice(0, 497) + '...';
+        }
+        if (accumulatedChars + body.length > 1600) {
+          break; // Stop including older turns if budget is exceeded
+        }
+        accumulatedChars += body.length;
         const isUser = r.sender_type === 'contact';
-        return {
+        safeTurns.unshift({
           senderType: r.sender_type,
-          body: (r.body || '').trim(),
+          body,
           role: isUser ? 'user' : 'model',
           openAiRole: isUser ? 'user' : 'assistant'
-        };
-      });
+        });
+      }
+
+      return safeTurns;
     } catch (err) {
       console.warn('[ChatMemoryEngine] Failed to retrieve turns:', err.message);
       return [];

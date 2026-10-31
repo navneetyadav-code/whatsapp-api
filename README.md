@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://whatsapp-api-xepo.onrender.com">
-    <img src="public/assets/logo.jpg" alt="WhatsGateway Logo" width="120" style="border-radius: 50%;">
+    <img src="public/assets/logo_white.png" alt="WhatsGateway Logo" width="120" style="border-radius: 50%;">
   </a>
 </p>
 
@@ -94,6 +94,11 @@ Commercial WhatsApp Business API providers (such as Twilio, MessageBird, or Meta
 
 - 🔑 **Single-Key REST Authentication:** Authenticate requests using a single Bearer token (`wa_live_...`). No secondary secret key is needed or generated. Send via `X-API-Key: wa_live_...`, `Authorization: Bearer wa_live_...`, or request body / query parameter.
 - 📁 **Universal Media Engine:** Ingests media via direct HTTP/HTTPS URLs (with SSRF protection), Base64 data strings/Data URIs, or standard `multipart/form-data` uploads up to 20MB. Supports Images (JPG, PNG, GIF, WEBP), Documents (PDF, DOCX, XLSX, TXT, CSV), Videos (MP4, MOV), and Audio (MP3, OGG, WAV, M4A) including push-to-talk voice notes (`ptt: true`).
+- 🧠 **Dual-Tier Cognitive Memory Engine:** Maintains short-term conversational context with a character-budgeted sliding window and 45-minute rolling TTL inactivity decay, alongside a durable, contact-scoped **Persistent Fact Notebook** (`ai_user_memory`). Incorporates an intelligent **Token Governor** that scores incoming query relevance and retrieves only the **Top-3 relevant facts (< 120 tokens)** to guarantee sub-1.5s latency and zero context window overflow. Supports hands-free in-chat memory management (e.g., *"Remember that..."* and *"Forget my..."*).
+- 🎯 **Smart In-Context Training (Few-Shot Golden Pairs):** Dynamically injects golden Q&A pairs and strict negative constraints (*"What NOT to do"*, such as discount caps or boundary rules) into the prompt without expensive fine-tuning or model redeployment.
+- ⚡ **Multi-Model AI Agent Studio:** Auto-cascades across Google Gemini (2.5/3.5 Flash), Groq LPU (Llama 3.3 70B, GPT-OSS 120B), and OpenRouter. Features dual operating modes: **Customer Support Desk** (with RAG knowledge retrieval and frustration detection) and **24/7 Personal Executive Assistant** (Chief of Staff for Boss with zero surveys and zero human escalation).
+- 🧰 **Modular App Store & Function Calling:** 1-click install catalog of modular tools: live DuckDuckGo web search, exact math evaluator, business hours clock, Open-Meteo weather API, outbound CRM webhooks, and a **Two-Phase Action Protocol** for high-consequence operations (drafting formal emails with Boss WhatsApp confirmation).
+- 💬 **Interactive Live Chat & Emergency Escalation Queue:** Real-time webchat desk supporting instant human takeover, audio buzzer alerts upon customer frustration, and automated customer satisfaction (CSAT) rating collection.
 - 🤖 **Chatbot Automation:** Incoming messages are evaluated in real time against customizable trigger rules (`exact`, `contains`, `starts_with`, or `catch_all`) to automatically dispatch instant replies.
 - 📬 **Asynchronous Delivery Queue:** Decouples API client latency from WhatsApp WebSocket delivery. Enqueued items are processed with automatic backoff retries, dead-letter tracking, and queue monitoring.
 - 🛡️ **Humanized Anti-Ban Delivery:** Emulates human chat behavior by generating randomized presence indicators (`available`, `composing`, `recording`) and delay intervals before message transmission.
@@ -736,7 +741,12 @@ All form POST submissions require `csrf_token` validation:
 | `/security` | `GET` / `POST` | Auth | Two-Factor Authentication (TOTP 2FA), recovery codes & password change. |
 | `/contacts` | `GET` | Auth | Address book, CSV import, vCard export (`/contacts-export-vcf`). |
 | `/campaigns` | `GET` | Auth | Broadcast campaigns targeting opted-in contacts with templating. |
-| `/chatbot` | `GET` | Auth | Chatbot automation rule builder (`exact`, `contains`, `catch_all`). |
+| `/chatbot` | `GET` | Auth | AI Assistant Studio: persona tuning, provider cascade & system prompt. |
+| `/memory` | `GET` | Auth | Dedicated AI Memory Notebook & Smart Few-Shot Training Manager. |
+| `/tools` | `GET` | Auth | Custom Tools & Dynamic Function Calling engine. |
+| `/app-store` | `GET` | Auth | 1-Click Preset Tools catalog (Search, Math, Weather, Email, Webhooks). |
+| `/live-chat` | `GET` | Auth | Live agent webchat desk with audio escalation buzzer & human takeover. |
+| `/ai-credentials` | `GET` | Auth | Multi-provider API keys (Gemini, Groq, OpenRouter) and SMTP mailers. |
 | `/webhooks` | `GET` | Auth | Webhook target URL configuration and secret rotation. |
 | `/audit` | `GET` | Auth | Paginated API request audit logs. |
 | `/docs` | `GET` | Public | In-app API documentation and integration snippets. |
@@ -759,6 +769,57 @@ Listening internally on `http://127.0.0.1:3107`. Requires `X-Worker-Token` heade
 | `/sessions/:userId/sleep` | `POST` | Closes active socket and marks session sleeping in database. |
 | `/sessions/:userId/wake` | `POST` | Resumes connection and re-opens WhatsApp WebSocket. |
 | `/sessions/:userId/send` | `POST` | Direct synchronous message dispatch. |
+
+---
+
+### 10.7 AI Memory & Smart Training REST API (`public/api/memory.php`)
+
+Used by the web dashboard, external integrations, and the autonomous AI agent to manage long-term facts, customer profiles, and few-shot in-context training examples:
+
+| Endpoint Action | Method | Auth | Description |
+| :--- | :---: | :---: | :--- |
+| `GET /api/memory.php?action=list` | `GET` | Session | Returns all active persistent facts and few-shot training pairs for the user. |
+| `POST /api/memory.php?action=save_memory` | `POST` | Session | Upserts a fact (`key`, `value`, `contact_phone`, `is_durable`, `ttl_days`). |
+| `POST /api/memory.php?action=delete_memory` | `POST` | Session | Deletes a fact permanently by `id` or `key` + `contact_phone`. |
+| `POST /api/memory.php?action=save_training` | `POST` | Session | Upserts a few-shot training example (`user_query`, `ideal_response`, `negative_constraint`). |
+| `POST /api/memory.php?action=delete_training` | `POST` | Session | Removes a training pair by `id`. |
+
+---
+
+## 10.8 AI Autonomous Agent, Memory Engine & App Store Deep Dive
+
+WhatsGateway incorporates an **enterprise-grade Autonomous AI Agent architecture** running directly on top of WhatsApp without third-party bot fees:
+
+### 1. Dual-Tier Cognitive Memory Engine
+- **Short-Term Dialogue Working Memory (`worker/chat-memory.mjs`):** Sliding window capped at 1,600 characters with a **45-minute rolling TTL inactivity decay**. If an ongoing chat is silent for over 45 minutes, context decays to a clean slate, preventing stale context pollution.
+- **Persistent Fact Notebook (`worker/chat-fact-memory.mjs`):** Permanent attributes stored in `ai_user_memory` partitioned by scope:
+  - **Personal Boss Mode:** Facts associated with the account owner (e.g., *Favorite Airline: Emirates*, *GSTIN*, *Home Address*).
+  - **Customer Support Mode:** Scoped to the customer's phone number (e.g., *Preferred Delivery Address*, *Past Order Numbers*, *VIP Status*).
+- **Token Governor (Top-K Relevance Matching):** Rather than blindly dumping dozens of facts into the model prompt, incoming user queries are scored against stored keys and values. Only the **Top-3 relevant facts (< 120 tokens)** are injected into the prompt.
+- **Hands-Free In-Chat Memory Control:** WhatsApp users can update or erase facts conversationally:
+  - *"Remember that my delivery address is Flat 101"* ➔ calls `update_memory`
+  - *"Forget my old address"* ➔ calls `delete_memory`
+- **Auto-Expiry for Ephemeral Facts (TTL):** Temporary facts (e.g., travel dates, temporary complaints) can be set with a TTL (e.g., 14 days) and clean up automatically.
+
+### 2. Smart Few-Shot In-Context Training (Train Smarter)
+- **Zero-Friction In-Context Guidance:** Instead of expensive offline fine-tuning, administrators can define 3–5 "Golden Q&A Pairs" in the dashboard (`/memory`).
+- **Negative Constraints (*"What NOT to do"*):** Strict guardrails (e.g., *"NEVER offer discounts above 10%"*, *"NEVER promise weekend deliveries"*) are dynamically appended to prevent model hallucination.
+
+### 3. Modular App Store & Autonomous Function Calling (`worker/tools-engine.mjs`)
+- **1-Click Modular Tools:** Pre-built tools registered as Gemini Function Declarations and OpenAI tool schemas:
+  - `web_search`: Live DuckDuckGo internet searches for real-time news and facts.
+  - `evaluate_math`: Exact financial math, discounts, and formula calculations with zero hallucination.
+  - `get_current_time`: Live IST/UTC clock and business operating hours verification.
+  - `get_weather`: Open-Meteo real-time weather and temperature reports.
+  - `send_crm_lead`: Outbound webhooks to Zapier, Make, n8n, or CRM backends.
+  - `draft_email` & `confirm_action`: **Two-Phase Action Safety Protocol** — drafts formal SMTP emails and requests explicit Boss WhatsApp confirmation before dispatching.
+  - `update_memory` & `delete_memory`: Autonomous in-chat memory management.
+  - `escalate_to_human`: Emergency handover for customer frustration.
+
+### 4. Interactive Live Chat & Escalation Queue (`/live-chat`)
+- Real-time conversation dashboard with sound buzzer notifications when a customer requests a human agent or shows high frustration.
+- 1-click human agent takeover pauses the AI bot automatically.
+- Automatic customer satisfaction (CSAT) survey collection upon conversation resolution.
 
 ---
 

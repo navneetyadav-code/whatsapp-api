@@ -5,10 +5,17 @@ $currentPage = $page ?? ($_GET['page'] ?? 'dashboard');
 $seo = seo_meta($currentPage);
 $isPublicDocs = !$isAuthed && $currentPage === 'docs';
 $initials = 'AD';
+$agentMode = 'support';
 if ($userForLayout) {
     $parts = preg_split('/\s+/', trim((string) $userForLayout['name'])) ?: [];
     $initials = strtoupper(substr($parts[0] ?? 'A', 0, 1) . substr($parts[1] ?? 'D', 0, 1));
+    try {
+        $modeStmt = Database::pdo()->prepare('SELECT agent_mode FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
+        $modeStmt->execute([(int) $userForLayout['id']]);
+        $agentMode = (string) ($modeStmt->fetchColumn() ?: 'support');
+    } catch (\Throwable $e) {}
 }
+$isPersonalMode = ($agentMode === 'personal');
 ?>
 <!doctype html>
 <html lang="en">
@@ -103,8 +110,10 @@ if ($userForLayout) {
         };
         window.AppConfig = {
             defaultCountryCode: "<?= e(app_config('app.default_country_code')) ?>" || "in",
+            defaultDialCode: "<?= e(default_country_dial_code()) ?>",
             baseUrl: "<?= e(base_url('')) ?>",
-            apiBase: "<?= e(base_url('api/chat')) ?>"
+            apiBase: "<?= e(base_url('api/chat')) ?>",
+            agentMode: "<?= e($agentMode) ?>"
         };
     </script>
     <style>
@@ -158,10 +167,336 @@ if ($userForLayout) {
                 overflow-x: hidden;
             }
         }
+        .sidebar-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+        .sidebar-scroll::-webkit-scrollbar { display: none; }
+        .sidebar-category + .sidebar-category { margin-top: 24px; }
+        .sidebar-category-title {
+            color: #64748b;
+            font-size: 10.5px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            line-height: 1;
+            margin: 0 10px 8px;
+            text-transform: uppercase;
+        }
+        .sidebar-link {
+            align-items: center;
+            border: 1px solid transparent;
+            border-radius: 9px;
+            color: #64748b;
+            display: flex;
+            gap: 11px;
+            min-height: 38px;
+            padding: 8px 10px;
+            transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+        }
+        .sidebar-link:hover { background: #f1f5f9; color: #0f172a; }
+        .sidebar-link.is-active {
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .sidebar-icon { color: #94a3b8; flex: 0 0 auto; height: 17px; width: 17px; }
+        .sidebar-link.is-active .sidebar-icon { color: #059669; }
+        .sidebar-item-content { align-items: center; display: flex; gap: 11px; min-width: 0; }
+        .sidebar-badge {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            color: #64748b;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            font-weight: 700;
+            line-height: 1.4;
+            padding: 2px 5px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .sidebar-badge-live { background: #ecfdf5; border-color: #bbf7d0; color: #047857; }
+        .sidebar-badge-amber { background: #fffbeb; border-color: #fde68a; color: #b45309; }
+        .sidebar-badge-indigo { background: #eef2ff; border-color: #c7d2fe; color: #4338ca; }
+        .sidebar-badge-emerald { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+        .sidebar-badge-fuchsia { background: #fdf4ff; border-color: #f5d0fe; color: #a21caf; }
+        .sidebar-badge-muted { background: #f1f5f9; border-color: #e2e8f0; color: #64748b; }
+        .shadow-subtle { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+        .sidebar-link:focus-visible,
+        .sidebar-sublink:focus-visible,
+        .sidebar-group-btn:focus-visible,
+        .sidebar-flyout-link:focus-visible {
+            outline: 2px solid #10b981;
+            outline-offset: 1px;
+        }
+
+        /* Sidebar Dropdown Groups & Sublinks */
+        .sidebar-group {
+            position: relative;
+        }
+        .sidebar-group:not(.is-open) .sidebar-group-content {
+            display: none;
+        }
+        .sidebar-group.is-open .sidebar-chevron-down {
+            transform: rotate(180deg);
+            color: #059669;
+        }
+        .sidebar-group.is-open > .sidebar-group-btn,
+        .sidebar-group-btn.group-active {
+            color: #0f172a;
+            font-weight: 600;
+        }
+        .sidebar-group-btn.group-active .sidebar-icon {
+            color: #059669;
+        }
+        .sidebar-sublink {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 31px;
+            padding: 5px 9px;
+            border-radius: 7px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid transparent;
+            transition: all 120ms ease;
+        }
+        .sidebar-sublink:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        .sidebar-sublink.is-active {
+            background: #ffffff;
+            color: #047857;
+            font-weight: 700;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .sidebar-sublink.is-active .sidebar-subicon {
+            color: #059669;
+        }
+        .sidebar-subicon {
+            width: 14px;
+            height: 14px;
+            color: #94a3b8;
+            flex-shrink: 0;
+            transition: color 120ms ease;
+        }
+        .sidebar-sublink:hover .sidebar-subicon {
+            color: #334155;
+        }
+        .sidebar-sublink .sidebar-item-content {
+            gap: 8px;
+        }
+
+        /* Collapsible Sidebar Rail Engine */
+        #sidebar {
+            transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1), transform 200ms ease;
+            will-change: width, transform;
+        }
+        #sidebar.sidebar-collapsed,
+        html.preload-sidebar-collapsed #sidebar {
+            width: 72px !important;
+            min-width: 72px !important;
+        }
+        #sidebar.sidebar-collapsed .sidebar-brand-text,
+        html.preload-sidebar-collapsed #sidebar .sidebar-brand-text,
+        #sidebar.sidebar-collapsed .sidebar-category-title,
+        html.preload-sidebar-collapsed #sidebar .sidebar-category-title,
+        #sidebar.sidebar-collapsed .sidebar-label,
+        html.preload-sidebar-collapsed #sidebar .sidebar-label,
+        #sidebar.sidebar-collapsed .sidebar-badge,
+        html.preload-sidebar-collapsed #sidebar .sidebar-badge,
+        #sidebar.sidebar-collapsed .sidebar-group-meta,
+        html.preload-sidebar-collapsed #sidebar .sidebar-group-meta,
+        #sidebar.sidebar-collapsed .sidebar-user-meta,
+        html.preload-sidebar-collapsed #sidebar .sidebar-user-meta,
+        #sidebar.sidebar-collapsed .sidebar-user-logout,
+        html.preload-sidebar-collapsed #sidebar .sidebar-user-logout {
+            display: none !important;
+        }
+        #sidebar.sidebar-collapsed .sidebar-category + .sidebar-category,
+        html.preload-sidebar-collapsed #sidebar .sidebar-category + .sidebar-category {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
+        #sidebar.sidebar-collapsed .sidebar-header,
+        html.preload-sidebar-collapsed #sidebar .sidebar-header {
+            padding: 0;
+            justify-content: center;
+        }
+        #sidebar.sidebar-collapsed .sidebar-brand,
+        html.preload-sidebar-collapsed #sidebar .sidebar-brand {
+            margin: 0 auto;
+            justify-content: center;
+        }
+        #sidebar.sidebar-collapsed #collapseSidebar,
+        html.preload-sidebar-collapsed #sidebar #collapseSidebar {
+            position: absolute;
+            right: -13px;
+            top: 21px;
+            width: 26px;
+            height: 26px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 9999px;
+            box-shadow: 0 2px 5px rgba(15, 23, 42, 0.08);
+            z-index: 40;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #475569;
+            transition: all 150ms ease;
+        }
+        #sidebar.sidebar-collapsed #collapseSidebar:hover,
+        html.preload-sidebar-collapsed #sidebar #collapseSidebar:hover {
+            background: #f8fafc;
+            color: #0f172a;
+            border-color: #94a3b8;
+            transform: scale(1.08);
+        }
+        #sidebar.sidebar-collapsed #collapseSidebar svg,
+        html.preload-sidebar-collapsed #sidebar #collapseSidebar svg {
+            width: 13px;
+            height: 13px;
+        }
+        #sidebar.sidebar-collapsed .sidebar-link,
+        html.preload-sidebar-collapsed #sidebar .sidebar-link {
+            justify-content: center;
+            padding: 8px 0;
+            width: 44px;
+            margin: 2px auto;
+        }
+        #sidebar.sidebar-collapsed .sidebar-item-content,
+        html.preload-sidebar-collapsed #sidebar .sidebar-item-content {
+            justify-content: center;
+            gap: 0;
+        }
+        #sidebar.sidebar-collapsed .sidebar-chevron {
+            transform: rotate(180deg);
+        }
+        #sidebar.sidebar-collapsed .sidebar-user-card,
+        html.preload-sidebar-collapsed #sidebar .sidebar-user-card {
+            justify-content: center;
+            padding: 6px 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+        .sidebar-dot {
+            display: none;
+            position: absolute;
+            top: -2px;
+            right: -3px;
+            width: 7px;
+            height: 7px;
+            border-radius: 9999px;
+            box-shadow: 0 0 0 1.5px #F8FAFC;
+        }
+        #sidebar.sidebar-collapsed .sidebar-dot,
+        html.preload-sidebar-collapsed #sidebar .sidebar-dot {
+            display: block !important;
+        }
+
+        /* Collapsed Rail Mode: Popover Flyout Menus & Micro-Tooltips */
+        aside.sidebar-collapsed nav {
+            overflow: visible !important;
+        }
+        aside.sidebar-collapsed .sidebar-group-content,
+        html.preload-sidebar-collapsed #sidebar .sidebar-group-content {
+            display: none !important;
+        }
+        aside.sidebar-collapsed .sidebar-chevron-down,
+        html.preload-sidebar-collapsed #sidebar .sidebar-chevron-down {
+            display: none !important;
+        }
+        aside.sidebar-collapsed .sidebar-group:hover .sidebar-flyout-menu,
+        html.preload-sidebar-collapsed #sidebar .sidebar-group:hover .sidebar-flyout-menu {
+            display: block !important;
+            animation: flyoutFadeIn 120ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes flyoutFadeIn {
+            from { opacity: 0; transform: translateX(-4px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        /* Invisible hover bridge to eliminate diagonal mouse travel drop-off */
+        .sidebar-flyout-menu::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            bottom: -12px;
+            left: -24px;
+            width: 28px;
+            background: transparent;
+        }
+        /* Direct item & user card instant micro-tooltips in collapsed rail mode */
+        #sidebar.sidebar-collapsed .sidebar-link[data-tooltip],
+        #sidebar.sidebar-collapsed .sidebar-user-card[data-tooltip],
+        html.preload-sidebar-collapsed #sidebar .sidebar-link[data-tooltip],
+        html.preload-sidebar-collapsed #sidebar .sidebar-user-card[data-tooltip] {
+            position: relative;
+        }
+        #sidebar.sidebar-collapsed .sidebar-link[data-tooltip]::after,
+        #sidebar.sidebar-collapsed .sidebar-user-card[data-tooltip]::after,
+        html.preload-sidebar-collapsed #sidebar .sidebar-link[data-tooltip]::after,
+        html.preload-sidebar-collapsed #sidebar .sidebar-user-card[data-tooltip]::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 58px;
+            top: 50%;
+            transform: translateY(-50%) translateX(-4px);
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.2;
+            padding: 5px 9px;
+            border-radius: 6px;
+            white-space: nowrap;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.18);
+            z-index: 60;
+        }
+        #sidebar.sidebar-collapsed .sidebar-link[data-tooltip]:hover::after,
+        #sidebar.sidebar-collapsed .sidebar-user-card[data-tooltip]:hover::after,
+        html.preload-sidebar-collapsed #sidebar .sidebar-link[data-tooltip]:hover::after,
+        html.preload-sidebar-collapsed #sidebar .sidebar-user-card[data-tooltip]:hover::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(-50%) translateX(0);
+        }
+        .sidebar-flyout-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #475569;
+            transition: all 100ms ease;
+        }
+        .sidebar-flyout-link:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        .sidebar-flyout-link.is-active {
+            background: #ecfdf5;
+            color: #047857;
+            font-weight: 700;
+        }
+        #sidebar.sidebar-collapsed .sidebar-flyout-menu .sidebar-badge,
+        html.preload-sidebar-collapsed #sidebar .sidebar-flyout-menu .sidebar-badge {
+            display: inline-block !important;
+        }
     </style>
     <?php endif; ?>
 </head>
-<body class="<?= $isAuthed ? 'flex h-screen h-[100dvh] overflow-hidden text-[13px]' : ($isPublicDocs ? 'docs-body' : 'auth-body') ?>">
+<body class="<?= $isAuthed ? 'flex h-screen h-[100dvh] overflow-hidden text-[13px]' : ($isPublicDocs ? 'docs-body' : 'auth-body') ?>" data-agent-mode="<?= e($agentMode) ?>">
 
 <?php if ($isAuthed): ?>
     <?php require __DIR__ . '/components/sidebar.php'; ?>
@@ -173,7 +508,8 @@ if ($userForLayout) {
     <main class="flex-1 flex flex-col h-full md:h-screen min-w-0 bg-[#FBFBFC] relative overflow-hidden">
         <?php require __DIR__ . '/components/navbar.php'; ?>
 
-        <!-- Global Floating Emergency Escalation Banner -->
+        <!-- Global Floating Emergency Escalation Banner (Hidden in Personal Assistant Mode) -->
+        <?php if (!$isPersonalMode): ?>
         <div id="globalEscalationBanner" class="hidden mx-4 sm:mx-6 mt-3 bg-gradient-to-r from-rose-600 via-rose-700 to-red-800 text-white rounded-xl p-3 px-4 shadow-xl border border-rose-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-200 z-30 shrink-0">
             <div class="flex items-center gap-3 min-w-0">
                 <span class="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-xs flex items-center justify-center text-base shrink-0 animate-bounce">
@@ -196,6 +532,7 @@ if ($userForLayout) {
                 </button>
             </div>
         </div>
+        <?php endif; ?>
         
         <!-- Scrollable Workspace -->
         <div id="workspaceContent" class="flex-1 <?= $currentPage === 'live-chat' ? 'overflow-hidden p-2 md:p-3 flex flex-col' : 'overflow-y-auto overflow-x-hidden custom-scrollbar p-4 md:p-6 lg:p-7' ?> bg-[#FBFBFC] overscroll-contain">
@@ -219,26 +556,99 @@ if ($userForLayout) {
         const sidebarOverlay = document.getElementById('sidebarOverlay');
         const openSidebarBtn = document.getElementById('openSidebar');
         const closeSidebarBtn = document.getElementById('closeSidebar');
+        const collapseSidebarBtn = document.getElementById('collapseSidebar');
 
-        if (openSidebarBtn && closeSidebarBtn && sidebar && sidebarOverlay) {
-            function toggleSidebar() {
-                sidebar.classList.toggle('-translate-x-full');
-                sidebarOverlay.classList.toggle('hidden');
-            }
-            openSidebarBtn.addEventListener('click', toggleSidebar);
-            closeSidebarBtn.addEventListener('click', toggleSidebar);
-            sidebarOverlay.addEventListener('click', toggleSidebar);
+        function isDesktop() {
+            return window.innerWidth >= 768;
         }
 
-        // Global Command Palette Shortcut (⌘K / Ctrl+K)
+        function setSidebarCollapsed(collapsed) {
+            if (!sidebar) return;
+            if (collapsed) {
+                sidebar.classList.add('sidebar-collapsed');
+                try { localStorage.setItem('sidebar-collapsed', 'true'); } catch (e) {}
+                if (collapseSidebarBtn) {
+                    collapseSidebarBtn.setAttribute('title', 'Expand sidebar (Ctrl+B)');
+                }
+            } else {
+                sidebar.classList.remove('sidebar-collapsed');
+                try { localStorage.setItem('sidebar-collapsed', 'false'); } catch (e) {}
+                if (collapseSidebarBtn) {
+                    collapseSidebarBtn.setAttribute('title', 'Collapse sidebar (Ctrl+B)');
+                }
+            }
+            document.documentElement.classList.remove('preload-sidebar-collapsed');
+            window.dispatchEvent(new Event('resize'));
+        }
+
+        if (isDesktop() && localStorage.getItem('sidebar-collapsed') === 'true') {
+            setSidebarCollapsed(true);
+        }
+
+        function toggleSidebar() {
+            if (isDesktop()) {
+                const isCollapsed = sidebar.classList.contains('sidebar-collapsed');
+                setSidebarCollapsed(!isCollapsed);
+            } else {
+                sidebar.classList.toggle('-translate-x-full');
+                if (sidebarOverlay) sidebarOverlay.classList.toggle('hidden');
+            }
+        }
+
+        if (openSidebarBtn) openSidebarBtn.addEventListener('click', toggleSidebar);
+        if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', toggleSidebar);
+        if (collapseSidebarBtn) collapseSidebarBtn.addEventListener('click', toggleSidebar);
+        if (sidebarOverlay) sidebarOverlay.addEventListener('click', toggleSidebar);
+
+        // Dropdown Groups (Accordion click-to-collapse or expand with localStorage memory)
+        document.querySelectorAll('.sidebar-group-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const group = btn.closest('.sidebar-group');
+                if (!group) return;
+                const groupKey = group.dataset.group;
+
+                if (sidebar && sidebar.classList.contains('sidebar-collapsed')) {
+                    setSidebarCollapsed(false);
+                    group.classList.add('is-open');
+                    btn.setAttribute('aria-expanded', 'true');
+                    if (groupKey) {
+                        try { localStorage.setItem('sidebar_group_' + groupKey, 'open'); } catch (err) {}
+                    }
+                    return;
+                }
+
+                const isOpen = group.classList.contains('is-open');
+                if (isOpen) {
+                    group.classList.remove('is-open');
+                    btn.setAttribute('aria-expanded', 'false');
+                    if (groupKey) {
+                        try { localStorage.setItem('sidebar_group_' + groupKey, 'closed'); } catch (err) {}
+                    }
+                } else {
+                    group.classList.add('is-open');
+                    btn.setAttribute('aria-expanded', 'true');
+                    if (groupKey) {
+                        try { localStorage.setItem('sidebar_group_' + groupKey, 'open'); } catch (err) {}
+                    }
+                }
+            });
+        });
+
+        // Global Command Palette Shortcut (⌘K / Ctrl+K) and Sidebar Toggle (⌘B / Ctrl+B)
         document.addEventListener('keydown', (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
                 e.preventDefault();
                 const searchInput = document.getElementById('navbarSearchInput');
                 if (searchInput) searchInput.focus();
             }
+            if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {
+                e.preventDefault();
+                toggleSidebar();
+            }
         });
     </script>
+    <script src="<?= e(base_url('assets/chart.min.js')) ?>"></script>
     <script src="<?= e(base_url('assets/global-alerts.js')) ?>?v=<?= time() ?>"></script>
 <?php elseif ($isPublicDocs): ?>
     <main class="public-doc-shell">

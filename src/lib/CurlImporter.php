@@ -45,6 +45,22 @@ class CurlImporter
             }
         }
 
+        // Support -b / --cookie
+        if (preg_match('/(?:-b|--cookie)\s+(?:\'([^\']*)\'|"((?:[^"\\\\]|\\\\.)*)"|([^\s\'"]+))/i', $clean, $cMatch)) {
+            $cVal = $cMatch[1] !== '' ? $cMatch[1] : ($cMatch[2] !== '' ? stripslashes($cMatch[2]) : $cMatch[3]);
+            if (!isset($headers['Cookie'])) {
+                $headers['Cookie'] = trim($cVal);
+            }
+        }
+
+        // Support -u / --user (Basic Auth)
+        if (preg_match('/(?:-u|--user)\s+(?:\'([^\']*)\'|"((?:[^"\\\\]|\\\\.)*)"|([^\s\'"]+))/i', $clean, $uMatch)) {
+            $uVal = $uMatch[1] !== '' ? $uMatch[1] : ($uMatch[2] !== '' ? stripslashes($uMatch[2]) : $uMatch[3]);
+            if (!isset($headers['Authorization'])) {
+                $headers['Authorization'] = 'Basic ' . base64_encode(trim($uVal));
+            }
+        }
+
         // 4. Extract Target URL
         $url = null;
         if (preg_match('/(?:[\'"])(https?:\/\/[^\'"]+)(?:[\'"])/i', $clean, $m)) {
@@ -67,15 +83,28 @@ class CurlImporter
         $pathSegments = array_values(array_filter(explode('/', $path)));
         $lastSegment = end($pathSegments) ?: 'endpoint';
         $lastSegment = preg_replace('/\.php$/i', '', $lastSegment); // strip .php extension
-        $slugCandidate = strtolower((string) preg_replace('/[^a-z0-9_]/', '_', $lastSegment));
-        if (strlen($slugCandidate) < 3) {
-            $slugCandidate = 'call_' . strtolower((string) preg_replace('/[^a-z0-9_]/', '_', explode('.', $host)[0]));
-        }
-        $slugCandidate = substr($slugCandidate, 0, 32);
 
-        $hostParts = explode('.', $host);
-        $brandName = ucfirst($hostParts[count($hostParts) > 2 ? 1 : 0] ?? 'Custom');
-        $displayTitle = "🌐 {$brandName} " . ucwords(str_replace('_', ' ', $slugCandidate));
+        // Check if host is shared hosting / localhost or has a project root directory
+        $isSharedOrLocal = ($host === 'localhost' || $host === '127.0.0.1' || str_contains($host, '.gt.tc') || str_contains($host, '.epizy.com') || str_contains($host, 'byet'));
+        $firstSegment = $pathSegments[0] ?? '';
+
+        if ($isSharedOrLocal && $firstSegment !== '' && !in_array(strtolower($firstSegment), ['api', 'v1', 'v2', 'admin'], true)) {
+            $appName = ucfirst(preg_replace('/[^a-zA-Z0-9]/', '', $firstSegment));
+            $brandName = $appName;
+            $cleanLast = preg_replace('/[^a-zA-Z0-9_]/', '_', $lastSegment);
+            $slugCandidate = strtolower(substr($firstSegment . '_' . $cleanLast, 0, 32));
+            $displayTitle = "🏢 {$appName} " . ucwords(str_replace('_', ' ', $cleanLast));
+        } else {
+            $slugCandidate = strtolower((string) preg_replace('/[^a-z0-9_]/', '_', $lastSegment));
+            if (strlen($slugCandidate) < 3) {
+                $slugCandidate = 'call_' . strtolower((string) preg_replace('/[^a-z0-9_]/', '_', explode('.', $host)[0]));
+            }
+            $slugCandidate = substr($slugCandidate, 0, 32);
+
+            $hostParts = explode('.', $host);
+            $brandName = ucfirst($hostParts[count($hostParts) > 2 ? 1 : 0] ?? 'Custom');
+            $displayTitle = "🌐 {$brandName} " . ucwords(str_replace('_', ' ', $slugCandidate));
+        }
 
         // 6. Parameter Extraction & URL Template Formulation
         $parameters = [];

@@ -11,7 +11,7 @@ const INTENT_PATTERNS = {
   math: /\b(math|calculate|calculation|\d+[\+\-\*\/]\d+|percentage|square root|sum of)\b/i,
   time: /\b(time|clock|ist|office hours|working hours|time now|current time)\b/i,
   web_search: /\b(search|google|lookup|who is|what is the latest|news|find online|browse)\b/i,
-  crm_read: /\b(crm|metrics|inquir(y|ies)|lead(s)?|user(s)?|pricing plan(s)?|god mode|storage files|cloudinary|audit log(s)?)\b/i,
+  crm_read: /\b(crm|metrics|stats|kpi|inquir(y|ies)|lead(s)?|user(s)?|account(s)?|customer(s)?|pricing plan(s)?|god mode|storage|file(s)?|cloudinary|audit log(s)?|team|member(s)?|settings|system info)\b/i,
   crm_write: /\b(update inquiry|change status|add inquiry|create inquiry|new lead)\b/i,
   email_draft: /\b(draft|mail|email|compose|write (an? )?(email|mail)|send (an? )?(email|mail))\b/i,
   email_confirm: /^(yes+|yeah|yep|ya|send( it)?|proceed|approve(d)?|bhej do|bhejdo|ha(an)? bhej do|confirm(ed)?|ok send|sure send|do it|okay send|ok|okay)\b/i,
@@ -75,22 +75,68 @@ export async function detectIntents(text, context = {}) {
 }
 
 /**
- * Dynamic Skill & Tool Composer: Filters tools & injects micro-plugins on-demand
+ * Evaluates whether a custom user tool matches the semantic context or keyword intent of the message
+ */
+function isCustomToolRelevant(tool, text) {
+  if (!text || typeof text !== 'string') return false;
+  const lower = text.toLowerCase().trim();
+
+  // 1. Direct Slug or Display Name matching (e.g. "delhivery", "order", "weather", "maintenance")
+  const slugTerms = (tool.tool_slug || '').toLowerCase().split(/[_\-\s]+/);
+  for (const term of slugTerms) {
+    if (term.length >= 3) {
+      if (lower.includes(term)) return true;
+      const stem = term.length > 5 ? term.slice(0, 5) : term;
+      if (lower.includes(stem)) return true;
+    }
+  }
+  const nameTerms = (tool.display_name || '').toLowerCase().split(/[_\-\s]+/);
+  for (const term of nameTerms) {
+    if (term.length >= 3) {
+      if (lower.includes(term)) return true;
+      const stem = term.length > 5 ? term.slice(0, 5) : term;
+      if (lower.includes(stem)) return true;
+    }
+  }
+
+  // 2. Action verbs for toggle / state tools (e.g. "turn on", "turn off", "disable", "enable", "off that")
+  if (/\b(turn\s+on|turn\s+off|off\b|on\b|enable|disable|activate|deactivate|status|toggle|properly)\b/i.test(lower)) {
+    const desc = (tool.description || '').toLowerCase();
+    const slug = (tool.tool_slug || '').toLowerCase();
+    if (desc.includes('enable') || desc.includes('disable') || desc.includes('maintenance') || desc.includes('toggle') || slug.includes('maintenance')) {
+      return true;
+    }
+  }
+
+  // 3. High-entropy description keyword matching
+  const desc = (tool.description || '').toLowerCase();
+  const descWords = desc.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length >= 4 && !/^(this|that|with|from|have|will|your|when|where|what|then|also)$/.test(w));
+  let matchHits = 0;
+  for (const w of descWords) {
+    const stem = w.length > 5 ? w.slice(0, 5) : w;
+    if (lower.includes(stem)) {
+      matchHits++;
+      if (matchHits >= 1) return true;
+    }
+  }
+
+  // 4. Dynamic parameter name extraction (e.g. { order_id }, { waybill }, { email }, { city })
+  const props = tool.parameters_schema?.properties || {};
+  for (const pName of Object.keys(props)) {
+    const pClean = pName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (pClean.length >= 4 && lower.includes(pClean)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Dynamic Skill & Tool Composer: Filters tools & injects micro-plugins on-demand with Token-Efficient Pruning
  */
 export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = true, context = {}) {
   const activeToolSlugs = new Set();
   const skillDirectives = [];
-
-  // In Personal Assistant mode, all executive tools are available to Boss at all times
-  if (isPersonalMode) {
-    activeToolSlugs.add('get_current_time');
-    activeToolSlugs.add('update_memory');
-    activeToolSlugs.add('draft_email');
-    activeToolSlugs.add('confirm_action');
-    activeToolSlugs.add('assistgroup_crm');
-    activeToolSlugs.add('web_search');
-    activeToolSlugs.add('evaluate_math');
-  }
+  const messageText = (context.messageText || '').toLowerCase();
 
   // State-Aware Draft Injection: If there is an active pending draft in this conversation,
   // ALWAYS keep confirm_action and draft_email in scope so the LLM can seamlessly confirm or revise!
@@ -127,16 +173,23 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
 
       case 'crm_read':
       case 'crm_write':
-        activeToolSlugs.add('assistgroup_crm');
+        for (const t of allTools) {
+          if (t.category === 'rest_api' || t.category === 'shared_env_api') {
+            const s = (t.tool_slug || '').toLowerCase();
+            if (s.includes('metric') || s.includes('user') || s.includes('inquir') || s.includes('lead') || s.includes('crm') || s.includes('system') || s.includes('file') || s.includes('team') || s.includes('plan') || s.includes('audit') || s.includes('cloud') || s.includes('health') || s.includes('growth') || s.includes('maintenance')) {
+              activeToolSlugs.add(t.tool_slug);
+            }
+          }
+        }
         skillDirectives.push(
-          `CRM PROTOCOL:\n• Autonomously call assistgroup_crm for platform metrics, user lookups, or inquiry records.\n• Summarize numbers clearly with bold labels.`
+          `ENTERPRISE API & CRM PROTOCOL:\n• Autonomously call the relevant external tool to look up requested information (metrics, users, leads, system status, records).\n• Provide clean, professional summaries with bold labels and numbers.`
         );
         break;
 
       case 'email_draft':
         activeToolSlugs.add('draft_email');
         skillDirectives.push(
-          `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• Call draft_email with to, subject, body. Prompt: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim email is sent until confirm_action succeeds.\n• RECIPIENT RULES:\n  - If Boss says "to me" or asks for a report, recipient MUST be: info.assistgroupofficial@gmail.com.\n  - NEVER invent synthetic domain emails (e.g. <name>@assistgroup.com).\n  - Boss is Ankit (info.assistgroupofficial@gmail.com); Ankush is a team collaborator (ankushkumary113@gmail.com).`
+          `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• Call draft_email with to, subject, body. Prompt: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim email is sent until confirm_action succeeds.`
         );
         break;
 
@@ -162,25 +215,55 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
         break;
 
       case 'escalation':
-        activeToolSlugs.add('escalate_to_human');
+        if (!isPersonalMode) {
+          activeToolSlugs.add('escalate_to_human');
+        }
         break;
 
       case 'general_assistant':
       default:
-        activeToolSlugs.add('web_search');
-        activeToolSlugs.add('evaluate_math');
-        activeToolSlugs.add('get_current_time');
+        // Lean Core Set: Only inject search/time if the message actually warrants outside knowledge
+        if (/\b(who|what|where|when|why|how|search|latest|news|price|weather|time|date|calculate|math)\b/i.test(messageText)) {
+          activeToolSlugs.add('web_search');
+          activeToolSlugs.add('get_current_time');
+        }
         break;
     }
   }
 
-  // Filter tools: active built-in utilities + ALL user-defined custom tools (rest_api, shared_env_api, webhook)
-  // Ensures that whenever a user adds or activates any custom tool, the bot gets immediate real-time access!
+  // In Personal mode, if message explicitly hints at core capabilities, ensure they are enabled
+  if (isPersonalMode) {
+    if (/\b(remember|note down|save this|keep in mind)\b/i.test(messageText)) activeToolSlugs.add('update_memory');
+    if (/\b(time|clock|today|date)\b/i.test(messageText)) activeToolSlugs.add('get_current_time');
+    if (/\b(mail|email|draft)\b/i.test(messageText)) activeToolSlugs.add('draft_email');
+
+    // Dynamically match user's installed tools based on keyword cues
+    for (const t of allTools) {
+      if (t.category === 'rest_api' || t.category === 'shared_env_api' || t.category === 'webhook') {
+        if (isCustomToolRelevant(t, messageText)) {
+          activeToolSlugs.add(t.tool_slug);
+        }
+      }
+    }
+  }
+
+  // Dynamic Precision Tool Pruning:
+  // Instead of dumping hundreds of tools, keep active custom tools (always keep when count <= 30)
   const filteredTools = allTools.filter(t => {
+    // STRICT ISOLATION: In Personal Assistant mode, escalation tools are NEVER provided to the LLM
+    if (isPersonalMode && t.tool_slug === 'escalate_to_human') return false;
+
+    // 1. Built-in tool matched by intent router
     if (activeToolSlugs.has(t.tool_slug)) return true;
-    if (t.category === 'rest_api' || t.category === 'shared_env_api' || t.category === 'webhook') return true;
-    const builtinSlugs = ['get_current_time', 'update_memory', 'draft_email', 'confirm_action', 'assistgroup_crm', 'web_search', 'evaluate_math', 'escalate_to_human', 'get_weather'];
-    return !builtinSlugs.includes(t.tool_slug);
+
+    // 2. Custom tools (rest_api, shared_env_api, webhook):
+    // When catalog is concise (<= 30 tools), provide all active custom tools so natural follow-up commands work!
+    if (t.category === 'rest_api' || t.category === 'shared_env_api' || t.category === 'webhook') {
+      if (allTools.length <= 30) return true;
+      return isCustomToolRelevant(t, messageText);
+    }
+
+    return false;
   });
 
   return {

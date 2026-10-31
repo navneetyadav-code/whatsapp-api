@@ -280,10 +280,52 @@ export function getCurrentCustomTime(config = {}, context = {}) {
 }
 
 /**
+ * Real-time Weather Lookup Handler
+ */
+export async function getLiveWeather(args = {}) {
+  const queryLoc = args.location || args.city || args.q || 'Delhi';
+  const apiKey = 'dccee50eab440ab2ba19959760e099f0';
+  let url;
+  if (args.lat && args.lon) {
+    url = `https://api.openweathermap.org/data/2.5/weather?lat=${encodeURIComponent(args.lat)}&lon=${encodeURIComponent(args.lon)}&units=metric&appid=${apiKey}`;
+  } else {
+    url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(queryLoc)}&units=metric&appid=${apiKey}`;
+  }
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) {
+      return { error: `Weather service error (${res.status}): ${res.statusText}` };
+    }
+    const data = await res.json();
+    return {
+      location: `${data.name}, ${data.sys?.country || ''}`,
+      condition: data.weather?.[0]?.description || data.weather?.[0]?.main,
+      temperature_celsius: Math.round(data.main?.temp),
+      feels_like_celsius: Math.round(data.main?.feels_like),
+      humidity_percent: data.main?.humidity,
+      wind_speed_kmh: Math.round((data.wind?.speed || 0) * 3.6),
+      pressure_hpa: data.main?.pressure
+    };
+  } catch (err) {
+    return { error: `Failed to fetch weather: ${err.message}` };
+  }
+}
+
+/**
  * Human Escalation Recorder
  */
 export async function triggerHumanEscalation(reason, context) {
   const { db, userId, conversationId, callerPhone } = context;
+  const isPersonalMode = context.agentMode === 'personal' || context.isPersonalMode;
+
+  // STRICT ISOLATION: In Personal Assistant mode, escalation is 100% strictly blocked!
+  if (isPersonalMode) {
+    return {
+      escalated: false,
+      reason: null,
+      message: 'Escalation is not available in Personal Assistant mode. You are communicating directly with your 24/7 dedicated AI Executive Assistant.'
+    };
+  }
 
   try {
     if (conversationId && db) {
@@ -316,52 +358,119 @@ export async function triggerHumanEscalation(reason, context) {
 }
 
 /**
- * Native SMTP Mail Dispatcher
+ * Native User-Isolated SMTP Mail Dispatcher with Multi-Server Auto-Failover
+ * Strictly tenant-isolated: zero system process.env fallback!
  */
-export async function sendNodeSmtpEmail({ to, subject, body, cc }) {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER || '';
-  const pass = process.env.SMTP_PASS || '';
-  const from = process.env.SMTP_FROM || user || 'noreply@localhost';
-  const fromName = process.env.SMTP_FROM_NAME || 'WhatsGateway';
+export async function sendNodeSmtpEmail({ to, subject, body, cc }, options = {}) {
+  const { db, userId } = options;
+  let smtpConfigs = [];
 
-  if (!host || !user || !pass) {
-    return {
-      success: false,
-      error: 'SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS) are not configured in system environment.'
-    };
+  // 1. Load user-isolated SMTP accounts from database (priority ordered)
+  if (db && userId) {
+    try {
+      const [rows] = await db.execute(
+        `SELECT id, label, host, port, encryption, username, password, from_email, from_name, priority
+         FROM user_smtp_credentials
+         WHERE user_id = ? AND is_active = 1
+         ORDER BY priority ASC, id ASC`,
+        [userId]
+      );
+      if (rows && rows.length > 0) {
+        smtpConfigs = rows.map(r => ({
+          id: r.id,
+          label: r.label,
+          host: r.host,
+          port: Number(r.port) || 587,
+          secure: r.encryption === 'ssl' || Number(r.port) === 465,
+          user: r.username,
+          pass: r.password,
+          from: r.from_email || r.username,
+          fromName: r.from_name || 'AI Assistant'
+        }));
+      }
+    } catch (e) {
+      console.warn('[SMTP] Failed to query user_smtp_credentials:', e.message);
+    }
   }
 
-  try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false }
+  // 2. Fallback to direct credentials if explicitly provided in options
+  if (smtpConfigs.length === 0 && options.host && options.user && options.pass) {
+    smtpConfigs.push({
+      id: null,
+      label: options.label || 'Direct SMTP',
+      host: options.host,
+      port: Number(options.port) || 587,
+      secure: options.secure || options.port === 465,
+      user: options.user,
+      pass: options.pass,
+      from: options.from || options.user,
+      fromName: options.fromName || 'AI Assistant'
     });
+  }
 
-    const mailOptions = {
-      from: `"${fromName}" <${from}>`,
-      to,
-      subject,
-      text: body
-    };
-
-    if (cc) mailOptions.cc = cc;
-
-    const info = await transporter.sendMail(mailOptions);
-    return {
-      success: true,
-      messageId: info.messageId
-    };
-  } catch (err) {
+  // Strictly enforce user isolation: ZERO system process.env fallback!
+  if (smtpConfigs.length === 0) {
     return {
       success: false,
-      error: err.message
+      error: 'No active SMTP accounts configured for your workspace. Please add your SMTP server in AI Keys & SMTP.'
     };
   }
+
+  let lastError = null;
+  for (const cfg of smtpConfigs) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: cfg.host,
+        port: cfg.port,
+        secure: cfg.secure,
+        auth: { user: cfg.user, pass: cfg.pass },
+        tls: { rejectUnauthorized: false }
+      });
+
+      const mailOptions = {
+        from: `"${cfg.fromName}" <${cfg.from}>`,
+        to,
+        subject,
+        text: body
+      };
+
+      if (cc) mailOptions.cc = cc;
+
+      const info = await transporter.sendMail(mailOptions);
+
+      // Record success in DB
+      if (cfg.id && db) {
+        db.execute(
+          `UPDATE user_smtp_credentials 
+           SET last_used_at = NOW(), fail_count = 0, status = 'active', last_error = NULL 
+           WHERE id = ?`,
+          [cfg.id]
+        ).catch(() => {});
+      }
+
+      return {
+        success: true,
+        messageId: info.messageId,
+        smtpServer: cfg.label
+      };
+    } catch (err) {
+      console.warn(`[SMTP] User ${userId || 'unknown'} SMTP '${cfg.label}' (${cfg.host}) failed: ${err.message}. Rotating to next SMTP server...`);
+      lastError = err;
+      if (cfg.id && db) {
+        db.execute(
+          `UPDATE user_smtp_credentials 
+           SET status = 'error', last_error = ?, fail_count = fail_count + 1 
+           WHERE id = ?`,
+          [String(err.message).slice(0, 500), cfg.id]
+        ).catch(() => {});
+      }
+    }
+  }
+
+  return {
+    success: false,
+    error: `All configured SMTP accounts failed to dispatch. Last error: ${lastError?.message || 'Connection error'}`
+  };
 }
 
 /**
@@ -374,12 +483,28 @@ export async function handleDraftEmail(args, context) {
   const body = String(args.body || '').trim();
   const cc = args.cc ? String(args.cc).trim() : null;
 
-  // Resolve Boss's verified primary email fallback
-  const bossPrimaryEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'info.assistgroupofficial@gmail.com';
+  // Resolve Boss's verified primary email fallback from user's configured SMTP or user account (zero env leakage)
+  let bossPrimaryEmail = 'boss@example.com';
+  if (db && userId) {
+    try {
+      const [smtpRows] = await db.execute(
+        `SELECT from_email FROM user_smtp_credentials WHERE user_id = ? AND is_active = 1 ORDER BY priority ASC LIMIT 1`,
+        [userId]
+      );
+      if (smtpRows && smtpRows.length > 0 && smtpRows[0].from_email) {
+        bossPrimaryEmail = smtpRows[0].from_email;
+      } else {
+        const [userRows] = await db.execute(`SELECT email FROM users WHERE id = ? LIMIT 1`, [userId]);
+        if (userRows && userRows.length > 0 && userRows[0].email) {
+          bossPrimaryEmail = userRows[0].email;
+        }
+      }
+    } catch (e) {}
+  }
 
   // Automatically correct recipient if user requested to send to self or if LLM hallucinated a synthetic domain email
   const lowerTo = to.toLowerCase();
-  if (!to || ['me', 'myself', 'boss', 'admin', 'self', 'ankit', 'to me', 'detach to me', 'send to me'].includes(lowerTo) || lowerTo.endsWith('@assistgroup.com') || lowerTo.endsWith('@assistgroup.gt.tc')) {
+  if (!to || ['me', 'myself', 'boss', 'admin', 'self', 'to me', 'detach to me', 'send to me'].includes(lowerTo) || lowerTo.includes('example.com') || lowerTo.includes('placeholder')) {
     to = bossPrimaryEmail;
   }
 
@@ -515,7 +640,7 @@ export async function handleConfirmAction(args, context) {
       subject,
       body,
       cc: meta.cc
-    });
+    }, { db, userId });
 
     if (!sendResult.success) {
       return {
@@ -544,13 +669,19 @@ export async function handleConfirmAction(args, context) {
 }
 
 /**
- * Autonomous Memory Handler: Remembers durable facts in ai_user_memory
+ * Autonomous Memory Handler: Remembers durable/ephemeral facts in ai_user_memory
  */
 export async function handleUpdateMemory(args, context) {
-  const { db, userId, conversationId } = context;
+  const { db, userId, conversationId, callerPhone } = context;
   const key = args.key;
   const value = args.value;
   const memoryType = args.memory_type || 'fact';
+  const isDurable = args.is_durable !== false && args.is_durable !== 0 && args.is_durable !== 'false';
+  const ttlDays = args.ttl_days ? Number(args.ttl_days) : (isDurable ? null : 14);
+
+  // In support mode, scope fact to customer phone; in personal mode, scope to owner
+  const isPersonalMode = context.isPersonalMode || false;
+  const contactPhone = isPersonalMode ? '' : (callerPhone || '');
 
   if (!key || !value) {
     return { error: 'Memory key and value are required.' };
@@ -563,7 +694,10 @@ export async function handleUpdateMemory(args, context) {
     value,
     memoryType,
     'whatsapp_chat',
-    conversationId
+    conversationId,
+    contactPhone,
+    isDurable,
+    ttlDays
   );
 
   if (!res.success) {
@@ -576,7 +710,36 @@ export async function handleUpdateMemory(args, context) {
     key: res.key,
     value: res.value,
     type: res.type,
-    message: `Stored fact permanently in notebook: "${res.key}" = "${res.value}"`
+    isDurable: res.isDurable,
+    contactPhone: res.contactPhone,
+    message: `Stored fact successfully: "${res.key}" = "${res.value}"`
+  };
+}
+
+/**
+ * Autonomous Memory Deletion Handler: Removes facts from ai_user_memory
+ */
+export async function handleDeleteMemory(args, context) {
+  const { db, userId, callerPhone } = context;
+  const key = args.key;
+  const isPersonalMode = context.isPersonalMode || false;
+  const contactPhone = isPersonalMode ? '' : (callerPhone || '');
+
+  if (!key) {
+    return { error: 'Memory key or topic to forget is required.' };
+  }
+
+  const res = await ChatFactMemory.deleteUserFact(db, userId, key, contactPhone);
+
+  if (!res.success) {
+    return { error: `Failed to delete memory: ${res.error}` };
+  }
+
+  return {
+    success: true,
+    deleted: res.deleted,
+    key,
+    message: res.deleted ? `Erased fact "${key}" from memory.` : `No memory found matching "${key}".`
   };
 }
 
@@ -589,6 +752,19 @@ export async function handleUpdateMemory(args, context) {
  */
 function interpolateVariables(template, variables = {}, isUrl = false) {
   if (typeof template === 'string') {
+    // If the template is exactly a single placeholder like "{enabled}" and not in a URL, preserve native boolean/number
+    if (!isUrl) {
+      const singleMatch = template.match(/^\{([a-zA-Z0-9_|]+)\}$/);
+      if (singleMatch) {
+        const keys = singleMatch[1].split('|');
+        for (const key of keys) {
+          if (variables[key] !== undefined && variables[key] !== null) {
+            return variables[key];
+          }
+        }
+      }
+    }
+
     return template.replace(/\{([a-zA-Z0-9_|]+)\}/g, (match, expression) => {
       const keys = expression.split('|');
       for (const key of keys) {
@@ -635,36 +811,132 @@ async function executeCustomRestApi(executionConfig, args = {}) {
   const method = (executionConfig.method || 'GET').toUpperCase();
   const headers = {
     'Accept': 'application/json',
-    'User-Agent': 'WhatsGateway-Autonomous-Engine/3.0',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
     ...(executionConfig.headers || {})
   };
 
   const reqOptions = {
     method,
     headers,
-    signal: AbortSignal.timeout(executionConfig.timeout_ms || 5000)
+    signal: AbortSignal.timeout(executionConfig.timeout_ms || 12000)
   };
 
-  // 2. Attach JSON body for write methods
+  // 2. Attach JSON or form body for write methods
+  let isForm = String(headers['Content-Type'] || headers['content-type'] || '').includes('application/x-www-form-urlencoded');
+  const isGtTc = String(finalUrl).includes('gt.tc') || String(finalUrl).includes('epizy.com') || String(finalUrl).includes('byet');
+  if (isGtTc && !headers['Content-Type'] && !headers['content-type']) {
+    isForm = true;
+    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+  }
+
+  const rawBody = executionConfig.body_template
+    ? interpolateVariables(executionConfig.body_template, args, false)
+    : args;
+
   if (['POST', 'PUT', 'PATCH'].includes(method)) {
-    headers['Content-Type'] = 'application/json';
-    if (executionConfig.body_template) {
-      reqOptions.body = JSON.stringify(interpolateVariables(executionConfig.body_template, args, false));
+    if (isForm) {
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      const formParams = new URLSearchParams();
+      if (typeof rawBody === 'object' && rawBody !== null) {
+        for (const [k, v] of Object.entries(rawBody)) {
+          const val = typeof v === 'boolean' ? (v ? '1' : '0') : String(v ?? '');
+          formParams.append(k, val);
+        }
+      } else if (typeof rawBody === 'string') {
+        formParams = rawBody;
+      }
+      reqOptions.body = formParams.toString();
     } else {
-      reqOptions.body = JSON.stringify(args);
+      if (!headers['Content-Type'] && !headers['content-type']) {
+        headers['Content-Type'] = 'application/json';
+      }
+      reqOptions.body = JSON.stringify(rawBody);
     }
   }
 
   try {
-    const res = await fetch(finalUrl, reqOptions);
-    const contentType = res.headers.get('content-type') || '';
-    
-    let responseData;
+    const testCookie = await resolveProxyCookie(finalUrl);
+    if (testCookie && !headers['Cookie'] && !headers['cookie']) {
+      headers['Cookie'] = `__test=${testCookie}`;
+    }
+
+    let res = await fetch(finalUrl, reqOptions);
+    let contentType = res.headers.get('content-type') || '';
+    let rawText = '';
+    let responseData = null;
+
     if (contentType.includes('application/json')) {
       responseData = await res.json();
     } else {
-      const text = await res.text();
-      responseData = { raw_text: text.slice(0, 1000) };
+      rawText = await res.text();
+      // If server returned the Byet/InfinityFree aes.js challenge, solve and retry
+      if (rawText.includes('toNumbers') && rawText.includes('slowAES')) {
+        const solved = await resolveProxyCookie(finalUrl);
+        if (solved) {
+          headers['Cookie'] = `__test=${solved}`;
+          res = await fetch(finalUrl, reqOptions);
+          contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            responseData = await res.json();
+          } else {
+            rawText = await res.text();
+            try {
+              responseData = JSON.parse(rawText);
+            } catch {
+              responseData = null;
+            }
+          }
+        }
+      } else {
+        try {
+          responseData = JSON.parse(rawText);
+        } catch {
+          responseData = null;
+        }
+      }
+    }
+
+    // Auto-retry with form-urlencoded on shared hosting if JSON returned 422
+    if (!isForm && res.status === 422 && isGtTc) {
+      const formHeaders = { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' };
+      const formParams = new URLSearchParams();
+      if (typeof rawBody === 'object' && rawBody !== null) {
+        for (const [k, v] of Object.entries(rawBody)) {
+          const val = typeof v === 'boolean' ? (v ? '1' : '0') : String(v ?? '');
+          formParams.append(k, val);
+        }
+      }
+      const retryRes = await fetch(finalUrl, {
+        ...reqOptions,
+        headers: formHeaders,
+        body: formParams.toString()
+      });
+      const retryType = retryRes.headers.get('content-type') || '';
+      if (retryType.includes('application/json')) {
+        res = retryRes;
+        responseData = await retryRes.json();
+      }
+    }
+
+    // Check if the response was HTML anti-bot or invalid non-JSON
+    const isChallengeOrHtml = !responseData && (
+      rawText.includes('aes.js') || 
+      rawText.includes('slowAES') || 
+      rawText.toLowerCase().includes('<html>') ||
+      rawText.toLowerCase().includes('<!doctype')
+    );
+
+    if (isChallengeOrHtml) {
+      return {
+        status: 502,
+        success: false,
+        error: 'API returned anti-bot challenge (aes.js) or HTML page instead of JSON',
+        details: { raw_text: rawText.slice(0, 500) }
+      };
+    }
+
+    if (!responseData) {
+      responseData = { raw_text: rawText.slice(0, 1000) };
     }
 
     if (!res.ok) {
@@ -727,7 +999,7 @@ async function resolveProxyCookie(targetUrl) {
     const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
     const cookieValue = decrypted.toString('hex');
 
-    const activateUrl = targetUrl.includes('?') ? `${targetUrl}&i=1` : `${targetUrl}?i=1`;
+    const activateUrl = `${new URL(targetUrl).origin}/?i=1`;
     await fetch(activateUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
@@ -899,7 +1171,8 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
   } catch (err) {
     const isTimeout = err.name === 'TimeoutError' || (err.message && err.message.includes('timeout'));
     const isConnect = err.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' || (err.cause?.message && err.cause.message.includes('Timeout'));
-    const detail = (isTimeout || isConnect) ? 'Server connection timed out (host assistgroup.gt.tc is unreachable)' : (err.cause?.message || err.message);
+    const host = (() => { try { return new URL(baseUrl).hostname; } catch { return 'remote host'; } })();
+    const detail = (isTimeout || isConnect) ? `Server connection timed out (host ${host} is unreachable)` : (err.cause?.message || err.message);
     return {
       success: false,
       error: `Production API request failed: ${detail}`
@@ -1017,6 +1290,71 @@ export class UniversalToolsRegistry {
   }
 
   /**
+   * Compacts raw tool execution results before delivering to LLM context to prevent token explosion
+   */
+  static compactResult(result, maxChars = 1400) {
+    if (!result) return result;
+    if (typeof result === 'string') {
+      return result.length > maxChars ? result.slice(0, maxChars) + '... [truncated for brevity]' : result;
+    }
+    if (typeof result !== 'object') return result;
+
+    try {
+      // 1. If result wraps a data array (e.g. { success: true, data: [...] })
+      if (Array.isArray(result.data) && result.data.length > 3) {
+        const total = result.data.length;
+        return {
+          success: result.success !== false,
+          total_records: total,
+          data: result.data.slice(0, 3),
+          note: `Showing first 3 of ${total} records to conserve token budget.`
+        };
+      }
+
+      // 2. If result itself is a root array
+      if (Array.isArray(result) && result.length > 3) {
+        return {
+          total_records: result.length,
+          records: result.slice(0, 3),
+          note: `Showing top 3 of ${result.length} items.`
+        };
+      }
+
+      // 3. Deep recursive string/object truncation
+      const compactNode = (node, depth = 0) => {
+        if (depth > 3 || !node || typeof node !== 'object') return node;
+        if (Array.isArray(node)) {
+          return node.slice(0, 3).map(item => compactNode(item, depth + 1));
+        }
+        const clean = {};
+        for (const [k, v] of Object.entries(node)) {
+          if (/^(debug|raw_headers|stack|internal_id|hash|meta_signature)$/i.test(k)) continue;
+          if (typeof v === 'string' && v.length > 350) {
+            clean[k] = v.slice(0, 350) + '... [truncated]';
+          } else if (typeof v === 'object' && v !== null) {
+            clean[k] = compactNode(v, depth + 1);
+          } else {
+            clean[k] = v;
+          }
+        }
+        return clean;
+      };
+
+      const compacted = compactNode(result);
+      const str = JSON.stringify(compacted);
+      if (str.length > maxChars) {
+        return {
+          status: result.status || 200,
+          summary: str.slice(0, maxChars) + '... [compacted]'
+        };
+      }
+      return compacted;
+    } catch (_) {
+      return result;
+    }
+  }
+
+  /**
    * Dispatches and executes tool dynamically by slug
    */
   static async executeTool(toolName, args, tools = [], context = {}) {
@@ -1039,7 +1377,7 @@ export class UniversalToolsRegistry {
         denied: true,
         error: `Permission Denied: Caller role "${callerRole}" is not permitted to execute tool "${toolName}".`
       };
-      await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, deniedResponse, 0, 'denied');
+      await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, deniedResponse, 0, 'denied', deniedResponse.error, context.conversationId);
       return deniedResponse;
     }
 
@@ -1062,11 +1400,19 @@ export class UniversalToolsRegistry {
           result = await handleConfirmAction(args, context);
         } else if (handler === 'update_memory') {
           result = await handleUpdateMemory(args, context);
+        } else if (handler === 'delete_memory') {
+          result = await handleDeleteMemory(args, context);
+        } else if (handler === 'get_weather') {
+          result = await getLiveWeather(args);
         } else {
           result = { error: `Unknown built-in handler: ${handler}` };
         }
       } else if (tool.category === 'rest_api') {
-        result = await executeCustomRestApi(tool.execution_config, args);
+        if (tool.tool_slug === 'get_weather') {
+          result = await getLiveWeather(args);
+        } else {
+          result = await executeCustomRestApi(tool.execution_config, args);
+        }
       } else if (tool.category === 'shared_env_api') {
         result = await executeSharedEnvApi(tool.execution_config, args);
       } else if (tool.category === 'webhook') {
@@ -1079,34 +1425,68 @@ export class UniversalToolsRegistry {
     }
 
     const latency = Date.now() - startTime;
-    const status = result?.error ? 'error' : 'success';
+    let status = 'success';
+    let errorMessage = null;
 
-    // 4. Record audit log
-    await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, result, latency, status);
+    if (result?.denied) {
+      status = 'denied';
+      errorMessage = typeof result.error === 'string' ? result.error : 'Permission Denied';
+    } else if (result?.error || result?.success === false) {
+      status = 'error';
+      if (typeof result?.error === 'string') {
+        errorMessage = result.error;
+      } else if (result?.error && typeof result.error === 'object') {
+        errorMessage = JSON.stringify(result.error);
+      } else if (result?.details?.message) {
+        errorMessage = result.details.message;
+      } else if (result?.message) {
+        errorMessage = result.message;
+      } else {
+        errorMessage = 'Tool execution returned failure';
+      }
+    }
 
-    return result;
+    // 4. Record audit log with exact error_message and conversationId
+    await UniversalToolsRegistry.logInvocation(
+      db,
+      userId,
+      context.callerPhone,
+      callerRole,
+      toolName,
+      args,
+      result,
+      latency,
+      status,
+      errorMessage,
+      context.conversationId
+    );
+
+    // Return compact, token-efficient projection to LLM context
+    return UniversalToolsRegistry.compactResult(result);
   }
 
   /**
    * Internal audit logger into ai_tool_invocations
    */
-  static async logInvocation(db, userId, callerPhone, callerRole, toolName, args, result, latencyMs, status) {
+  static async logInvocation(db, userId, callerPhone, callerRole, toolName, args, result, latencyMs, status, errorMessage = null, conversationId = null) {
     if (!db || !userId) return;
 
     try {
       await db.execute(
         `INSERT INTO ai_tool_invocations 
-         (user_id, caller_phone, caller_role, tool_name, tool_arguments, tool_result, execution_time_ms, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (user_id, conversation_id, caller_phone, caller_role, tool_name, tool_arguments, tool_result, execution_time_ms, status, error_message)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           userId,
+          conversationId || null,
           callerPhone || 'unknown',
           callerRole || 'guest',
           toolName,
           JSON.stringify(args || {}),
           JSON.stringify(result || {}).slice(0, 4000),
           latencyMs || 0,
-          status || 'success'
+          status || 'success',
+          errorMessage ? String(errorMessage).slice(0, 1000) : null
         ]
       );
     } catch (e) {

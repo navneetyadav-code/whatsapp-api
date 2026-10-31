@@ -1,82 +1,62 @@
 <?php
 $pageLabels = [
-    'dashboard' => 'Overview',
-    'live-chat' => 'Live Chat',
-    'device' => 'Device Management',
-    'api-keys' => 'API Keys',
-    'queue' => 'Message Queue',
-    'contacts' => 'Contacts',
-    'feedback' => 'Customer Feedback',
-    'message' => 'New Message',
-    'chatbot' => 'Chatbots',
-    'webhooks' => 'Webhooks',
-    'campaigns' => 'Campaigns',
-    'audit' => 'Audit Logs',
-    'security' => 'Security',
+    'dashboard'   => 'Overview',
+    'live-chat'   => 'Live Chat',
+    'device'      => 'Device Management',
+    'api-keys'    => 'API Keys',
+    'queue'       => 'Message Queue',
+    'contacts'    => 'Contacts',
+    'feedback'    => 'Customer Feedback',
+    'message'     => 'New Message',
+    'chatbot'     => 'AI Agent Studio',
+    'ai-agent'    => 'AI Agent Studio',
+    'knowledge'   => 'Company Knowledge Base (RAG)',
+    'tools'       => 'Installed Tools & RBAC',
+    'app-store'   => 'App Store & Presets Catalog',
+    'presets'     => 'App Store & Presets Catalog',
+    'escalations' => 'Escalations & Alarms',
+    'rules'       => 'Keyword Trigger Rules',
+    'webhooks'    => 'Webhooks',
+    'campaigns'   => 'Campaigns',
+    'audit'       => 'Audit Logs',
+    'security'    => 'Security',
 ];
 $title = $pageLabels[$page ?? ($_GET['page'] ?? 'dashboard')] ?? 'Overview';
 ?>
-<!-- Top Navbar (High-Density Linear/Stripe Style) -->
-<header class="h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-5 shrink-0 z-20 sticky top-0">
-    <div class="flex items-center gap-3">
-        <button id="openSidebar" class="md:hidden text-slate-500 hover:text-slate-900 p-1.5 rounded-md hover:bg-slate-100 transition-colors" aria-label="Open Navigation">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+<!-- Top Navbar -->
+<header class="h-[68px] bg-white/95 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0 z-20 sticky top-0">
+    <div class="flex items-center gap-2.5">
+        <!-- Mobile navigation drawer toggle -->
+        <button id="openSidebar" type="button" class="md:hidden text-slate-500 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer" aria-label="Open navigation" title="Open navigation">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M4 6h16M4 12h16M4 18h16"></path></svg>
         </button>
-        
-        <!-- Breadcrumbs / Operational Status -->
-        <div class="hidden sm:flex items-center text-[13px]">
-            <span class="text-slate-500 hover:text-slate-800 font-medium transition-colors cursor-default">Admin Console</span>
-            <svg class="w-3.5 h-3.5 text-slate-300 mx-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-            <span class="font-semibold text-slate-900 tracking-tight"><?= e($title) ?></span>
-            
-            <!-- Real Operational State -->
-            <span class="ml-3 px-2 py-0.5 text-[10px] font-bold bg-emerald-50/90 text-emerald-800 rounded-md border border-emerald-200/70 tracking-wide flex items-center gap-1.5 shadow-subtle">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20"></span>
-                <span>Active</span>
-            </span>
+
+        <!-- Current View Title / Breadcrumb -->
+        <div class="flex items-center gap-2">
+            <span class="text-[14px] sm:text-[15px] font-semibold text-slate-800 tracking-[-0.01em]"><?= e($title) ?></span>
         </div>
     </div>
 
-    <div class="flex items-center gap-2.5 sm:gap-3">
-        <!-- Command Search -->
-        <div class="hidden md:flex relative group">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg class="h-3.5 w-3.5 text-slate-400 group-focus-within:text-emerald-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            </div>
-            <input id="navbarSearchInput" type="text" aria-label="Search commands" class="block w-64 pl-9 pr-16 py-2 border border-transparent rounded-xl text-[12px] font-medium text-slate-800 placeholder:text-slate-400 bg-slate-100/80 hover:bg-slate-100 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/15 focus:border-emerald-500/40 transition-all" placeholder="Search...">
-            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span class="text-[10px] font-medium tracking-wide text-slate-400">Ctrl K</span>
-            </div>
-        </div>
-
-        <!-- Star on GitHub CTA -->
-        <a href="https://github.com/navneetyadav-code/whatsapp-api" target="_blank" rel="noopener noreferrer" class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-semibold text-slate-700 bg-white hover:bg-slate-50 hover:text-slate-900 border border-slate-200/90 rounded-lg transition-all shadow-subtle btn-tactile" title="Star WhatsGateway on GitHub">
-            <svg class="w-3.5 h-3.5 text-amber-500 fill-amber-400" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-            <span class="tabular-nums">Star</span>
+    <div class="flex items-center gap-3">
+        <!-- Quick Link: Live Chat -->
+        <?php if (empty($isPersonalMode)): ?>
+        <a id="navbarLiveChatLink" href="<?= e(base_url('index.php?page=live-chat')) ?>" class="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 rounded-lg border border-slate-200/80 transition-all shadow-subtle btn-tactile" title="Open Live Chat">
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+            <span class="hidden sm:inline">Live Chat</span>
         </a>
+        <?php endif; ?>
 
-        <!-- Divider -->
-        <div class="h-4 w-px bg-slate-200 hidden sm:block mx-0.5"></div>
-
-        <!-- Global Buzzer Control -->
-        <button id="globalBuzzerBtn" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 transition-all shadow-subtle btn-tactile" title="Buzzer Sound (Click to Mute/Unmute)">
-            <span id="globalBuzzerIcon">🔔</span>
-            <span id="globalBuzzerLabel" class="hidden sm:inline">Buzzer</span>
-            <span id="globalBuzzerBadge" class="hidden px-1.5 py-0.2 rounded-full bg-rose-600 text-white text-[10px] font-bold animate-pulse">!</span>
-        </button>
-
-        <!-- Desktop Notifications Enable Button -->
-        <button id="globalNotifBtn" type="button" class="hidden inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-all shadow-subtle" title="Click to allow desktop notifications for customer messages & escalations">
-            <span class="animate-bounce">🔔</span>
-            <span class="hidden sm:inline">Enable Alerts</span>
-        </button>
-        
-        <a href="<?= e(base_url('index.php?page=docs')) ?>" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 hidden sm:block transition-colors" title="Documentation">
+        <!-- Quick Link: API Docs -->
+        <a href="<?= e(base_url('index.php?page=docs')) ?>" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors" title="API Documentation">
             <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
         </a>
-        <button class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 relative transition-colors" title="Notifications">
-            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-            <span class="absolute top-1.5 right-1.5 block h-1.5 w-1.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
-        </button>
+
+        <!-- User Identity Ribbon Mini -->
+        <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
+            <div class="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold font-mono shadow-xs">
+                <?= e($initials ?? 'AD') ?>
+            </div>
+            <span class="hidden lg:inline text-xs font-semibold text-slate-800"><?= e($userForLayout['name'] ?? 'Admin') ?></span>
+        </div>
     </div>
 </header>
