@@ -1,14 +1,15 @@
 <p align="center">
-  <a href="https://whatsapp-api-xepo.onrender.com">
-    <img src="public/assets/logo_white.png" alt="WhatsGateway Logo" width="120" style="border-radius: 50%;">
+  <a href="https://whatsapp-api-xepo.onrender.com" target="_blank" rel="noopener noreferrer">
+    <img src="public/assets/logo_white.png" alt="WhatsGateway Logo" width="128" style="border-radius: 50%;">
   </a>
 </p>
 
-<h1 align="center">🚀 WhatsGateway — Free WhatsApp API & Gateway</h1>
+<h1 align="center">WhatsGateway</h1>
 
 <p align="center">
-  <strong>The 100% Free, Open-Source & Self-Hosted WhatsApp REST API Gateway</strong><br>
-  <em>Developer-first alternative to Twilio and Meta WhatsApp Cloud API — Zero per-conversation fees, zero template approvals, and no credit card required.</em>
+  <strong>Your Self-Hosted WhatsApp API. Your Infrastructure. Your Control.</strong><br>
+  <em>The modern, open-source WhatsApp REST API gateway and web management dashboard built for developers and teams.<br>
+  Zero per-conversation fees, zero template approvals, and no credit card required.</em>
 </p>
 
 <p align="center">
@@ -21,826 +22,224 @@
 
 <p align="center">
   <a href="https://www.php.net/"><img src="https://img.shields.io/badge/PHP-8.2%2B-777BB4.svg?style=flat-square&logo=php&logoColor=white" alt="PHP 8.2+"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-18%2B%20%7C%2020%2B-339933.svg?style=flat-square&logo=node.js&logoColor=white" alt="Node.js 18+"></a>
-  <a href="https://github.com/WhiskeySockets/Baileys"><img src="https://img.shields.io/badge/Engine-Baileys%20v7-25D366.svg?style=flat-square&logo=whatsapp&logoColor=white" alt="Baileys"></a>
-  <a href="https://www.mysql.com/"><img src="https://img.shields.io/badge/Database-MySQL%20%7C%20TiDB-4479A1.svg?style=flat-square&logo=mysql&logoColor=white" alt="MySQL/TiDB"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-18%2B%20%7C%2020%2B-339933.svg?style=flat-square&logo=node.js&logoColor=white" alt="Node.js"></a>
+  <a href="https://github.com/WhiskeySockets/Baileys"><img src="https://img.shields.io/badge/Engine-Baileys%20v7-25D366.svg?style=flat-square&logo=whatsapp&logoColor=white" alt="Baileys Engine"></a>
+  <a href="https://www.mysql.com/"><img src="https://img.shields.io/badge/Database-MySQL%20%7C%20MariaDB%20%7C%20TiDB-4479A1.svg?style=flat-square&logo=mysql&logoColor=white" alt="Database"></a>
   <a href="Dockerfile"><img src="https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat-square&logo=docker&logoColor=white" alt="Docker Ready"></a>
   <a href="https://whatsapp-api-xepo.onrender.com"><img src="https://img.shields.io/badge/Live%20Demo-Online-success?style=flat-square&logo=render" alt="Live Demo"></a>
 </p>
 
-> **WhatsGateway** is a free, open-source, self-hosted WhatsApp REST API Gateway and Web Management Dashboard built with **PHP 8.2+**, **Node.js (@whiskeysockets/baileys)**, and **MySQL / TiDB**.  
-> Send text messages, rich media (PDFs, images, documents, audio, video, voice notes), automate conversational auto-replies, track delivery queues, and receive real-time webhooks — **100% free with zero Meta Cloud API fees, zero per-conversation costs, and no credit card required.**
-
----
-
-### ⭐ Support Open Source — Star on GitHub!
-If you find this project valuable, please consider giving it a **Star (⭐)**! It helps more developers discover free open-source WhatsApp tools and keeps the project actively maintained.  
-👉 [**Star navneetyadav-code/whatsapp-api on GitHub**](https://github.com/navneetyadav-code/whatsapp-api/stargazers)
-
----
-
-## Table of Contents
-
-1. [Project Overview & Purpose](#1-project-overview--purpose)
-2. [Key Features & Capabilities](#2-key-features--capabilities)
-3. [Technology Stack & Runtime Requirements](#3-technology-stack--runtime-requirements)
-4. [System Architecture & Directory Structure](#4-system-architecture--directory-structure)
-5. [Prerequisites & System Requirements](#5-prerequisites--system-requirements)
-6. [Installation & Dependency Setup](#6-installation--dependency-setup)
-7. [Environment Variable Configuration](#7-environment-variable-configuration)
-8. [Database Setup, Migrations & Initialization](#8-database-setup-migrations--initialization)
-9. [Running the Application (Local & Production)](#9-running-the-application-local--production)
-10. [Comprehensive API Endpoint Reference](#10-comprehensive-api-endpoint-reference)
-11. [Request & Response Examples](#11-request--response-examples)
-12. [Authentication, Authorization & Security Safeguards](#12-authentication-authorization--security-safeguards)
-13. [Error Handling & Status Codes](#13-error-handling--status-codes)
-14. [Testing & Quality Verification](#14-testing--quality-verification)
-15. [Deployment Guide (Docker, Cloud, VPS)](#15-deployment-guide-docker-cloud-vps)
-16. [External Integrations & Background Workers](#16-external-integrations--background-workers)
-17. [Logging, Monitoring & Debugging](#17-logging-monitoring--debugging)
-18. [Anti-Ban Practices, Known Limitations & Notes](#18-anti-ban-practices-known-limitations--notes)
-19. [Frequently Asked Questions (FAQ) & Search Index](#19-frequently-asked-questions-faq--search-index)
-20. [Community & Discussions](#20-community--discussions)
-
----
-
-## 1. Project Overview & Purpose
-
-Commercial WhatsApp Business API providers (such as Twilio, MessageBird, or Meta Cloud API directly) enforce pay-per-conversation billing (\$0.05 – \$0.15+ per dialogue), require business registration paperwork, mandate pre-approved message templates, and demand credit card verifications.
-
-**WhatsGateway** is an open-source, developer-centric alternative for individuals, startups, and software engineering teams who require a reliable WhatsApp notification gateway without external per-message costs:
-
-- **100% Free & Open Source:** Licensed under MIT with no hidden subscription fees.
-- **Any Regular or Business WhatsApp Number:** Connect your existing phone number in seconds by scanning a QR code via WhatsApp Web multi-device.
-- **Meta Cloud API Drop-In Compatibility:** Accepts both simple flat JSON and official Meta WhatsApp Cloud API schemas (`messaging_product`, `recipient_type`, `text.body`, `template`).
-- **Complete Self-Hosting:** Your messages, media files, and cryptographic keys stay on your own infrastructure.
-
-### Comparison Table
-
-| Dimension | WhatsGateway | Meta Cloud API | Twilio WhatsApp | Traditional Cloud Gateways |
-| :--- | :---: | :---: | :---: | :---: |
-| **Pricing** | **100% Free ($0)** | Pay-per-conversation | Pay-per-message + markup | $49 – $299 / month |
-| **Credit Card Required** | ❌ **No** | ✅ Yes | ✅ Yes | ✅ Yes |
-| **Template Approval** | ❌ **No (Freeform text & media)** | ✅ Strict mandatory | ✅ Strict mandatory | ✅ Strict mandatory |
-| **Setup Time** | **2 minutes (Scan QR)** | Days / Weeks | Days / Weeks | Hours / Days |
-| **Self-Hosted** | ✅ **Yes (Full privacy)** | ❌ Cloud only | ❌ Cloud only | ❌ Cloud only |
-| **Web Dashboard** | ✅ **Included (PHP + Tailwind)** | ❌ None | ⚠️ Basic logs only | ✅ Varies |
-| **Media Attachments** | ✅ **URL, Base64 & Upload** | ✅ URL / Upload | ✅ URL only | ✅ Varies |
-| **Chatbot Engine** | ✅ **Built-in Rule Matcher** | ❌ Custom webhook required | ❌ Studio build required | ⚠️ Add-on cost |
-
----
-
-## 2. Key Features & Capabilities
-
-- 🔑 **Single-Key REST Authentication:** Authenticate requests using a single Bearer token (`wa_live_...`). No secondary secret key is needed or generated. Send via `X-API-Key: wa_live_...`, `Authorization: Bearer wa_live_...`, or request body / query parameter.
-- 📁 **Universal Media Engine:** Ingests media via direct HTTP/HTTPS URLs (with SSRF protection), Base64 data strings/Data URIs, or standard `multipart/form-data` uploads up to 20MB. Supports Images (JPG, PNG, GIF, WEBP), Documents (PDF, DOCX, XLSX, TXT, CSV), Videos (MP4, MOV), and Audio (MP3, OGG, WAV, M4A) including push-to-talk voice notes (`ptt: true`).
-- 🧠 **Dual-Tier Cognitive Memory Engine:** Maintains short-term conversational context with a character-budgeted sliding window and 45-minute rolling TTL inactivity decay, alongside a durable, contact-scoped **Persistent Fact Notebook** (`ai_user_memory`). Incorporates an intelligent **Token Governor** that scores incoming query relevance and retrieves only the **Top-3 relevant facts (< 120 tokens)** to guarantee sub-1.5s latency and zero context window overflow. Supports hands-free in-chat memory management (e.g., *"Remember that..."* and *"Forget my..."*).
-- 🎯 **Smart In-Context Training (Few-Shot Golden Pairs):** Dynamically injects golden Q&A pairs and strict negative constraints (*"What NOT to do"*, such as discount caps or boundary rules) into the prompt without expensive fine-tuning or model redeployment.
-- ⚡ **Multi-Model AI Agent Studio:** Auto-cascades across Google Gemini (2.5/3.5 Flash), Groq LPU (Llama 3.3 70B, GPT-OSS 120B), and OpenRouter. Features dual operating modes: **Customer Support Desk** (with RAG knowledge retrieval and frustration detection) and **24/7 Personal Executive Assistant** (Chief of Staff for Boss with zero surveys and zero human escalation).
-- 🧰 **Modular App Store & Function Calling:** 1-click install catalog of modular tools: live DuckDuckGo web search, exact math evaluator, business hours clock, Open-Meteo weather API, outbound CRM webhooks, and a **Two-Phase Action Protocol** for high-consequence operations (drafting formal emails with Boss WhatsApp confirmation).
-- 💬 **Interactive Live Chat & Emergency Escalation Queue:** Real-time webchat desk supporting instant human takeover, audio buzzer alerts upon customer frustration, and automated customer satisfaction (CSAT) rating collection.
-- 🤖 **Chatbot Automation:** Incoming messages are evaluated in real time against customizable trigger rules (`exact`, `contains`, `starts_with`, or `catch_all`) to automatically dispatch instant replies.
-- 📬 **Asynchronous Delivery Queue:** Decouples API client latency from WhatsApp WebSocket delivery. Enqueued items are processed with automatic backoff retries, dead-letter tracking, and queue monitoring.
-- 🛡️ **Humanized Anti-Ban Delivery:** Emulates human chat behavior by generating randomized presence indicators (`available`, `composing`, `recording`) and delay intervals before message transmission.
-- 🔔 **HMAC-Signed Webhooks:** Dispatches instantaneous HTTP POST notifications to your server on `message.sent` and `message.failed` events, signed with `X-WA-Hub-Signature` (HMAC-SHA256).
-- 👥 **Contacts & Broadcast Campaigns:** Built-in address book supporting single contact creation, CSV bulk imports, Google Contacts (People API) synchronization, vCard (`.vcf`) exports, and personalized template broadcasts (`{name}`, `{phone}`).
-- 🔐 **Security Safeguards & Access Controls:** API keys are stored hashed (SHA-256) with configurable per-minute, per-hour, and per-day rate limits and IP allowlists. Failed login attempts are throttled to mitigate brute-force attacks, remote media/webhook URLs undergo SSRF DNS validation, and uploaded file directories are locked down against script execution.
-- 🔁 **Self-Service Password Recovery:** 6-digit OTP password reset workflow delivered via SMTP email and/or WhatsApp message.
-- 🌐 **Social Authentication:** Optional Google OAuth2 single sign-on.
-
----
-
-## 3. Technology Stack & Runtime Requirements
-
-### Backend Components
-- **API & Web Tier:** PHP 8.1+ / 8.2+ with extensions: `pdo_mysql`, `curl`, `mbstring`, `openssl`, `fileinfo`, `json`.
-- **Worker Daemon:** Node.js 18.x or 20.x LTS (ES Modules) running `@whiskeysockets/baileys` (`7.0.0-rc13`), `express` (`5.2.1`), `mysql2` (`3.22.4`), `pino` (`10.3.1`), and `qrcode` (`1.5.4`).
-- **Database:** MySQL 8.0+, MariaDB 10.4+, or TiDB Cloud Serverless (SSL-encrypted on port 4000).
-- **Web Server:** Apache 2.4+ with `mod_rewrite` and `mod_headers` (or Nginx reverse proxy).
-
-### Client SDKs & Quickstart Programs
-Dedicated, zero-dependency examples in five programming languages are located in the [`quickstart/`](quickstart/) directory:
-- **Python:** `python quickstart/python/send.py` (CLI arguments, interactive prompt, zero third-party dependencies).
-- **Node.js:** `node quickstart/nodejs/send.js` (native `fetch`, zero npm dependencies).
-- **PHP:** `php quickstart/php/send.php` (strict types, native cURL wrapper class).
-- **Go:** `go run quickstart/go/main.go` (standard library `net/http`).
-- **Java:** `java quickstart/java/SendWhatsApp.java` (Compatible with Java 8, 11, 17, and 21+ using standard `java.net.HttpURLConnection`, zero external JAR dependencies).
-
----
-
-## 4. System Architecture & Directory Structure
-
 <p align="center">
-  <img src="public/assets/architecture.png" alt="WhatsGateway System Architecture Diagram" width="100%">
+  <a href="#quick-start"><b>🚀 Quick Start</b></a> •
+  <a href="#api-quick-reference"><b>📖 API Reference</b></a> •
+  <a href="https://whatsapp-api-xepo.onrender.com" target="_blank"><b>⚡ Live Demo</b></a> •
+  <a href="#system-architecture"><b>🏗️ Architecture</b></a> •
+  <a href="#why-whatsgateway"><b>⚖️ Why WhatsGateway</b></a> •
+  <a href="#client-sdks"><b>💻 SDKs</b></a> •
+  <a href="#faq"><b>❓ FAQ</b></a> •
+  <a href="https://github.com/navneetyadav-code/whatsapp-api/stargazers"><b>⭐ Star on GitHub</b></a>
 </p>
 
-### High-Level Request & Delivery Flow
+---
 
-```mermaid
-flowchart LR
-    subgraph Clients["1. Clients & Ingestion"]
-        direction TB
-        C1["REST API Consumers<br/>(cURL, Python, Node, Go, Java)"]
-        C2["Admin Dashboard<br/>(PHP & Tailwind SaaS)"]
-    end
+## 📌 Executive Summary
 
-    subgraph Gateway["2. Web Gateway & Security"]
-        direction TB
-        G1["Apache URL Rewriter<br/>(.htaccess & Routing)"]
-        G2["Authentication & Guardrails<br/>(API Key HMAC, 2FA, SSRF Filter)"]
-        G3["REST API Ingestion<br/>(public/api/send.php)"]
-    end
+**WhatsGateway** is a production-ready, self-hosted WhatsApp REST API Gateway and Web Management Dashboard built with **PHP 8.2+**, **Node.js (@whiskeysockets/baileys)**, and **MySQL / MariaDB / TiDB**.
 
-    subgraph Storage["3. Persistent Storage"]
-        direction TB
-        DB[("MySQL / MariaDB / TiDB<br/>ACID Message Queue & Sessions")]
-    end
+Connect any existing WhatsApp number (personal or WhatsApp Business) in seconds by scanning a QR code. Send transactional alerts, OTPs, customer notifications, and rich media without paying \$0.05–\$0.15+ per conversation to third-party providers.
 
-    subgraph Worker["4. Node.js Worker & Engine"]
-        direction TB
-        W1["Express IPC Controller (:3107)"]
-        W2["FIFO Queue Poller & Humanized Delay"]
-        W3["Baileys Multi-Device Client"]
-        W4["Chatbot Engine & Outbound Webhooks"]
-    end
-
-    subgraph WhatsApp["5. WhatsApp Network"]
-        WA["Meta WhatsApp Servers<br/>(Noise Protocol WebSocket)"]
-    end
-
-    Clients -->|HTTP POST / Auth| Gateway
-    Gateway -->|Verify & Enqueue| Storage
-    Gateway -.->|Fast Wakeup Notify| Worker
-    Worker -->|Claim Pending Messages| Storage
-    Worker <==>|Encrypted Protocol| WhatsApp
-    Worker -.->|Webhooks / Delivery Acks| Clients
-```
-
-### Directory Structure
-
-```text
-whatsapp-api/
-├── .github/                      # Issue templates, PR templates, and CI workflow (ci.yml)
-├── config/
-│   └── app.php                   # Central application configuration loader & .env parser
-├── docker/
-│   ├── entrypoint.sh             # Docker startup script, env exporter & Apache config
-│   └── supervisord.conf          # Supervisor dual-process manager (Apache + Node.js)
-├── examples/                     # Ready-to-use snippets (curl, go, javascript, php, python)
-├── migrations/
-│   └── 001_initial_schema.sql    # Idempotent 17-table schema initialization
-├── prod/                         # Production database schemas & SSL root certificates
-├── public/                       # Web server public root (DocumentRoot)
-│   ├── .htaccess                 # Apache rewrites (clean URLs & Meta API compatibility)
-│   ├── index.php                 # Main front controller & router
-│   ├── media.php                 # Protected media delivery with signed URLs & session auth
-│   ├── robots.php / robots.txt   # Search crawler instructions
-│   ├── session.php               # AJAX session management & real-time queue endpoints
-│   ├── sitemap.php               # XML Sitemap
-│   ├── test-page.php             # Developer test page wrapper
-│   ├── api/
-│   │   ├── contacts.php          # Contact directory listing, search, single upsert & ID deletion
-│   │   ├── contacts-batch.php    # Atomic batch contact ingestion (up to 500 records)
-│   │   ├── contacts-delete.php   # Dedicated secure contact deletion by phone in request body
-│   │   ├── health.php            # Gateway, database & worker readiness health check
-│   │   ├── messages.php          # Meta Cloud API endpoint alias (requires send.php)
-│   │   └── send.php              # Core REST messaging endpoint
-│   ├── assets/                   # CSS, JS (dashboard.js), templates, and branding
-│   └── uploads/                  # Temporary media downloads (protected by .htaccess)
-├── quickstart/                   # Standalone zero-dependency client apps in 5 languages
-│   ├── go/                       # Go quickstart program
-│   ├── java/                     # Java quickstart program
-│   ├── nodejs/                   # Node.js quickstart program
-│   ├── php/                      # PHP quickstart program
-│   └── python/                   # Python quickstart program
-├── scripts/
-│   ├── create-initial-admin.php  # Headless initial admin provisioning script
-│   └── migrate.php               # Non-destructive CLI migration runner (17 application tables)
-├── src/                          # Application source code
-│   ├── bootstrap.php             # Session initializer, error handlers, and lib imports
-│   ├── data/dashboard/           # Lazy data loaders for modular dashboard sections
-│   ├── lib/
-│   │   ├── ApiCredentials.php    # Single API key generation, SHA-256 hashing, rate limiting
-│   │   ├── Auth.php              # User authentication, registration, session management
-│   │   ├── ContactService.php    # Recipient directory logic, validation & PII guardrails
-│   │   ├── Database.php          # PDO connection factory with automatic TiDB/SSL support
-│   │   ├── MessageQueue.php      # Message enqueue, campaign dispatch, retry, and metrics
-│   │   ├── Security.php          # RFC 6238 TOTP 2FA math, backup codes, secret hygiene
-│   │   ├── Support.php           # SSRF validator, media downloader, MIME detector, emailer
-│   │   └── WorkerClient.php      # HTTP client communicating with Node.js worker
-│   └── pages/                    # Web views & dashboard components
-│       └── dashboard/            # Modular dashboard section views
-├── test/
-│   └── index.php                 # Interactive developer test console
-├── tests/                        # Comprehensive PHP & Node.js unit and security test suite
-├── worker/                       # Background Baileys worker daemon
-│   ├── package.json              # Node.js dependencies
-│   ├── server.mjs                # Baileys client, queue loop, chatbot matcher, webhooks
-│   └── worker.pid / *.log        # Worker runtime logs and process identifier
-├── .dockerignore                 # Docker build exclusion rules
-├── .env.example                  # Environment configuration template
-├── .gitignore                    # Git version control exclusions
-├── .htaccess                     # Root directory protection & redirect rules
-├── app.php                       # Alias returning config/app.php
-├── database.sql                  # Canonical MySQL schema dump
-├── docker-compose.yml            # Multi-container orchestration (App + MySQL)
-├── Dockerfile                    # Container definition (PHP 8.2 + Apache + Node.js 20)
-├── index.php                     # Root redirector forwarding to public/
-├── send_whatsapp.py              # Interactive Python terminal sender tool
-├── setup.php                     # CLI setup & initialization utility
-└── start-worker.bat              # Windows background worker daemon controller
-```
+> 💡 **Drop-In Compatibility:** WhatsGateway natively accepts both clean flat JSON and official **Meta WhatsApp Cloud API payloads** (`messaging_product`, `recipient_type`, `text.body`, `template`), allowing you to switch existing integrations with zero code rewrites.
 
 ---
 
-## 5. Prerequisites & System Requirements
+<a id="why-whatsgateway"></a>
+## ⚖️ Why WhatsGateway? (vs. Meta Cloud & Twilio)
 
-| Requirement | Supported Version | Notes |
-| :--- | :--- | :--- |
-| **Operating System** | Windows 10/11, Ubuntu 20.04+, Debian 11+, macOS | Cross-platform |
-| **PHP Runtime** | PHP 8.1.0 or higher (PHP 8.2 recommended) | Must have `pdo_mysql`, `curl`, `mbstring`, `fileinfo` |
-| **Node.js** | Node.js 18.x or 20.x LTS | Required for Baileys WebSocket worker |
-| **Database** | MySQL 8.0+, MariaDB 10.4+, or TiDB Cloud Serverless | UTF8MB4 collation required |
-| **Web Server** | Apache 2.4+ with `mod_rewrite` or Nginx | Must support rewrite rules and `.htaccess` |
+Commercial messaging providers enforce high conversation fees, strict template pre-approval delays, and cloud vendor lock-in. WhatsGateway gives you total privacy, speed, and freedom on your own infrastructure.
 
----
+| Capability / Metric | WhatsGateway | Meta WhatsApp Cloud API | Twilio WhatsApp API | Traditional Cloud SaaS |
+| :--- | :---: | :---: | :---: | :---: |
+| **Software Cost** | **Free & Open Source (MIT)** | Pay-per-conversation | Pay-per-message + markup | \$49 – \$299 / month |
+| **Credit Card Mandate** | ❌ **None** | ✅ Required | ✅ Required | ✅ Required |
+| **Message Approval** | ❌ **Instant (Freeform text & media)** | ⚠️ Strict template review | ⚠️ Strict template review | ⚠️ Strict template review |
+| **Onboarding Time** | **2 minutes (Scan QR)** | Days to weeks (Meta verification) | Days to weeks | Hours to days |
+| **Data Privacy & Ownership** | ✅ **100% On your own servers** | ❌ Hosted by Meta | ❌ Hosted by Twilio | ❌ Third-party cloud |
+| **Web Dashboard** | ✅ **Included (PHP + Tailwind)** | ❌ No built-in dashboard | ⚠️ Basic log view only | ✅ Varies |
+| **Meta API Drop-In Format** | ✅ **Yes (`/v20.0/.../messages`)** | ✅ Native | ❌ Proprietary Twilio API | ❌ Proprietary API |
+| **Autonomous AI Agent & RAG**| ✅ **Built-in (Gemini, Groq, Llama)** | ❌ Custom webhook required | ❌ Studio build required | ⚠️ High add-on cost |
+| **Live Chat & Human Takeover**| ✅ **Included with sound alerts** | ❌ None | ❌ Extra service | ⚠️ Varies |
+| **Multi-Model Cognitive Memory**| ✅ **Dual-tier memory + Top-K** | ❌ None | ❌ None | ❌ None |
 
-## 6. Installation & Dependency Setup
-
-### Option A: Local Development Setup (XAMPP on Windows)
-
-1. **Clone the repository:**
-   Clone into your local web root (e.g. `c:\xampp\htdocs\wa` or `c:\xampp\htdocs\whatsapp-api`):
-   ```bash
-   git clone https://github.com/navneetyadav-code/whatsapp-api.git c:\xampp\htdocs\wa
-   ```
-
-2. **Create the MySQL Database:**
-   Open phpMyAdmin or MySQL CLI and run:
-   ```sql
-   CREATE DATABASE whatsapp_api CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
-   For a brand-new local database, run `php scripts/migrate.php`. The legacy `database.sql` is a dump with destructive `DROP TABLE` statements; do not import it into a database that has existing data.
-
-3. **Configure Environment:**
-   Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-   Set your local parameters in `.env`:
-   ```ini
-   APP_ENV=local
-   APP_NAME="WhatsGateway"
-   APP_PUBLIC_URL=http://localhost/wa/public
-   APP_BASE_PATH=/wa/public
-
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_NAME=whatsapp_api
-   DB_USER=root
-   DB_PASSWORD=
-   DB_SSL=false
-
-   WORKER_URL=http://127.0.0.1:3107
-   WORKER_TOKEN=my-secure-worker-token-12345
-   DEFAULT_COUNTRY_CODE=91
-   ```
-
-4. **Install Worker Dependencies:**
-   ```bash
-   cd worker
-   npm install
-   ```
-
-5. **Start the Background Worker:**
-   - **Interactive Menu:** Run `start-worker.bat` from the root folder.
-   - **Command Line:** Run `start-worker.bat start` or `node worker/server.mjs`.
-
-6. **Access the Application:**
-   Open your browser to: `http://localhost/wa/public` (or `http://localhost/wa/`).
+> ℹ️ *Note on Infrastructure:* WhatsGateway software is 100% free under the MIT License. Underlying hosting and server infrastructure (e.g. VPS, local hardware, or cloud database) are managed directly by you.
 
 ---
 
-### Option B: Linux Server Setup (Ubuntu / Debian / VPS)
+## 🖼️ Visual Product Showcase
 
-1. **Install System Dependencies:**
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y php8.2 php8.2-curl php8.2-mysql php8.2-mbstring php8.2-xml \
-       apache2 libapache2-mod-php8.2 nodejs npm git
-   sudo a2enmod rewrite headers
-   ```
+### System Architecture Overview
+The application decouples high-throughput API ingestion from persistent queueing and real-time WebSocket protocol handling:
 
-2. **Clone & Configure DocumentRoot:**
-   ```bash
-   cd /var/www
-   sudo git clone https://github.com/navneetyadav-code/whatsapp-api.git whatsapp-api
-   cd whatsapp-api
-   cp .env.example .env
-   ```
-   Update Apache virtual host configuration to point `DocumentRoot` to `/var/www/whatsapp-api/public` with `AllowOverride All`.
-
-3. **Install Worker Dependencies & Manage Process:**
-   ```bash
-   cd /var/www/whatsapp-api/worker
-   npm install --omit=dev
-   npm install -g pm2
-   pm2 start server.mjs --name "wa-worker"
-   pm2 save
-   pm2 startup
-   ```
-
-4. **Set Permissions:**
-   ```bash
-   sudo chown -R www-data:www-data /var/www/whatsapp-api/public/uploads
-   sudo chmod -R 755 /var/www/whatsapp-api/public/uploads
-   ```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/assets/architecture-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="public/assets/architecture.png">
+    <img src="public/assets/architecture.png" alt="WhatsGateway System Architecture Diagram" width="100%">
+  </picture>
+</p>
 
 ---
 
-### Option C: Automated Local Setup & Database Migrations
+## 🌟 Core Features & Highlights
 
-For a fresh install, run the CLI setup utility:
-```bash
-php setup.php
 ```
-The CLI wizard tests MySQL connectivity, creates the database, imports schema definitions, prompts for initial administrator credentials, and generates `.env`.
-
-> ⚠️ **Note:** `setup.php` is strictly a CLI utility (`PHP_SAPI === 'cli'`). Direct HTTP requests via browser (e.g. `http://localhost/wa/setup.php`) are blocked by `.htaccess` and return `403 Forbidden` to prevent remote execution attacks.
-
-For existing environments or standard deployments, initialize or update database tables directly via the non-destructive migration runner:
-```bash
-php scripts/migrate.php
+┌────────────────────────────────────────────────────────────────────────┐
+│                              WhatsGateway                              │
+├─────────────────────┬─────────────────────┬────────────────────────────┤
+│  📨 Messaging       │  🤖 Autonomous AI   │  🛡️ Enterprise Security    │
+│  • Text & Markdown  │  • Gemini & Groq    │  • SHA-256 API Key Hash    │
+│  • PDF & Documents  │  • Cognitive Memory │  • Per-Key Rate Limiter    │
+│  • Images & Audio   │  • Top-K Token Gov  │  • SSRF DNS Filtering      │
+│  • PTT Voice Memos  │  • Function Calling │  • Active PII Rejecter     │
+│  • Video & Media    │  • Live Takeover    │  • HMAC Signed Webhooks    │
+├─────────────────────┼─────────────────────┼────────────────────────────┤
+│  ⚡ Developer UX    │  👥 Audiences       │  🚀 Deployment             │
+│  • Universal REST   │  • Contact Directory│  • 1-Command Docker Compose│
+│  • Meta Cloud DropIn│  • CSV Bulk Import  │  • MySQL / MariaDB / TiDB  │
+│  • 5-Language SDKs  │  • Google Contacts  │  • Render & VPS Guide      │
+│  • Zero-Dep Snippets│  • vCard (.vcf)     │  • Supervisor Daemon       │
+│  • Health Probes    │  • Templating {name}│  • Auto Migrations         │
+└─────────────────────┴─────────────────────┴────────────────────────────┘
 ```
 
----
+### 1. 📨 Universal Messaging Engine
+- **Text & Rich Markdown:** Send formatting (`*bold*`, `_italic_`, `~strike~`, ````monospace````) with full emoji support.
+- **Universal Media Handler:** Transmit documents (PDF, DOCX, XLSX, TXT, CSV), images (JPEG, PNG, WEBP, GIF), videos (MP4, MOV), and audio files (MP3, OGG, WAV, M4A).
+- **Push-to-Talk (PTT) Voice Notes:** Deliver audio files as native WhatsApp green-waveform voice memos (`"ptt": true`).
+- **Flexible Ingestion:** Deliver media via direct public HTTP/HTTPS URLs (with SSRF protection), Base64 data strings / Data URIs, or standard `multipart/form-data` uploads up to 20MB.
 
-## 7. Environment Variable Configuration
+### 2. ⚡ Developer Experience & API Compatibility
+- **Universal REST API:** Authenticate with a single Bearer token (`wa_live_...`) or `X-API-Key`.
+- **Meta Cloud API Compatibility:** Seamless drop-in route (`POST /v20.0/{phone_number_id}/messages`) accepts Meta Graph API schemas without code rewrites.
+- **Multi-Language Quickstarts:** Zero-dependency, copy-paste snippets in Python, Node.js, PHP, Go, and Java.
+- **Observability:** Dedicated health probe (`GET /api/health.php`) verifying PHP runtime, database schemas, and worker status.
 
-All application configurations are managed in `.env` at the root directory and loaded via `config/app.php`:
+### 3. 🤖 Autonomous AI Agent Studio & Memory Engine
+- **Multi-Model LLM Orchestration:** Auto-cascade across Google Gemini (Flash 2.5 / 3.5), Groq LPU (Llama 3.3 70B, GPT-OSS 120B), and OpenRouter.
+- **Dual-Tier Cognitive Memory:** 
+  - *Short-Term Working Memory:* Character-budgeted sliding window with 45-minute rolling TTL inactivity decay.
+  - *Persistent Fact Notebook:* Contact-scoped durable memory (`ai_user_memory`) with conversational self-update (*"Remember that..."*, *"Forget my..."*).
+- **Token Governor (Top-K Relevance Matching):** Scores incoming queries against stored facts and injects only the Top-3 relevant facts (< 120 tokens) to prevent context bloat and minimize latency.
+- **Smart Few-Shot In-Context Training:** Define Golden Q&A pairs and strict negative guardrails (*"What NOT to do"*, such as discount caps) right from the web dashboard.
+- **Modular App Store & Function Calling:** 1-click tools for DuckDuckGo web search, exact math calculation, business hours clock, Open-Meteo weather, outbound CRM leads, and a **Two-Phase Action Protocol** (drafting emails with Boss WhatsApp confirmation).
 
-| Variable | Default Value | Description |
-| :--- | :--- | :--- |
-| `APP_ENV` | `local` | Environment mode (`local` or `production`). Production enforces non-default tokens. |
-| `APP_NAME` | `WhatsGateway` | Application display name. |
-| `APP_PUBLIC_URL` | `http://localhost/wa/public` | Canonical public URL used for redirects, webhooks, and sitemaps. |
-| `APP_BASE_PATH` | `/wa/public` | Subfolder base path (leave blank when using root domain in production). |
-| `APP_SESSION_NAME` | `whatsgateway_session` | PHP session cookie name. |
-| `APP_SECURE_COOKIES` | `false` (auto in prod) | Force HTTPS-only cookie attributes (`Secure; HttpOnly; SameSite=Lax`). |
-| `ENABLE_REGISTRATION` | `false` | Set to `true` in local development to allow self-registration from the web UI. |
-| `ENABLE_TEST_PAGE` | `true` (dev only) | Enables developer interactive tester at `/test-page.php`. |
-| `DISABLE_PASSWORD_LOGIN` | `false` | Disables standard password login (e.g., when strictly using Google OAuth). |
-| `ALLOW_NEW_DEVICES` | `false` | Controls whether non-owner accounts can initiate new WhatsApp device pairing. |
-| `ADMIN_EMAIL` | `admin@example.com` | Comma-separated list of administrative dashboard owners. |
-| `ALLOW_QUERY_AUTH` | `false` | Allows passing API key in query string (`?access_token=...`). Keep `false` to avoid access log leakage. |
-| `DEFAULT_COUNTRY_CODE` | `91` | Default country code prefix applied to numbers without a leading `+`. |
-| `DB_HOST` | `127.0.0.1` | MySQL / TiDB server hostname. |
-| `DB_PORT` | `3306` | Database port (3306 for MySQL, 4000 for TiDB Cloud). |
-| `DB_NAME` | `whatsapp_api` | Database name. |
-| `DB_USER` | `root` | Database username. |
-| `DB_PASSWORD` | `""` | Database password. |
-| `DB_SSL` | `false` | Enable TLS/SSL. Always enabled for TiDB Cloud hostnames or port 4000. |
-| `DB_SSL_CA` | system CA bundle | Optional filesystem path to a trusted CA bundle. |
-| `DB_DSN` | *(computed)* | Optional MySQL PDO DSN override; its database must remain `whatsapp_api`. |
-| `WORKER_URL` | `http://127.0.0.1:3107` | Internal HTTP endpoint used by PHP to call the Node worker. |
-| `WORKER_PORT` | `3107` | Port for the background worker microservice (defaults to `3107`). |
-| `WORKER_TOKEN` | *(required in prod)* | Shared secret of at least 32 characters passed in `X-Worker-Token`. |
-| `WA_SESSION_DIR` | *(platform default)* | Directory where Baileys multi-file authentication keys are stored. |
-| `SEND_DELAY_MS` | `2500` | Base delay between message dispatches in milliseconds. |
-| `QUEUE_POLL_MS` | `3000` | Polling frequency for claiming queued messages from the database. |
-| `LOG_LEVEL` | `warn` | Pino worker log verbosity (`debug`, `info`, `warn`, `error`). |
-| `LOGIN_MAX_ATTEMPTS` | `5` | Maximum failed login attempts allowed before IP lockout. |
-| `LOGIN_LOCKOUT_MINUTES`| `15` | Lockout duration in minutes after exceeding max failed login attempts. |
-| `OTP_VIA_EMAIL` | `false` | Deliver password reset OTPs via SMTP/Brevo email. |
-| `OTP_VIA_PHONE` | `true` | Deliver password reset OTPs via WhatsApp using system API key. |
-| `SYSTEM_API_KEY` | `""` | Dedicated API key used for internal system notifications (e.g. OTP delivery). |
-| `SYSTEM_API_SECRET` | `""` | Optional secret for system key if legacy dual validation is configured. |
-| `SMTP_HOST` | `""` | SMTP mail server hostname (e.g. `smtp.gmail.com`). |
-| `SMTP_PORT` | `587` | SMTP port (typically 587 for STARTTLS). |
-| `SMTP_USER` | `""` | SMTP username / email address. |
-| `SMTP_PASS` | `""` | SMTP password or App Password. |
-| `SMTP_FROM` | `noreply@localhost` | Outgoing email sender address. |
-| `SMTP_FROM_NAME` | `WhatsGateway` | Outgoing email sender name. |
-| `BREVO_API_KEY` | `""` | Brevo REST API key for HTTPS transactional emails. |
-| `RESEND_API_KEY` | `""` | Resend REST API key for transactional emails. |
-| `GOOGLE_CLIENT_ID` | `""` | Google OAuth2 Client ID (for login and Google Contacts sync). |
-| `GOOGLE_CLIENT_SECRET` | `""` | Google OAuth2 Client Secret. |
-| `INITIAL_ADMIN_EMAIL` | `""` | Auto-provisions initial owner account on first container startup. |
-| `INITIAL_ADMIN_PASSWORD` | `""` | Initial owner account password (minimum 12 characters). |
-| `INITIAL_ADMIN_NAME` | `Administrator` | Initial owner account display name. |
+### 4. 💬 Live Chat & Human Escalation Desk
+- **Real-Time Webchat Desk:** Intercept conversations directly from the browser (`/live-chat`).
+- **Frustration Detection & Audio Alerts:** Trigger immediate sound buzzer alerts when customers express high urgency or request human support.
+- **1-Click Human Takeover:** Seamlessly pause automated AI replies to let human agents respond.
+- **Automated CSAT Surveys:** Collect customer satisfaction ratings automatically upon chat resolution.
+
+### 5. 📬 Queueing & Humanized Anti-Ban Delivery
+- **Asynchronous FIFO Queue:** Decouples API client responses from WhatsApp delivery latency.
+- **Humanized Presence Emulation:** Simulates authentic user behavior with typing presence indicators (`composing` / `recording`) and configurable randomized jitter intervals.
+- **Retry Backoff & Dead-Letter Tracking:** Automatic backoff retries with queue visualizer and cancellation controls in the dashboard.
+
+### 6. 🛡️ Enterprise Security & Privacy Guardrails
+- **SHA-256 Single API Key Hashing:** Plaintext keys are never stored; only cryptographic hashes are persisted.
+- **Active PII Query String Rejection:** Rejects plaintext phone numbers in URL query strings with `HTTP 400` to prevent PII leakage into web server logs.
+- **SSRF DNS Inspection:** Validates destination IPs for all media URLs and webhooks, blocking private ranges (`10.0.0.0/8`, `127.0.0.0/8`, `192.168.0.0/16`, `169.254.0.0/16`, `::1`).
+- **HMAC-SHA256 Webhook Signatures:** Signs every webhook dispatch (`X-WA-Hub-Signature`) for tamper-proof delivery verification.
+- **Hardened Uploads:** Upload directories prevent script execution via strict `.htaccess` directives.
 
 ---
 
-## 8. Database Setup, Migrations & Initialization
+<a id="quick-start"></a>
+## 🚀 Quick Start
 
-The database schema is managed via the non-destructive, repeatable [`001_initial_schema.sql`](migrations/001_initial_schema.sql) migration. It contains no `DROP`, `TRUNCATE`, or destructive seed-data statements.
+Get WhatsGateway running in under 2 minutes:
 
-The application uses **17 application tables** (plus `schema_migrations` for version tracking):
+### Option 1: Docker Compose (Recommended)
 
-1. **`users`:** User accounts, hashed passwords (`password_hash`), contact phone numbers, timestamps.
-2. **`api_keys`:** Single API key records storing `key_hash` (SHA-256), `key_prefix`, `status` (`active`/`disabled`), `ip_allowlist`, and rate limits (`rate_per_minute`, `rate_per_hour`, `rate_per_day`, `allow_humanize`).
-3. **`api_request_logs`:** Audit log capturing endpoint, IP address, HTTP status code, request ID, and error messages.
-4. **`campaigns`:** Bulk broadcast records with template message, scheduling, media attachments, and target counts.
-5. **`chatbot_rules`:** Keyword-based auto-reply rules (`match_type`: `exact`, `contains`, `starts_with`, `catch_all`).
-6. **`contacts`:** Opted-in recipient directory with normalized phone numbers, consent flags (`opt_in`), and import notes.
-7. **`login_attempts`:** Tracks failed login attempts per email and IP for security lockouts.
-8. **`message_logs`:** Historic log of dispatched messages, timestamps, and provider delivery responses.
-9. **`message_queue`:** Asynchronous FIFO queue containing `recipient`, `normalized_recipient`, `message_type` (`text`, `image`, `document`, `video`), `body`, JSON `payload`, `status` (`queued`, `processing`, `sent`, `failed`, `cancelled`), `attempts`, `priority`, `available_at`, `locked_at`, and `locked_by`.
-10. **`password_resets`:** Temporary OTP codes with 15-minute expiration windows.
-11. **`webhooks`:** Webhook subscription containing HTTPS `target_url`, HMAC `secret`, and `enabled` flag.
-12. **`webhook_deliveries`:** Audit history of outbound webhook HTTP dispatches, status codes, and retry attempts.
-13. **`whatsapp_sessions`:** Baileys connection state (`idle`, `connecting`, `qr`, `connected`, `disconnected`, `error`), device phone number, push name, auto-sleep status, and timestamps.
-14. **`user_security`:** Two-Factor Authentication (RFC 6238 TOTP), hashed recovery codes, lockout counters, and security preferences.
-15. **`media_assets`:** Uploaded media file metadata, SHA-256 checksums, and reference counting to prevent premature disk cleanup across broadcast campaigns.
-16. **`inbound_messages`:** Normalized record of incoming customer messages with processing status.
-17. **`webhook_queue`:** Asynchronous delivery and retry queue for outbound HTTP webhooks.
-
-Run migrations anytime via:
-```bash
-php scripts/migrate.php
-```
-Docker container startup automatically runs this migration before Supervisor launches Apache or the worker. Health checks confirm the database connection and verify that all 17 tables are ready.
-
----
-
-## 9. Running the Application (Local & Production)
-
-### Windows Service Management (`start-worker.bat`)
-
-The included Windows script manages the Node.js background worker as a background process:
-
-```cmd
-:: Launch interactive console menu
-start-worker.bat
-
-:: Direct CLI subcommands
-start-worker.bat start      :: Starts worker via PowerShell background process
-start-worker.bat stop       :: Kills worker PID gracefully
-start-worker.bat restart    :: Stops and restarts worker
-start-worker.bat status     :: Displays live running status and PID
-start-worker.bat logs       :: Shows output and error log paths
-```
-
-### Production Process Management (PM2 on Linux)
-
-```bash
-cd /var/www/whatsapp-api/worker
-pm2 start server.mjs --name "whatsapp-worker" --watch false
-pm2 logs whatsapp-worker
-```
-
-### 1-Command Setup with Docker Compose (Recommended)
-
-Spin up MySQL, PHP 8.2 Apache, and the Node.js Baileys worker in seconds:
+The fastest way to deploy WhatsGateway with PHP 8.2 Apache, Node.js 20, and MySQL 8.0:
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/navneetyadav-code/whatsapp-api.git
 cd whatsapp-api
 
-# 2. Launch the full stack (App + MySQL + Worker)
+# 2. Launch the full stack
 docker compose up -d
 
-# 3. Access your dashboard at http://localhost:8080
+# 3. Open your browser
+# Dashboard: http://localhost:8080
 ```
 
-> 💡 **Note on `WORKER_TOKEN`:** When running with `APP_ENV=production`, ensure `WORKER_TOKEN` is set to a secret of at least 32 characters in your environment or in `docker-compose.yml` to satisfy the application's runtime token requirement.
+> 🔑 **Initial Account Setup:** On your first container launch, configure `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` in your environment or `docker-compose.yml` to automatically provision your dashboard administrator account.
 
-### Standalone Docker Container Execution
+---
+
+### Option 2: Local / Server Setup (PHP + Node.js + MySQL)
+
+#### Prerequisites
+- **PHP 8.2+** (with extensions: `pdo_mysql`, `curl`, `mbstring`, `openssl`, `fileinfo`, `json`)
+- **Node.js 18.x or 20.x LTS** & `npm`
+- **MySQL 8.0+**, **MariaDB 10.4+**, or **TiDB Cloud Serverless**
+- **Apache 2.4+** (with `mod_rewrite` and `mod_headers`) or **Nginx**
+
+#### Step-by-Step Installation:
 
 ```bash
-# Build Docker image
-docker build -t whatsgateway .
+# 1. Clone repository into your web root
+git clone https://github.com/navneetyadav-code/whatsapp-api.git
+cd whatsapp-api
 
-# Run container with environment configuration
-docker run -d \
-  -p 80:80 \
-  --name whatsgateway \
-  --env-file .env \
-  -v wa_sessions:/var/www/html/whatsapp-api-data/sessions \
-  whatsgateway
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your database credentials and APP_PUBLIC_URL
+
+# 3. Run database migrations (17 application tables)
+php scripts/migrate.php
+
+# 4. Install worker dependencies
+cd worker
+npm install
+cd ..
+
+# 5. Start the background worker daemon
+# On Windows:
+start-worker.bat start
+# On Linux / macOS:
+cd worker && npm start
 ```
 
 ---
 
-## 10. Comprehensive API Endpoint Reference
+### Pairing Your WhatsApp Account
 
-### 10.1 Public REST Messaging Endpoints
-
-All inbound messaging endpoints point to the same handler (`public/api/send.php`) and accept signed JSON or multipart form-data.
-
-#### `POST /api/send.php` (Core REST Endpoint)
-- **Direct Path:** `/api/send.php`
-- **Aliases & Rewrites:**
-  - `POST /api/messages.php`
-  - `POST /api/messages`
-  - `POST /messages`
-  - `POST /v20.0/{phone_number_id}/messages` (Meta Cloud API route compatibility)
-- **Authentication:**
-  - `X-API-Key: wa_live_...` OR
-  - `Authorization: Bearer wa_live_...` OR
-  - URL Query parameter: `?access_token=wa_live_...` (or `?api_key=wa_live_...`, requires `ALLOW_QUERY_AUTH=true` in `.env`)
-- **Headers:** `Content-Type: application/json` or `multipart/form-data`
-- **Rate Limiting:** Enforced per API key (`rate_per_minute`, `rate_per_hour`, `rate_per_day`). Exceeding returns `429 Too Many Requests`.
-- **IP Filtering:** Enforced if `ip_allowlist` is populated on the API key.
-
-#### Request Parameters Reference:
-
-| Field Name | Type | Mandatory? | Description |
-| :--- | :--- | :--- | :--- |
-| `to` / `recipient` | `string` | **Yes** | Destination phone number. Accepts international numbers (`+919876543210`, `919876543210`) or 10-digit Indian numbers (auto-prefixed with `+91`). |
-| `message` / `caption` / `body` | `string` | **Conditional** | Text content or media caption. Required if no media file/URL is supplied. Supports WhatsApp markdown: `*bold*`, `_italic_`, `~strike~`, ````code````. |
-| `media_url` / `url` / `link` | `string` | Optional | Direct public HTTP/HTTPS URL to media file. Validated against SSRF and downloaded securely (20MB limit). |
-| `type` | `string` | Optional | Declared payload type: `'text'`, `'image'`, `'document'`, `'video'`, or `'audio'`. Auto-detected if omitted. |
-| `base64` / `file_base64` | `string` | Optional | Base64-encoded file payload or Data URI string (`data:image/jpeg;base64,...`). |
-| `filename` | `string` | Optional | Explicit file name for documents or attachments (e.g. `invoice_october.pdf`). |
-| `ptt` | `boolean` | Optional | When sending audio, set to `true` to deliver as a push-to-talk voice memo. |
-| `humanize` | `boolean` | Optional | Simulates human typing presence (`composing`/`recording`) with delay before sending. |
-| `campaign_id` | `integer`| Optional | Associates the message with a campaign ID in analytics. |
+1. Open your WhatsGateway dashboard: `http://localhost:8080` (Docker) or `http://localhost/wa/public` (Local).
+2. Navigate to **Device** (`/device`) and click **Connect**.
+3. Open **WhatsApp** on your phone > **Linked Devices** > **Link a Device**.
+4. Scan the QR code displayed on your screen.
+5. Your session will transition to `connected`. You are ready to dispatch messages!
 
 ---
 
-### 10.2 Contacts & Audience Directory REST API Suite
+<a id="send-first-message"></a>
+## ⚡ Send Your First API Request in 10 Seconds
 
-Manage your recipient directory, opt-in compliance, and bulk audience records via a modular, service-isolated architecture (`ContactService`).
+Once your device is connected, generate an API key in **API Keys** (`/api-keys`), then execute:
 
-> 🛡️ **OWASP & GDPR Privacy Guardrail: Active PII Query String Rejection**  
-> To guarantee that sensitive phone numbers are **never** logged in plaintext web server access logs (Apache/Nginx `access.log`, Cloudflare edge logs, load balancer traces), **the gateway actively blocks raw phone numbers from URL query strings** (e.g., `?phone=+...`) with an immediate `HTTP 400 Bad Request`.  
-> * Use synthetic integer IDs (`?id=142`) for URL-based REST operations.  
-> * For operations targeting phone numbers, transmit payloads inside the **encrypted JSON request body**.
-
-#### 1. Directory Listing & Search: `GET /api/contacts.php`
-- **Method:** `GET`
-- **Authentication:** `X-API-Key: wa_live_...` or `Authorization: Bearer wa_live_...`
-- **Parameters (Query String):**
-  - `id`: (Optional) Retrieve a single contact record by its synthetic ID.
-  - `search` / `q`: Substring search across name, phone, or notes (wildcard-escaped; max 100 chars).
-  - `opt_in`: `1` (consented contacts only) or `0` (opted-out contacts).
-  - `limit`: Integer (1 to 250, default 50).
-  - `offset`: Pagination offset (default 0).
-- **Response Schema (`200 OK`):**
-  ```json
-  {
-    "ok": true,
-    "total": 1,
-    "opted_in_count": 85,
-    "limit": 50,
-    "offset": 0,
-    "contacts": [
-      {
-        "id": 142,
-        "user_id": 1,
-        "name": "Acme Logistics",
-        "phone": "+919876543210",
-        "normalized_phone": "919876543210",
-        "opt_in": 1,
-        "notes": "VIP Shipping Client",
-        "created_at": "2026-10-27 10:30:00",
-        "updated_at": "2026-10-27 10:30:00"
-      }
-    ]
-  }
-  ```
-
-#### 2. Create or Upsert Contact: `POST /api/contacts.php`
-- **Method:** `POST`
-- **Headers:** `Content-Type: application/json`
-- **Payload:**
-  ```json
-  {
-    "phone": "+919876543210",
-    "name": "Acme Logistics",
-    "opt_in": true,
-    "notes": "Verified partner"
-  }
-  ```
-- **Behavior:** Idempotently updates name, opt-in status, and notes on duplicate phone under tenant account.
-
-#### 3. Dedicated Batch Ingestion: `POST /api/contacts-batch.php`
-- **Method:** `POST`
-- **Headers:** `Content-Type: application/json`
-- **Payload (up to 500 records per transaction):**
-  ```json
-  {
-    "contacts": [
-      { "phone": "+15551234567", "name": "John Doe", "opt_in": true },
-      { "phone": "+447911123456", "name": "Jane Smith", "opt_in": true, "notes": "UK Branch" }
-    ]
-  }
-  ```
-- **Guards:** Wrapped in an atomic database transaction. Batches exceeding 500 records return `413 Payload Too Large`.
-
-#### 4. REST Deletion by ID: `DELETE /api/contacts.php?id={id}`
-- **Method:** `DELETE`
-- **Query Parameter:** `id` (synthetic contact ID, e.g. `?id=142`).
-- **Response (`200 OK`):**
-  ```json
-  {
-    "ok": true,
-    "message": "Contact deleted successfully.",
-    "deleted_count": 1
-  }
-  ```
-
-#### 5. Dedicated Secure Deletion by Phone: `POST /api/contacts-delete.php`
-- **Method:** `POST` (or `DELETE` with JSON body)
-- **Headers:** `Content-Type: application/json`
-- **Payload:**
-  ```json
-  {
-    "phone": "+919876543210"
-  }
-  ```
-- **Security:** Phone number is end-to-end encrypted in the HTTPS request body and never exposed in web server access logs.
-
----
-
-### 10.3 System Health Check Endpoint
-
-#### `GET /api/health.php`
-- **Method:** `GET`
-- **Authentication:** None (Public)
-- **Purpose:** Verifies operational readiness of the PHP gateway, database connectivity, table integrity, and background Node.js worker microservice.
-- **Success Response (`200 OK`):**
-  ```json
-  {
-    "ok": true,
-    "status": "healthy",
-    "timestamp": "2026-10-27T12:00:00+00:00",
-    "service": "whatsapp-api-hub",
-    "database": {
-      "ok": true,
-      "connected": true,
-      "schema_ready": true,
-      "missing_tables": []
-    },
-    "worker": {
-      "ok": true,
-      "status_code": 200,
-      "service": "whatsapp-worker",
-      "error": null
-    }
-  }
-  ```
-- **Failure Response (`503 Service Unavailable`):**
-  ```json
-  {
-    "ok": false,
-    "status": "degraded",
-    "timestamp": "2026-10-27T12:00:00+00:00",
-    "service": "whatsapp-api-hub",
-    "database": {
-      "ok": true,
-      "connected": true,
-      "schema_ready": true,
-      "missing_tables": []
-    },
-    "worker": {
-      "ok": false,
-      "status_code": 0,
-      "service": null,
-      "error": "Worker is not reachable."
-    }
-  }
-  ```
-
----
-
-### 10.4 Session Management Endpoints (`public/session.php`)
-
-Used by the web dashboard and AJAX clients to control the WhatsApp connection lifecycle. Requires an authenticated user session cookie; POST actions require `csrf_token`.
-
-| Action Parameter | Method | Description |
-| :--- | :---: | :--- |
-| `?action=status` | `GET` | Fetches live session state, phone number, push name, QR state, and error logs. |
-| `?action=start` | `POST` | Initiates Baileys socket handshake and generates a fresh QR code Data URI. |
-| `?action=logout` | `POST` | Unlinks device, purges on-disk session credentials, and resets status to `idle`. |
-| `?action=sleep` | `POST` | Suspends socket connection to conserve host RAM while preserving auth. |
-| `?action=wake` | `POST` | Wakes up a suspended device and re-establishes the WhatsApp WebSocket. |
-| `?action=queue-status` | `GET` | Returns paginated message queue status and delivery metrics for the user. |
-
----
-
-### 10.5 Web Application Routes & Form Actions (`public/index.php`)
-
-All form POST submissions require `csrf_token` validation:
-
-| Route / Parameter | HTTP Method | Access | Function |
-| :--- | :---: | :---: | :--- |
-| `/login` | `GET` / `POST` | Public | Authenticates user credentials with brute-force lockout protection. |
-| `/register` | `GET` / `POST` | Public | Creates new user account (when `ENABLE_REGISTRATION=true`). |
-| `/logout` | `POST` | Auth | Terminates user session and invalidates cookies. |
-| `/forgot-password` | `GET` / `POST` | Public | Self-service OTP password recovery (`request_otp` & `verify_otp`). |
-| `/google-auth` | `GET` | Public | Google OAuth2 single-sign-on redirect & callback handler. |
-| `/google-contacts` | `GET` | Auth | Google People API OAuth redirect & bulk contact importer. |
-| `/dashboard` | `GET` | Auth | Overview workspace: delivery counts, success rate, readiness score. |
-| `/device` | `GET` | Auth | Interactive device pairing console (QR code, sleep, disconnect). |
-| `/message` | `GET` | Auth | Dashboard message composer with file attachment support. |
-| `/queue` | `GET` | Auth | Real-time queue visualizer with retry and cancellation controls. |
-| `/api-keys` | `GET` | Auth | API credentials management, IP allowlists, rate limit editor. |
-| `/security` | `GET` / `POST` | Auth | Two-Factor Authentication (TOTP 2FA), recovery codes & password change. |
-| `/contacts` | `GET` | Auth | Address book, CSV import, vCard export (`/contacts-export-vcf`). |
-| `/campaigns` | `GET` | Auth | Broadcast campaigns targeting opted-in contacts with templating. |
-| `/chatbot` | `GET` | Auth | AI Assistant Studio: persona tuning, provider cascade & system prompt. |
-| `/memory` | `GET` | Auth | Dedicated AI Memory Notebook & Smart Few-Shot Training Manager. |
-| `/tools` | `GET` | Auth | Custom Tools & Dynamic Function Calling engine. |
-| `/app-store` | `GET` | Auth | 1-Click Preset Tools catalog (Search, Math, Weather, Email, Webhooks). |
-| `/live-chat` | `GET` | Auth | Live agent webchat desk with audio escalation buzzer & human takeover. |
-| `/ai-credentials` | `GET` | Auth | Multi-provider API keys (Gemini, Groq, OpenRouter) and SMTP mailers. |
-| `/webhooks` | `GET` | Auth | Webhook target URL configuration and secret rotation. |
-| `/audit` | `GET` | Auth | Paginated API request audit logs. |
-| `/docs` | `GET` | Public | In-app API documentation and integration snippets. |
-| `/privacy`, `/terms` | `GET` | Public | Privacy policy and terms of service pages. |
-
----
-
-### 10.6 Internal Worker Microservice Endpoints (`worker/server.mjs`)
-
-Listening internally on `http://127.0.0.1:3107`. Requires `X-Worker-Token` header on all non-health routes:
-
-| Route | Method | Purpose |
-| :--- | :---: | :--- |
-| `/health` | `GET` | Returns `{ "ok": true, "service": "whatsapp-worker" }` (No token required). |
-| `/queue/notify` | `POST` | Wakes up worker event loop to immediately process pending queue messages. |
-| `/sessions/:userId/status` | `GET` | Returns current Baileys state, QR string, and device details. |
-| `/sessions/:userId/start` | `POST` | Launches Baileys socket for specific tenant user. |
-| `/sessions/:userId/logout` | `POST` | Unlinks session and deletes auth files in `sessions/user_<userId>`. |
-| `/sessions/:userId/auto-sleep` | `POST` | Configures idle auto-sleep timeout and toggle for specific tenant. |
-| `/sessions/:userId/sleep` | `POST` | Closes active socket and marks session sleeping in database. |
-| `/sessions/:userId/wake` | `POST` | Resumes connection and re-opens WhatsApp WebSocket. |
-| `/sessions/:userId/send` | `POST` | Direct synchronous message dispatch. |
-
----
-
-### 10.7 AI Memory & Smart Training REST API (`public/api/memory.php`)
-
-Used by the web dashboard, external integrations, and the autonomous AI agent to manage long-term facts, customer profiles, and few-shot in-context training examples:
-
-| Endpoint Action | Method | Auth | Description |
-| :--- | :---: | :---: | :--- |
-| `GET /api/memory.php?action=list` | `GET` | Session | Returns all active persistent facts and few-shot training pairs for the user. |
-| `POST /api/memory.php?action=save_memory` | `POST` | Session | Upserts a fact (`key`, `value`, `contact_phone`, `is_durable`, `ttl_days`). |
-| `POST /api/memory.php?action=delete_memory` | `POST` | Session | Deletes a fact permanently by `id` or `key` + `contact_phone`. |
-| `POST /api/memory.php?action=save_training` | `POST` | Session | Upserts a few-shot training example (`user_query`, `ideal_response`, `negative_constraint`). |
-| `POST /api/memory.php?action=delete_training` | `POST` | Session | Removes a training pair by `id`. |
-
----
-
-## 10.8 AI Autonomous Agent, Memory Engine & App Store Deep Dive
-
-WhatsGateway incorporates an **enterprise-grade Autonomous AI Agent architecture** running directly on top of WhatsApp without third-party bot fees:
-
-### 1. Dual-Tier Cognitive Memory Engine
-- **Short-Term Dialogue Working Memory (`worker/chat-memory.mjs`):** Sliding window capped at 1,600 characters with a **45-minute rolling TTL inactivity decay**. If an ongoing chat is silent for over 45 minutes, context decays to a clean slate, preventing stale context pollution.
-- **Persistent Fact Notebook (`worker/chat-fact-memory.mjs`):** Permanent attributes stored in `ai_user_memory` partitioned by scope:
-  - **Personal Boss Mode:** Facts associated with the account owner (e.g., *Favorite Airline: Emirates*, *GSTIN*, *Home Address*).
-  - **Customer Support Mode:** Scoped to the customer's phone number (e.g., *Preferred Delivery Address*, *Past Order Numbers*, *VIP Status*).
-- **Token Governor (Top-K Relevance Matching):** Rather than blindly dumping dozens of facts into the model prompt, incoming user queries are scored against stored keys and values. Only the **Top-3 relevant facts (< 120 tokens)** are injected into the prompt.
-- **Hands-Free In-Chat Memory Control:** WhatsApp users can update or erase facts conversationally:
-  - *"Remember that my delivery address is Flat 101"* ➔ calls `update_memory`
-  - *"Forget my old address"* ➔ calls `delete_memory`
-- **Auto-Expiry for Ephemeral Facts (TTL):** Temporary facts (e.g., travel dates, temporary complaints) can be set with a TTL (e.g., 14 days) and clean up automatically.
-
-### 2. Smart Few-Shot In-Context Training (Train Smarter)
-- **Zero-Friction In-Context Guidance:** Instead of expensive offline fine-tuning, administrators can define 3–5 "Golden Q&A Pairs" in the dashboard (`/memory`).
-- **Negative Constraints (*"What NOT to do"*):** Strict guardrails (e.g., *"NEVER offer discounts above 10%"*, *"NEVER promise weekend deliveries"*) are dynamically appended to prevent model hallucination.
-
-### 3. Modular App Store & Autonomous Function Calling (`worker/tools-engine.mjs`)
-- **1-Click Modular Tools:** Pre-built tools registered as Gemini Function Declarations and OpenAI tool schemas:
-  - `web_search`: Live DuckDuckGo internet searches for real-time news and facts.
-  - `evaluate_math`: Exact financial math, discounts, and formula calculations with zero hallucination.
-  - `get_current_time`: Live IST/UTC clock and business operating hours verification.
-  - `get_weather`: Open-Meteo real-time weather and temperature reports.
-  - `send_crm_lead`: Outbound webhooks to Zapier, Make, n8n, or CRM backends.
-  - `draft_email` & `confirm_action`: **Two-Phase Action Safety Protocol** — drafts formal SMTP emails and requests explicit Boss WhatsApp confirmation before dispatching.
-  - `update_memory` & `delete_memory`: Autonomous in-chat memory management.
-  - `escalate_to_human`: Emergency handover for customer frustration.
-
-### 4. Interactive Live Chat & Escalation Queue (`/live-chat`)
-- Real-time conversation dashboard with sound buzzer notifications when a customer requests a human agent or shows high frustration.
-- 1-click human agent takeover pauses the AI bot automatically.
-- Automatic customer satisfaction (CSAT) survey collection upon conversation resolution.
-
----
-
-## 11. Request & Response Examples
-
-### 11.1 Format A: Standard Flat JSON (Recommended)
-
-#### Request:
 ```bash
-curl -X POST "http://localhost/wa/public/api/send.php" \
+curl -X POST "http://localhost:8080/api/send.php" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: wa_live_YOUR_API_KEY_HERE" \
   -d '{
     "to": "919876543210",
-    "message": "Hello from WhatsGateway! 🚀\nYour order *#84920* has been shipped.",
+    "message": "Hello from WhatsGateway! 🚀\nYour self-hosted WhatsApp API is up and running.",
     "humanize": true
   }'
 ```
-```
 
-#### Success Response (`200 OK`):
+### Success Response (`200 OK`):
 ```json
 {
   "ok": true,
@@ -868,13 +267,113 @@ curl -X POST "http://localhost/wa/public/api/send.php" \
 
 ---
 
-### 11.2 Format B: Meta WhatsApp Cloud API Format (Drop-In)
+<a id="system-architecture"></a>
+## 🏗️ System Architecture
 
-Works transparently with existing codebases targeting Meta Graph API without altering payloads:
+### Request & Delivery Lifecycle
 
-#### Request:
+```mermaid
+flowchart LR
+    subgraph Clients["1. Clients & Ingestion"]
+        direction TB
+        C1["REST API Consumers<br/>(cURL, Python, Node, Go, Java)"]
+        C2["Admin Dashboard<br/>(PHP 8.2 + Tailwind)"]
+    end
+
+    subgraph Gateway["2. Web Gateway & Security"]
+        direction TB
+        G1["Apache / Nginx Router<br/>(URL Rewriting & Headers)"]
+        G2["Security & Guardrails<br/>(SHA-256 Auth, Rate Limiter, SSRF Check)"]
+        G3["REST Ingestion<br/>(public/api/send.php)"]
+    end
+
+    subgraph Storage["3. Persistent Storage"]
+        direction TB
+        DB[("MySQL / MariaDB / TiDB<br/>ACID Message Queue & Sessions")]
+    end
+
+    subgraph Worker["4. Node.js Worker Microservice"]
+        direction TB
+        W1["Express Controller (:3107)"]
+        W2["FIFO Queue Poller & Humanized Delay"]
+        W3["Baileys Multi-Device Client"]
+        W4["Chatbot & AI Tools Engine"]
+    end
+
+    subgraph WhatsApp["5. WhatsApp Network"]
+        WA["Meta WhatsApp Servers<br/>(Noise Protocol WebSocket)"]
+    end
+
+    Clients -->|HTTP POST / Auth| Gateway
+    Gateway -->|Validate & Enqueue| Storage
+    Gateway -.->|Fast Wakeup Notify| Worker
+    Worker -->|Claim Pending Batch| Storage
+    Worker <==|Encrypted WebSocket|=> WhatsApp
+    Worker -.->|HMAC-SHA256 Webhooks| Clients
+```
+
+### Why This Architecture Works:
+1. **Zero Client Blocking:** The PHP REST API immediately validates your payload and returns `200 OK` with a queued message ID in milliseconds. Your application never waits for WhatsApp network latency.
+2. **Resilience to Network Drops:** Messages are safely held in MySQL/TiDB. If the WhatsApp socket temporarily disconnects, messages remain safely queued and resume dispatch upon reconnection.
+3. **Internal Worker Security:** The Node.js Baileys worker listens strictly on internal localhost (`127.0.0.1:3107`) with shared secret validation (`X-Worker-Token`).
+
+---
+
+<a id="api-quick-reference"></a>
+## 📖 API Quick Reference
+
+### Inbound Messaging Endpoints
+- **Primary Endpoint:** `POST /api/send.php`
+- **Meta Cloud API Drop-In:** `POST /v20.0/{phone_number_id}/messages`
+- **Aliases:** `POST /api/messages.php`, `POST /api/messages`, `POST /messages`
+
+### Authentication Methods
+- `X-API-Key: wa_live_...` (Recommended)
+- `Authorization: Bearer wa_live_...`
+- JSON Body: `{"api_key": "wa_live_...", ...}`
+
+---
+
+### Request Parameters Reference
+
+| Field Name | Type | Mandatory? | Description |
+| :--- | :---: | :---: | :--- |
+| `to` / `recipient` | `string` | **Yes** | Destination phone number with country code (e.g. `919876543210` or `+15551234567`). |
+| `message` / `caption` / `body` | `string` | **Conditional** | Message text or media caption. Required if no media attachment is provided. |
+| `media_url` / `url` | `string` | Optional | Direct HTTP/HTTPS URL to media file (validated against SSRF; 20MB limit). |
+| `type` | `string` | Optional | Declared payload type: `'text'`, `'image'`, `'document'`, `'video'`, or `'audio'`. |
+| `base64` / `file_base64` | `string` | Optional | Base64-encoded file payload or Data URI string. |
+| `filename` | `string` | Optional | Explicit file name for document attachments (e.g. `Invoice_8492.pdf`). |
+| `ptt` | `boolean` | Optional | Set to `true` to deliver audio files as push-to-talk voice memos. |
+| `humanize` | `boolean` | Optional | Simulates human typing presence (`composing`/`recording`) before sending. |
+| `priority` | `string`/`int`| Optional | Queue priority: `'urgent'` / `'high'` (10), `'bulk'` / `'low'` (1), or integer 1-100. |
+
+---
+
+### API Examples
+
+<details open>
+<summary><b>1. Standard Flat JSON (Recommended)</b></summary>
+
 ```bash
-curl -X POST "http://localhost/wa/public/v20.0/100012345/messages" \
+curl -X POST "http://localhost:8080/api/send.php" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: wa_live_YOUR_API_KEY_HERE" \
+  -d '{
+    "to": "919876543210",
+    "message": "Your booking for *Conference 2026* is confirmed! 🎫",
+    "humanize": true
+  }'
+```
+</details>
+
+<details>
+<summary><b>2. Meta WhatsApp Cloud API Drop-In Format</b></summary>
+
+WhatsGateway parses official Meta Cloud API payloads natively:
+
+```bash
+curl -X POST "http://localhost:8080/v20.0/100012345/messages" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer wa_live_YOUR_API_KEY_HERE" \
   -d '{
@@ -888,157 +387,87 @@ curl -X POST "http://localhost/wa/public/v20.0/100012345/messages" \
     }
   }'
 ```
+</details>
 
----
+<details>
+<summary><b>3. Send PDF / Document via Remote URL</b></summary>
 
-### 11.3 Media Transmission: Document / PDF via Direct URL
-
-#### Request:
 ```bash
-curl -X POST "http://localhost/wa/public/api/send.php" \
+curl -X POST "http://localhost:8080/api/send.php" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: wa_live_YOUR_API_KEY_HERE" \
   -d '{
     "to": "919876543210",
     "type": "document",
-    "media_url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
-    "caption": "Please find attached your monthly account statement.",
-    "filename": "Account_Statement.pdf"
+    "media_url": "https://example.com/files/Monthly_Statement.pdf",
+    "caption": "Your monthly statement is ready for review.",
+    "filename": "Monthly_Statement.pdf"
   }'
 ```
+</details>
 
----
+<details>
+<summary><b>4. Send Image via Multipart Form-Data Upload</b></summary>
 
-### 11.4 Media Transmission: Image via Multipart Form-Data Upload
-
-#### Request:
 ```bash
-curl -X POST "http://localhost/wa/public/api/send.php" \
+curl -X POST "http://localhost:8080/api/send.php" \
   -H "X-API-Key: wa_live_YOUR_API_KEY_HERE" \
   -F "to=919876543210" \
-  -F "caption=Product Catalogue 📸" \
-  -F "file=@/path/to/product_flyer.jpg"
+  -F "caption=Product Brochure 📸" \
+  -F "file=@/local/path/to/brochure.jpg"
 ```
+</details>
 
 ---
 
-### 11.5 Error Responses
+### Contacts & Audience REST API Suite
 
-#### Missing Required Parameters (`422 Unprocessable Entity`):
+Manage customer directories, opt-in compliance, and bulk imports via `ContactService`.
+
+> 🛡️ **OWASP Privacy Protection:** To guarantee phone numbers are never leaked into web server access logs or edge CDN traces, the API actively rejects phone numbers passed in URL query strings (`?phone=...`) with an immediate `HTTP 400 Bad Request`. Pass phone numbers in the encrypted JSON request body or use synthetic integer IDs (`?id=142`).
+
+- **List Contacts:** `GET /api/contacts.php?limit=50&search=Acme`
+- **Create / Upsert Contact:** `POST /api/contacts.php` with `{"phone": "+919876543210", "name": "Acme Corp", "opt_in": true}`
+- **Batch Contact Ingestion:** `POST /api/contacts-batch.php` (Atomic transaction up to 500 records)
+- **Delete Contact by ID:** `DELETE /api/contacts.php?id=142`
+- **Delete Contact by Phone:** `POST /api/contacts-delete.php` with `{"phone": "+919876543210"}`
+
+---
+
+### System Health Probe
+
+Monitor system readiness via `GET /api/health.php` (no authentication required):
+
 ```json
 {
-  "ok": false,
-  "error": "Field \"to\" and either a \"message\" or media attachment are required.",
-  "request_id": "a1b2c3d4e5f6789012345678",
-  "meta_error": {
-    "message": "Invalid parameter: \"to\" and either \"text.body\" or media object are required.",
-    "type": "OAuthException",
-    "code": 100
-  }
-}
-```
-
-#### Rate Limit Exceeded (`429 Too Many Requests`):
-```json
-{
-  "ok": false,
-  "error": "Rate limit exceeded.",
-  "request_id": "f1e2d3c4b5a6789012345678",
-  "rate": {
-    "allowed": false,
-    "counts": { "per_minute": 20, "per_hour": 140, "per_day": 850 },
-    "limits": { "rate_per_minute": 20, "rate_per_hour": 300, "rate_per_day": 1000 }
+  "ok": true,
+  "status": "healthy",
+  "timestamp": "2026-10-31T12:00:00+00:00",
+  "service": "whatsapp-api-hub",
+  "database": {
+    "ok": true,
+    "connected": true,
+    "schema_ready": true,
+    "missing_tables": []
   },
-  "meta_error": {
-    "message": "Rate limit hit.",
-    "type": "OAuthException",
-    "code": 80007
-  }
-}
-```
-
-#### Invalid or Missing API Key (`401 Unauthorized`):
-```json
-{
-  "ok": false,
-  "error": "Invalid API key or access token.",
-  "meta_error": {
-    "message": "Invalid OAuth access token or API key.",
-    "type": "OAuthException",
-    "code": 190
+  "worker": {
+    "ok": true,
+    "status_code": 200,
+    "service": "whatsapp-worker",
+    "error": null
   }
 }
 ```
 
 ---
 
-## 12. Authentication, Authorization & Security Safeguards
-
-### Single-Key Authentication Architecture
-WhatsGateway uses a unified **Single API Key** architecture:
-- **One Token to Manage:** When you generate an API key in the dashboard under **API Keys**, a single Bearer token (`wa_live_...`) is generated and displayed once. There is no separate secret key to configure or track.
-- **Hashed Storage:** The database **never stores plaintext API keys**. Only the SHA-256 hash (`hash('sha256', $apiKey)`) and a public key prefix (`substr($apiKey, 0, 22)`) are persisted for lookup and verification.
-- **Accepted Authentication Methods:**
-  - `X-API-Key: wa_live_YOUR_KEY` header (Recommended)
-  - `Authorization: Bearer wa_live_YOUR_KEY` header
-  - JSON / POST body: `{"api_key": "wa_live_YOUR_KEY", ...}`
-  - URL Query parameter: `?access_token=wa_live_YOUR_KEY` (Requires `ALLOW_QUERY_AUTH=true` in `.env` to avoid exposing tokens in web server access logs).
-- **Backward Compatibility:** Legacy dual-key credentials (`key:secret` or `X-API-Secret` headers) from earlier versions remain supported in the request parser for backward compatibility, but are deprecated; new keys only require the single `wa_live_...` token.
-
-### Security Safeguards & Practical Considerations
-> ⚠️ **Practical Reality Check:**
-> No web software is 100% impenetrable. Running a self-hosted gateway that emulates WhatsApp Web WebSocket traffic requires pragmatic operational security:
-> - **Server Isolation & Reverse Proxy:** Run WhatsGateway behind a hardened reverse proxy (Caddy, Nginx, Apache, or Cloudflare) with HTTPS/TLS termination.
-> - **Worker Port Isolation:** The Node.js Baileys worker listens on port `3107` and is intended strictly for local loopback communication with PHP (`127.0.0.1:3107`). Never expose port `3107` to the public internet without firewall restrictions.
-> - **Session Directory Protection:** WhatsApp cryptographic Noise protocol keys are stored in `whatsapp-api-data/sessions/user_<userId>`. Protect this directory with restrictive file permissions (`chmod 700`) and never commit session keys or `.env` to public repositories.
-> - **Anti-Ban Practices:** WhatsApp actively monitors automated burst patterns. Enable humanized presence (`"humanize": true`), configure rate limits, and send only to opted-in recipients.
-
-### SSRF Protection (Server-Side Request Forgery)
-All remote media URLs and webhook target URLs undergo DNS inspection via `assert_safe_media_url()` and `assertSafeWebhookUrl()`:
-- Rejects non-HTTP/HTTPS protocols.
-- Resolves DNS A/AAAA records and inspects all destination IP addresses.
-- Strictly blocks private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16`, `::1`, and IPv6 unique local/site-local).
-
-### Upload Directory Hardening
-The `public/uploads/` directory contains an automated [`.htaccess`](public/uploads/.htaccess) policy that:
-- Forbids execution of all server-side script extensions (`.php`, `.phtml`, `.cgi`, `.pl`, `.exe`, `.sh`, `.bat`, `.cmd`, `.py`, etc.).
-- Turns off `mod_php` engine (`php_flag engine off`).
-- Strips script handlers (`RemoveHandler`).
-
-### Webhook Signature Verification
-Every outbound webhook includes an HMAC-SHA256 signature in the `X-WA-Hub-Signature` HTTP header. Verify incoming webhooks in your receiving service:
-
-```php
-// PHP verification example
-$payload = file_get_contents('php://input');
-$signature = $_SERVER['HTTP_X_WA_HUB_SIGNATURE'] ?? '';
-$expected = hash_hmac('sha256', $payload, $yourWebhookSecret);
-
-if (!hash_equals($expected, $signature)) {
-    http_response_code(403);
-    exit('Invalid signature');
-}
-```
-
-```javascript
-// Node.js verification example
-import crypto from 'crypto';
-
-function verifyWebhook(rawBody, signature, secret) {
-  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-}
-```
-
----
-
-## 13. Error Handling & Status Codes
+### HTTP Status Codes & Error Handling
 
 | HTTP Status | Meaning | Typical Cause & Resolution |
 | :---: | :--- | :--- |
 | `200 OK` | Message Enqueued | Request validated and placed into queue for worker dispatch. |
 | `202 Accepted` | Test Message Enqueued | Dashboard test message accepted for immediate queueing. |
-| `400 Bad Request` | Malformed Request | Invalid JSON structure or missing parameters. |
+| `400 Bad Request` | Malformed Request | Invalid JSON structure or raw phone number in query string. |
 | `401 Unauthorized` | Authentication Failure | Missing or invalid `X-API-Key` or `Authorization: Bearer` header. |
 | `404 Not Found` | Unregistered Number | The recipient phone number is not registered on WhatsApp. |
 | `405 Method Not Allowed`| Wrong HTTP Method | The endpoint expects `POST`. Check your HTTP client method. |
@@ -1051,200 +480,354 @@ function verifyWebhook(rawBody, signature, secret) {
 
 ---
 
-## 14. Testing & Quality Verification
+<a id="client-sdks"></a>
+## 💻 Client SDKs & Quickstarts
 
-### Syntax & Quality Verification Commands
+Ready-to-use, zero-dependency client implementations are located in [`quickstart/`](quickstart/):
 
-Verify the entire codebase locally using the same automated suite run by GitHub Actions (`.github/workflows/ci.yml`):
+| Language | Path | Features |
+| :--- | :--- | :--- |
+| **Python** | [`quickstart/python/send.py`](quickstart/python/send.py) | CLI arguments, interactive prompts, zero third-party packages |
+| **Node.js** | [`quickstart/nodejs/send.js`](quickstart/nodejs/send.js) | Native `fetch`, zero npm dependencies |
+| **PHP** | [`quickstart/php/send.php`](quickstart/php/send.php) | Strict types, native cURL client wrapper class |
+| **Go** | [`quickstart/go/main.go`](quickstart/go/main.go) | Standard library `net/http` |
+| **Java** | [`quickstart/java/SendWhatsApp.java`](quickstart/java/SendWhatsApp.java) | Compatible with Java 8, 11, 17, and 21+ using `HttpURLConnection` |
 
-```bash
-# 1. Lint all PHP files in the project
-php -l app.php
-php -l index.php
-php -l public/index.php
-php -l test/index.php
-php -l public/api/send.php
-php -l public/api/health.php
+<details>
+<summary><b>View Python Example</b></summary>
 
-# 2. Check Node.js worker syntax
-node --check worker/server.mjs
+```python
+import urllib.request
+import json
+
+url = "http://localhost:8080/api/send.php"
+api_key = "wa_live_YOUR_API_KEY_HERE"
+
+payload = {
+    "to": "919876543210",
+    "message": "Hello from Python! 🐍",
+    "humanize": True
+}
+
+req = urllib.request.Request(
+    url,
+    data=json.dumps(payload).encode("utf-8"),
+    headers={
+        "Content-Type": "application/json",
+        "X-API-Key": api_key
+    }
+)
+
+with urllib.request.urlopen(req) as response:
+    print(response.read().decode())
+```
+</details>
+
+<details>
+<summary><b>View Node.js Example</b></summary>
+
+```javascript
+const url = "http://localhost:8080/api/send.php";
+const apiKey = "wa_live_YOUR_API_KEY_HERE";
+
+async function sendMessage() {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey
+    },
+    body: JSON.stringify({
+      to: "919876543210",
+      message: "Hello from Node.js! 🚀",
+      humanize: true
+    })
+  });
+  console.log(await response.json());
+}
+
+sendMessage();
+```
+</details>
+
+---
+
+## 🔔 Outbound Webhooks & HMAC Verification
+
+Configure an HTTPS destination in **Webhooks** (`/webhooks`) to receive instant delivery and inbound message updates. Every dispatch is signed using HMAC-SHA256 in the `X-WA-Hub-Signature` header.
+
+### Verifying Webhook Signatures:
+
+#### In PHP:
+```php
+$payload = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_WA_HUB_SIGNATURE'] ?? '';
+$expected = hash_hmac('sha256', $payload, $yourWebhookSecret);
+
+if (!hash_equals($expected, $signature)) {
+    http_response_code(403);
+    exit('Invalid signature');
+}
+// Signature verified safely
 ```
 
-### Interactive Developer Testing Tools
+#### In Node.js:
+```javascript
+import crypto from 'crypto';
 
-1. **Web Test Console:** Open `http://localhost/wa/test/index.php` (or `/test-page.php`) in your browser to test endpoints, headers, and media URLs interactively.
+function verifyWebhook(rawBody, signature, secret) {
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
+```
+
+---
+
+## 🤖 AI Assistant Studio, Memory Engine & App Store
+
+WhatsGateway features a built-in Autonomous AI Agent architecture running directly on WhatsApp:
+
+### 1. Dual-Tier Cognitive Memory Engine
+- **Short-Term Dialogue Context:** Rolling sliding window (1,600 chars) with 45-minute inactivity decay. Silent chats decay to a clean slate, preventing stale context bleed.
+- **Persistent Fact Notebook (`ai_user_memory`):** Durable attributes partitioned by scope:
+  - *Personal Boss Mode:* Executive facts for the account owner (GSTIN, Home Address, Travel Preferences).
+  - *Customer Support Mode:* Scoped per customer phone (VIP Status, Delivery Address, Preferences).
+- **Top-K Token Governor:** Matches incoming questions against stored memories and injects only the **Top-3 relevant facts (< 120 tokens)** into the model prompt to keep latency low.
+- **Conversational Memory Control:** WhatsApp users can self-manage facts (*"Remember my address is Flat 2B"* or *"Forget my old address"*).
+
+### 2. Smart Few-Shot In-Context Training
+- Define 3–5 **Golden Q&A Pairs** in `/memory` to guide model style and tone without fine-tuning.
+- Define strict **Negative Constraints** (*"What NOT to do"*, such as *"NEVER quote discounts above 15%"*) to eliminate hallucinations.
+
+### 3. Modular App Store & Function Calling
+Pre-built tools enabled with 1 click:
+- `web_search`: Live DuckDuckGo internet searches.
+- `evaluate_math`: Exact financial math and formula calculation.
+- `get_current_time`: Live IST/UTC time and business operating hours verification.
+- `get_weather`: Open-Meteo real-time temperature and weather forecasts.
+- `send_crm_lead`: Outbound webhooks to Zapier, Make, n8n, or CRM.
+- `draft_email` & `confirm_action`: **Two-Phase Action Safety Protocol** — drafts formal emails and waits for explicit WhatsApp confirmation before sending.
+
+---
+
+## 🚀 Production Deployment & Operations
+
+### Production Checklist
+1. Set `APP_ENV=production` in `.env`.
+2. Generate a strong, random `WORKER_TOKEN` (at least 32 characters, e.g. `openssl rand -hex 24`).
+3. Set `ENABLE_REGISTRATION=false` to prevent unauthorized dashboard registrations.
+4. Set `ENABLE_TEST_PAGE=false` to restrict internal developer test utilities.
+5. Set `APP_SECURE_COOKIES=true` and ensure TLS/HTTPS is active.
+6. Configure `APP_PUBLIC_URL=https://your-domain.com` (leave `APP_BASE_PATH=` empty).
+
+### Deploying to Render / Railway with TiDB Cloud Serverless
+
+The repository includes a production [`Dockerfile`](Dockerfile) with Supervisor process orchestration:
+
+1. Connect your GitHub repository to Render or Railway.
+2. Configure Environment Variables:
+   - `DB_HOST`, `DB_PORT=4000`, `DB_NAME=whatsapp_api`, `DB_USER`, `DB_PASSWORD`, `DB_SSL=true`
+   - `APP_ENV=production`, `APP_PUBLIC_URL=https://your-service.onrender.com`, `APP_BASE_PATH=`
+   - `WORKER_TOKEN=your-random-32-char-token`, `ENABLE_REGISTRATION=false`
+3. **Provision the First Admin Account:** Set temporary environment variables `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` (minimum 12 characters). The Docker entrypoint executes [`scripts/create-initial-admin.php`](scripts/create-initial-admin.php) before launching services. Once created, delete these variables from your dashboard.
+4. Startup automatically executes `php scripts/migrate.php` to verify all 17 tables are ready.
+5. Verify health: `https://your-service.onrender.com/api/health.php` returns `status: "healthy"` and `database.ok: true`.
+
+### Linux VPS Service Management (PM2)
+```bash
+cd /var/www/whatsapp-api/worker
+npm install --omit=dev
+npm install -g pm2
+pm2 start server.mjs --name "whatsapp-worker"
+pm2 save
+pm2 startup
+```
+
+### Windows Background Worker (`start-worker.bat`)
+```cmd
+start-worker.bat start      :: Starts worker background process
+start-worker.bat stop       :: Stops worker gracefully
+start-worker.bat restart    :: Restarts worker process
+start-worker.bat status     :: Shows current PID and status
+start-worker.bat logs       :: Shows output and error log paths
+```
+
+---
+
+## 🧪 Interactive Testing & Developer Tools
+
+1. **Web Test Console:** Navigate to `http://localhost:8080/test/index.php` (when `ENABLE_TEST_PAGE=true`) to test API keys, payloads, and media URLs interactively.
 2. **Interactive Terminal Sender (`send_whatsapp.py`):**
    ```bash
    python send_whatsapp.py
    ```
-   Prompts for phone number and message, caches your credentials locally, and delivers via the API.
-3. **Multi-Language Quickstart Suite:**
-   Run quickstart examples across different language runtimes:
+   Prompts for recipient and message, caches credentials, and sends via the REST API.
+3. **Automated Syntax Checks:**
    ```bash
-   python quickstart/python/send.py
-   node quickstart/nodejs/send.js
-   php quickstart/php/send.php
-   go run quickstart/go/main.go
-   java quickstart/java/SendWhatsApp.java
+   # PHP syntax validation
+   php -l public/api/send.php
+   php -l public/api/health.php
+
+   # Node.js worker syntax
+   node --check worker/server.mjs
    ```
 
 ---
 
-## 15. Deployment Guide (Docker, Cloud, VPS)
+## ⚙️ Environment Configuration Reference
 
-### Production Checklist
-1. Set `APP_ENV=production` in `.env`.
-2. Generate a strong, random `WORKER_TOKEN` (e.g. `openssl rand -hex 24`).
-3. Set `ENABLE_REGISTRATION=false` to prevent public sign-ups on your private instance.
-4. Set `ENABLE_TEST_PAGE=false` to restrict internal test utilities.
-5. Set `APP_SECURE_COOKIES=true` and ensure SSL/TLS is active.
-6. Configure `APP_PUBLIC_URL=https://your-domain.com` (leave `APP_BASE_PATH=` empty).
+All settings are configured in `.env` and loaded by `config/app.php`:
 
-### Deploying to Render / Railway / PaaS with TiDB Cloud
-
-The repository includes a production [`Dockerfile`](Dockerfile) configured with Supervisor. Its entrypoint applies `php scripts/migrate.php` before any service starts:
-1. Connect your GitHub repository to Render / Railway.
-2. Set Environment Variables:
-   - `DB_HOST`, `DB_PORT=4000`, `DB_NAME=whatsapp_api`, `DB_USER`, `DB_PASSWORD`, `DB_SSL=true` (TLS certificate verification stays enabled; provide `DB_SSL_CA` only if a trusted CA file is required)
-   - `APP_ENV=production`, `APP_PUBLIC_URL=https://your-service.onrender.com`, `APP_BASE_PATH=`
-   - `WORKER_TOKEN` generated with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, `ENABLE_REGISTRATION=false`. Paste the generated value directly into Render Environment Variables; do not commit it or send it in chat.
-3. Deploy. Startup applies the migration before the queue worker. For a manual run on a compatible Render service shell, execute `php /var/www/html/scripts/migrate.php`; Render also documents one-off jobs for tasks such as database migrations. Do not use `database.sql`, `clean_tidb_import.sql`, or `schema_export.sql` against the existing database because they contain destructive dump statements.
-4. The container forces `WORKER_URL` to `http://127.0.0.1:${WORKER_PORT}` because Apache and the Node worker run in the same container; `WORKER_PORT` defaults to `3107`. Loopback cURL requests explicitly bypass inherited HTTP proxy settings. The worker's `GET /health` route is unauthenticated but reports ready only after it connects to the `whatsapp_api` database and confirms all 17 required tables; a not-ready result is HTTP 503 JSON with `error.code=database_not_ready`. Other worker routes require `X-Worker-Token`; PHP includes it without logging or returning it. Verify `https://<service-host>/api/health.php` returns HTTP 200 with `database.ok`, `database.schema_ready`, and `worker.ok` all `true`. On a failed worker probe, the PHP error log records only the sanitized target, peer IP, HTTP status, content type, a redacted response excerpt, and a short failure category. Then check Render logs for `Database schema is ready: 17 application tables in whatsapp_api.` and confirm queue processing no longer logs `ER_NO_SUCH_TABLE`.
-
-### First private dashboard account
-
-Public registration should remain disabled with `ENABLE_REGISTRATION=false`. To provision the first account without a public administrator endpoint, set `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` as temporary Render environment variables, then deploy. Use a unique valid email and a password of at least 12 characters; optionally set `INITIAL_ADMIN_NAME` (defaults to `Administrator`). The Docker entrypoint runs `scripts/create-initial-admin.php` after the existing non-destructive schema initializer and before Apache or the worker starts. The password is read from the process environment, hashed with PHP `password_hash`, and never included in logs or command arguments. After logs report that the account was created, remove all `INITIAL_ADMIN_*` variables and deploy again. The command is safe to rerun for the same sole account: it reports that the account already exists without changing its password. It refuses if other user accounts exist or if it cannot acquire TiDB's advisory setup lock; it never upgrades, downgrades, or replaces an existing account.
-
-The current schema has no `is_admin` column or separate administrator role: the first account is the initial dashboard owner, and authenticated accounts use the same user-scoped dashboard permissions. This setup creates only that first login account and its normal WhatsApp session and webhook records; it makes no schema changes. Sign in at `/login`; the authenticated root route (`/`) opens the dashboard. Open `/device`, select **Connect**, and scan the QR displayed by the existing session UI. The connect action is a CSRF-protected request to `public/session.php?action=start`; this source confirms the QR pairing flow, but a successful WhatsApp connection still depends on the deployed worker and WhatsApp session.
-
-For local test runs, include `php tests/initial-admin.test.php`.
-
----
-
-## 16. External Integrations & Background Workers
-
-### Baileys WebSocket Lifecycle
-- The Node.js worker initializes a WebSocket connection to WhatsApp servers using the Noise protocol.
-- Cryptographic session state is stored in `whatsapp-api-data/sessions/user_<userId>`.
-- Supports automatic reconnects on socket dropouts (`restartRequired`, stream errors).
-- Ephemeral downloaded media files (`public/uploads/media_*`) are automatically deleted from server disk after successful delivery to prevent storage exhaustion.
-
-### Chatbot Trigger Engine
-Incoming messages trigger Baileys `messages.upsert` events. If active rules exist in `chatbot_rules`:
-- Evaluates keywords with `exact`, `starts_with`, or `contains` matching.
-- Supports fallback `catch_all` rules for unhandled inquiries.
-- Enqueues the automated reply with `source: 'chatbot'`.
-
-### SMTP & Email Integration
-- Configured via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASS`.
-- Used for self-service password reset OTP dispatch.
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `APP_ENV` | `local` | Environment mode (`local` or `production`). Production enforces strict tokens. |
+| `APP_NAME` | `WhatsGateway` | Application display name. |
+| `APP_PUBLIC_URL` | `http://localhost/wa/public` | Canonical URL used for redirects, webhooks, and sitemaps. |
+| `APP_BASE_PATH` | `/wa/public` | Subfolder base path (leave blank when using root domain in production). |
+| `APP_SESSION_NAME` | `whatsgateway_session` | Name of PHP session cookie. |
+| `APP_SECURE_COOKIES`| `false` (auto in prod) | Force HTTPS-only cookie attributes (`Secure; HttpOnly; SameSite=Lax`). |
+| `ENABLE_REGISTRATION`| `false` | Enable/disable public user registration in the web UI. |
+| `ENABLE_TEST_PAGE` | `true` (dev only) | Enables developer interactive tester at `/test-page.php`. |
+| `DB_HOST` | `127.0.0.1` | MySQL, MariaDB, or TiDB server hostname. |
+| `DB_PORT` | `3306` | Database port (3306 for MySQL, 4000 for TiDB Cloud). |
+| `DB_NAME` | `whatsapp_api` | Database name. |
+| `DB_USER` | `root` | Database username. |
+| `DB_PASSWORD` | `""` | Database password. |
+| `DB_SSL` | `false` | Enable TLS/SSL (auto-enabled for TiDB Cloud hostnames or port 4000). |
+| `WORKER_URL` | `http://127.0.0.1:3107` | Internal HTTP address used by PHP to communicate with Node worker. |
+| `WORKER_PORT` | `3107` | Port for the background worker daemon (defaults to `3107`). |
+| `WORKER_TOKEN` | *(required in prod)* | Shared secret of at least 32 characters passed in `X-Worker-Token`. |
+| `SEND_DELAY_MS` | `2500` | Base delay between message dispatches in milliseconds. |
+| `QUEUE_POLL_MS` | `3000` | Polling frequency for claiming queued messages from database. |
+| `LOG_LEVEL` | `warn` | Pino worker log verbosity (`debug`, `info`, `warn`, `error`). |
+| `LOGIN_MAX_ATTEMPTS`| `5` | Maximum failed logins before IP lockout. |
+| `LOGIN_LOCKOUT_MINUTES`| `15` | Lockout duration in minutes after exceeding failed attempts. |
+| `DEFAULT_COUNTRY_CODE`| `91` | Default country code prefix applied to numbers without leading `+`. |
 
 ---
 
-## 17. Logging, Monitoring & Debugging
+## 🗄️ Database Architecture (17 Application Tables)
 
-- **API Request Audit Logs:** Viewable in the dashboard under **Audit Logs** (`api_request_logs`). Records timestamp, IP address, HTTP status code, request ID, and error messages.
-- **Worker Daemon Logs:**
-  - Standard output: `worker/worker.out.log`
-  - Error output: `worker/worker.err.log`
-  - Control logs via `start-worker.bat logs` on Windows.
-- **Database Delivery Logs:** Recorded in `message_logs` with provider responses and message IDs.
-- **Worker Log Verbosity:** Change `LOG_LEVEL=debug` in `.env` to view full Baileys frame logs.
+The database schema is managed via the non-destructive migration runner [`php scripts/migrate.php`](scripts/migrate.php):
+
+1. **`users`:** User accounts, hashed passwords, contact numbers, and timestamps.
+2. **`api_keys`:** Single API keys storing `key_hash` (SHA-256), `key_prefix`, `status`, `ip_allowlist`, and rate limits.
+3. **`api_request_logs`:** Audit trail capturing endpoints, IP addresses, HTTP status codes, and error logs.
+4. **`campaigns`:** Bulk broadcast records with template message, scheduling, and target counts.
+5. **`chatbot_rules`:** Keyword auto-reply rules (`exact`, `contains`, `starts_with`, `catch_all`).
+6. **`contacts`:** Opted-in recipient directory with normalized phone numbers and consent flags.
+7. **`login_attempts`:** Tracks failed login attempts per email/IP for security lockouts.
+8. **`message_logs`:** Historic log of dispatched messages and provider delivery responses.
+9. **`message_queue`:** Asynchronous FIFO queue with status (`queued`, `processing`, `sent`, `failed`), retry attempts, and priority.
+10. **`password_resets`:** Temporary OTP codes with 15-minute expiration windows.
+11. **`webhooks`:** Webhook targets containing HTTPS URL, HMAC secret, and enabled flag.
+12. **`webhook_deliveries`:** Audit history of outbound webhook HTTP dispatches and response codes.
+13. **`whatsapp_sessions`:** Baileys connection state (`idle`, `connecting`, `qr`, `connected`, `disconnected`), push name, and timestamps.
+14. **`user_security`:** Two-Factor Authentication (RFC 6238 TOTP), hashed recovery codes, and security preferences.
+15. **`media_assets`:** Uploaded media file metadata, SHA-256 checksums, and reference counting.
+16. **`inbound_messages`:** Normalized record of incoming customer messages with processing status.
+17. **`webhook_queue`:** Asynchronous delivery and retry queue for outbound HTTP webhooks.
+
+Run migrations anytime without dropping data:
+```bash
+php scripts/migrate.php
+```
 
 ---
 
-## 18. Anti-Ban Practices, Known Limitations & Notes
+## 🛡️ Anti-Ban Best Practices & Limitations
 
-### WhatsApp Anti-Ban Best Practices
-Because this gateway operates via WhatsApp Web multi-device emulation:
-1. **Always Enable `"humanize": true`:** Adds typing presence updates (`composing`/`recording`) and realistic 2–5 second delays before dispatching.
-2. **Respect Opt-In Consent:** Only message users who have explicitly agreed to receive communications.
-3. **Avoid Sudden High-Volume Blasts:** Warm up new numbers gradually over 7–14 days. Do not send thousands of messages instantly.
-4. **Configure Rate Limits:** Set conservative limits in the dashboard under **API Keys** (e.g. 20 msgs/min).
+Because WhatsGateway connects via WhatsApp Web multi-device emulation:
 
-### Known Implementation Notes
-- **Multi-Device Dependency:** Your WhatsApp mobile account must remain active. If WhatsApp logs out all linked devices from the mobile app, you must re-scan the QR code in the dashboard.
-- **Drop-In Compatibility:** Compatible with Meta Cloud API schemas for text, documents, images, audio, video, and simple templates. Advanced interactive Meta catalog flows or Meta business payment flows are not supported by the WhatsApp Web protocol.
+### Anti-Ban Recommendations
+1. **Always Enable `"humanize": true`:** Dispatches typing indicators (`composing`/`recording`) and realistic delays before transmission.
+2. **Respect Opt-In Consent:** Only message users who have explicitly requested communications from you.
+3. **Warm Up New Numbers Gradually:** On brand new WhatsApp numbers, start with 20–50 messages per day and scale gradually over 14 days. Avoid sudden bursts of hundreds of messages.
+4. **Configure Rate Limits:** Set conservative limits in **API Keys** (e.g. 15–25 messages per minute).
+
+### Known Limitations
+- **Phone Active Requirement:** Your paired mobile phone must keep WhatsApp installed. If WhatsApp logs out all linked devices, re-scan the QR in the dashboard.
+- **Protocol Boundary:** WhatsApp Web emulation supports text, media, documents, and simple templates. Interactive Meta Catalog flows or native WhatsApp Pay buttons are only available on Meta's official Cloud API.
 
 ---
 
-## 19. Frequently Asked Questions (FAQ) & Search Index
+<a id="faq"></a>
+## ❓ Frequently Asked Questions (FAQ)
 
 <details>
-<summary><strong>Q1: Is WhatsGateway really 100% free? Are there any hidden fees or message limits?</strong></summary>
+<summary><strong>Q1: Is WhatsGateway really 100% free? Are there any hidden message costs?</strong></summary>
 
-**Yes, 100% free.** Unlike Meta WhatsApp Cloud API or Twilio, WhatsGateway is completely open-source (MIT licensed) and self-hosted. There are no monthly subscriptions, no pay-per-conversation fees, and no message credits. You can send as many messages as your phone carrier and WhatsApp account allow.
+**Yes, 100% free software.** WhatsGateway is licensed under MIT. There are no per-conversation fees, no message volume surcharges, and no monthly subscriptions. You only manage your own host or server.
 </details>
 
 <details>
-<summary><strong>Q2: How does WhatsGateway work without Meta Business Verification?</strong></summary>
+<summary><strong>Q2: How does WhatsGateway work without Meta Business verification?</strong></summary>
 
-WhatsGateway connects directly to WhatsApp Web's multi-device protocol via [WhiskeySockets/Baileys](https://github.com/WhiskeySockets/Baileys). You simply scan a QR code from your existing WhatsApp mobile app (just like WhatsApp Web or WhatsApp Desktop). No Facebook Developer account, credit card, or business registration paperwork is needed.
+WhatsGateway connects directly to WhatsApp Web's multi-device protocol via [WhiskeySockets/Baileys](https://github.com/WhiskeySockets/Baileys). You simply scan a QR code from your existing WhatsApp mobile app (just like WhatsApp Web). No Facebook Developer account, credit card, or business paperwork is required.
 </details>
 
 <details>
-<summary><strong>Q3: How does WhatsGateway compare to Twilio WhatsApp API?</strong></summary>
+<summary><strong>Q3: Can I drop WhatsGateway into existing codebases built for Meta Cloud API?</strong></summary>
 
-Twilio charges approximately $0.005 per message + Meta's regional conversation fee ($0.03 – $0.15+ per dialogue), requires strict pre-approved message templates, and locks you into their cloud. WhatsGateway is self-hosted ($0 cost), allows freeform message text without pre-approval, supports rich media up to 20MB, and gives you total data privacy on your own server.
+Yes! The endpoint `POST /v20.0/{phone_number_id}/messages` accepts official Meta Graph API JSON payloads (`messaging_product: "whatsapp"`, `recipient_type: "individual"`, `text.body`, etc.) and returns compliant `wamid` response structures.
 </details>
 
 <details>
-<summary><strong>Q4: Can I use my existing WhatsApp Business or personal phone number?</strong></summary>
+<summary><strong>Q4: Can I use my personal WhatsApp number or WhatsApp Business number?</strong></summary>
 
-Yes! Any active WhatsApp phone number (personal or WhatsApp Business) can be linked in seconds by scanning the QR code in the WhatsGateway dashboard.
+Yes. Any active WhatsApp phone number can be connected in seconds via the dashboard device pairing screen.
 </details>
 
 <details>
-<summary><strong>Q5: What programming languages and SDKs are supported?</strong></summary>
+<summary><strong>Q5: Can I deploy WhatsGateway with Docker?</strong></summary>
 
-WhatsGateway provides a universal REST API that works with any HTTP client in any language. The repository includes zero-dependency quickstart examples in:
-- **cURL:** [`examples/curl/send-message.sh`](examples/curl/send-message.sh)
-- **Python:** [`quickstart/python/send.py`](quickstart/python/send.py) & [`send_whatsapp.py`](send_whatsapp.py)
-- **Node.js / JavaScript:** [`quickstart/nodejs/send.js`](quickstart/nodejs/send.js)
-- **PHP:** [`quickstart/php/send.php`](quickstart/php/send.php)
-- **Go:** [`quickstart/go/main.go`](quickstart/go/main.go)
-- **Java:** [`quickstart/java/SendWhatsApp.java`](quickstart/java/SendWhatsApp.java)
-</details>
-
-<details>
-<summary><strong>Q6: How does WhatsGateway protect against WhatsApp bans?</strong></summary>
-
-WhatsGateway includes an intelligent anti-ban engine:
-- **Humanized Presence:** Automatically dispatches `"composing"` (typing) and `"recording"` presence states before delivering messages.
-- **Randomized Jitter Delays:** Introduces configurable random intervals between deliveries to mimic human conversational rhythm.
-- **Asynchronous Queue & Rate Limiter:** Protects against burst spam by metering outgoing traffic according to your configured limits.
-</details>
-
-<details>
-<summary><strong>Q7: Can I deploy WhatsGateway with Docker?</strong></summary>
-
-Yes! The repository includes a containerized [`Dockerfile`](Dockerfile) with multi-process Supervisor orchestration, running Apache (PHP 8.2) and the Node.js Baileys worker in tandem with automatic database migrations. It runs seamlessly on local Docker, Render, Railway, Fly.io, AWS, or any Linux VPS.
-</details>
-
-<details>
-<summary><strong>Q8: Does WhatsGateway support webhooks for delivery status and inbound messages?</strong></summary>
-
-Yes! You can configure an HTTPS endpoint in the dashboard to receive HMAC-SHA256 signed POST webhooks on `message.sent` and `message.failed` events. The worker also features a built-in automated chatbot rule engine that replies to incoming triggers automatically.
+Yes. A multi-container [`docker-compose.yml`](docker-compose.yml) and production [`Dockerfile`](Dockerfile) are included. Run `docker compose up -d` to launch PHP 8.2 Apache, Node.js 20, and MySQL 8.0 in seconds.
 </details>
 
 ---
 
-## 20. Community & Discussions
+## ⭐ Support Open Source — Star on GitHub!
 
-Have questions, suggestions, or need help integrating WhatsGateway?
-- 💬 **Join the Discussion:** [GitHub Discussions](https://github.com/navneetyadav-code/whatsapp-api/discussions) — Ask questions, share ideas, and showcase your integrations.
-- 🐛 **Report a Bug:** [GitHub Issues](https://github.com/navneetyadav-code/whatsapp-api/issues) — File bug reports and feature requests.
-- 🤝 **Contribute:** Read our [Contributing Guide](CONTRIBUTING.md) to submit pull requests.
+If WhatsGateway saves you development time or helps your project avoid expensive SaaS messaging fees, please consider giving it a **Star (⭐)**!
+
+Your support helps more developers discover free open-source tools and motivates continued development.
+
+<p align="center">
+  <a href="https://github.com/navneetyadav-code/whatsapp-api/stargazers">
+    <img src="https://img.shields.io/badge/⭐%20Star%20WhatsGateway-on%20GitHub-gold?style=for-the-badge&logo=github" alt="Star on GitHub">
+  </a>
+</p>
 
 ---
 
-## ⚖️ License & Trademark Notice
+## 🤝 Contributing & Community
+
+Contributions are welcomed! Whether reporting bugs, improving documentation, or submitting pull requests:
+
+1. **Discussions:** Have a question or idea? Join [GitHub Discussions](https://github.com/navneetyadav-code/whatsapp-api/discussions).
+2. **Issue Tracker:** Found a bug? Open a [GitHub Issue](https://github.com/navneetyadav-code/whatsapp-api/issues).
+3. **Pull Requests:** Check our [Contributing Guide](CONTRIBUTING.md) and run local quality checks:
+
+```powershell
+# Check PHP syntax
+foreach ($file in Get-ChildItem -Recurse -Filter *.php -File) { php -l $file.FullName }
+
+# Check Node.js worker syntax
+node --check worker/server.mjs
+```
+
+---
+
+## ⚖️ License & Trademark Disclaimer
 
 ### License
-This project is licensed under the [MIT License](LICENSE).
+This project is open-source software licensed under the [MIT License](LICENSE).
 
 ### Trademark Disclaimer
-This project is an independent open-source library and is **not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with Meta Platforms, Inc. or WhatsApp LLC.** WhatsApp is a registered trademark of WhatsApp LLC.
+WhatsGateway is an independent open-source project and is **not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with Meta Platforms, Inc. or WhatsApp LLC.** WhatsApp is a registered trademark of WhatsApp LLC.
 
-**Inquiries & Support:** `info.assistgroupofficial@gmail.com`  
-**Maintainer:** [Navneet Kumar Yadav](https://github.com/navneetyadav-code/whatsapp-api)
+---
+
+<p align="center">
+  <strong>WhatsGateway</strong> — Crafted with ❤️ by <a href="https://github.com/navneetyadav-code">Navneet Kumar Yadav</a> & the Open-Source Community.
+</p>
