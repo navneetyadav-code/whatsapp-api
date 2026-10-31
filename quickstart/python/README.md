@@ -1,4 +1,4 @@
-# 🐍 Python Quickstart — WhatsGateway
+# 🐍 Python Quickstart — WhatsApp API Hub
 
 A production-ready Python client with **zero required external dependencies** (falls back to native `urllib` if `requests` is not installed).
 

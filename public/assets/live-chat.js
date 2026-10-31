@@ -17,7 +17,7 @@
         activeConversation: null,
         lastMessageId: 0,
         conversations: [],
-        currentFilter: 'all',
+        currentFilter: 'unread',
         searchQuery: '',
         isSending: false,
         selectedFile: null,
@@ -38,7 +38,8 @@
         chatSearchInput: document.getElementById('chatSearchInput'),
         chatSearchClear: document.getElementById('chatSearchClear'),
         unreadFilterBadge: document.getElementById('unreadFilterBadge'),
-        escalatedFilterBadge: document.getElementById('escalatedFilterBadge'),
+        botFilterBadge: document.getElementById('botFilterBadge'),
+        closedFilterBadge: document.getElementById('closedFilterBadge'),
         btnRefreshConversations: document.getElementById('btnRefreshConversations'),
         filterBtns: document.querySelectorAll('.chat-filter-btn'),
 
@@ -58,7 +59,6 @@
         chatResolutionRemarkText: document.getElementById('chatResolutionRemarkText'),
         chatClosedBannerText: document.getElementById('chatClosedBannerText'),
         chatClosedDot: document.getElementById('chatClosedDot'),
-        btnManualEscalate: document.getElementById('btnManualEscalate'),
         btnToggleBot: document.getElementById('btnToggleBot'),
         botToggleIcon: document.getElementById('botToggleIcon'),
         botToggleLabel: document.getElementById('botToggleLabel'),
@@ -67,7 +67,6 @@
 
         chatEscalationBanner: document.getElementById('chatEscalationBanner'),
         escalationReasonText: document.getElementById('escalationReasonText'),
-        btnAcknowledgeEscalation: document.getElementById('btnAcknowledgeEscalation'),
         btnResolveEscalation: document.getElementById('btnResolveEscalation'),
 
         chatClosedBanner: document.getElementById('chatClosedBanner'),
@@ -103,17 +102,19 @@
         return div.innerHTML;
     }
 
-    // Helper: Canonical phone normalizer (defaults 10-digit numbers to '91')
+    // Helper: Canonical phone normalizer (defaults 10-digit numbers to default country dial code)
+    const DEFAULT_DIAL = (window.AppConfig && window.AppConfig.defaultDialCode) ? String(window.AppConfig.defaultDialCode).replace(/\D/g, '') : '91';
+
     function normalizePhone(raw) {
         let digits = String(raw || '').replace(/\D/g, '');
         if (digits.startsWith('00')) {
             digits = digits.slice(2);
         }
         if (digits.length === 11 && digits.startsWith('0')) {
-            digits = '91' + digits.slice(1);
+            digits = DEFAULT_DIAL + digits.slice(1);
         }
         if (digits.length === 10) {
-            digits = '91' + digits;
+            digits = DEFAULT_DIAL + digits;
         }
         return digits;
     }
@@ -121,8 +122,10 @@
     // Helper: Pretty formats a canonical phone number
     function formatPhone(phone) {
         const clean = String(phone || '').replace(/\D/g, '');
-        if (clean.length === 12 && clean.startsWith('91')) {
-            return `+91 ${clean.slice(2, 7)} ${clean.slice(7)}`;
+        if (clean.length === (DEFAULT_DIAL.length + 10) && clean.startsWith(DEFAULT_DIAL)) {
+            const local = clean.slice(DEFAULT_DIAL.length);
+            const mid = Math.floor(local.length / 2);
+            return `+${DEFAULT_DIAL} ${local.slice(0, mid)} ${local.slice(mid)}`;
         }
         return clean ? `+${clean}` : '';
     }
@@ -193,6 +196,13 @@
     }
 
     function startBuzzerLoop() {
+        if (window.WhatsAlerts) {
+            if (window.WhatsAlerts.isSilenced && window.WhatsAlerts.isSilenced()) {
+                return;
+            }
+            window.WhatsAlerts.startBuzzer(state.conversations);
+            return;
+        }
         if (buzzerInterval) return;
         playBuzzerTone();
         buzzerInterval = setInterval(() => {
@@ -201,6 +211,9 @@
     }
 
     function stopBuzzerLoop() {
+        if (window.WhatsAlerts) {
+            window.WhatsAlerts.stopBuzzer();
+        }
         if (buzzerInterval) {
             clearInterval(buzzerInterval);
             buzzerInterval = null;
@@ -297,9 +310,6 @@
             // Manage Buzzer Alarm & Desktop Notification Triggers
             if (state.activeEscalationsCount > 0) {
                 startBuzzerLoop();
-                if (dom.escalatedFilterBadge) {
-                    dom.escalatedFilterBadge.textContent = `(${state.activeEscalationsCount})`;
-                }
 
                 // Check for newly escalated conversations to notify
                 for (const c of state.conversations) {
@@ -316,13 +326,10 @@
                 }
             } else {
                 stopBuzzerLoop();
-                if (dom.escalatedFilterBadge) {
-                    dom.escalatedFilterBadge.textContent = '';
-                }
             }
 
+            updateTabBadges();
             renderConversations();
-            updateUnreadBadge();
 
             // Refresh active chat UI in case status changed (e.g. escalated)
             if (state.activePhone) {
@@ -349,21 +356,42 @@
         let items = state.conversations;
 
         if (state.currentFilter === 'unread') {
-            items = items.filter(c => c.unread_count > 0);
+            // Flagged Human: Escalated, Human Takeover, or Has Unread Messages (and not closed)
+            items = items.filter(c => c.status !== 'closed' && (c.status === 'escalated' || c.bot_paused === 1 || Number(c.unread_count || 0) > 0));
+        } else if (state.currentFilter === 'bot') {
+            // Bot: Bot is actively chatting or trying to solve query (open and bot_paused = 0)
+            items = items.filter(c => c.status === 'open' && c.bot_paused === 0 && c.status !== 'escalated');
         } else if (state.currentFilter === 'closed') {
+            // All closed chats
             items = items.filter(c => c.status === 'closed');
-        } else if (state.currentFilter === 'escalated') {
-            items = items.filter(c => c.status === 'escalated');
         }
 
         if (items.length === 0) {
+            let emptyTitle = 'No conversations';
+            let emptySubtitle = 'Inbound messages or new chats will appear here.';
+            let emptyIcon = '<svg class="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>';
+
+            if (state.currentFilter === 'unread') {
+                emptyTitle = 'All caught up!';
+                emptySubtitle = 'No pending unread or human-flagged conversations.';
+                emptyIcon = '<span class="text-xl">✅</span>';
+            } else if (state.currentFilter === 'bot') {
+                emptyTitle = 'No active bot chats';
+                emptySubtitle = 'Chats handled autonomously by the AI bot will appear here.';
+                emptyIcon = '<span class="text-xl">🤖</span>';
+            } else if (state.currentFilter === 'closed') {
+                emptyTitle = 'No closed chats';
+                emptySubtitle = 'Resolved and completed conversations will be stored here.';
+                emptyIcon = '<span class="text-xl">📁</span>';
+            }
+
             dom.conversationsContainer.innerHTML = `
                 <div class="p-8 text-center text-slate-400 select-none">
-                    <div class="w-10 h-10 rounded-full bg-slate-100 mx-auto mb-2 flex items-center justify-center text-slate-300">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    <div class="w-10 h-10 rounded-full bg-slate-100 mx-auto mb-2 flex items-center justify-center">
+                        ${emptyIcon}
                     </div>
-                    <p class="text-xs font-semibold text-slate-500 mb-0.5">No conversations</p>
-                    <p class="text-[11px] text-slate-400">Inbound messages or new chats will appear here.</p>
+                    <p class="text-xs font-semibold text-slate-600 mb-0.5">${emptyTitle}</p>
+                    <p class="text-[11px] text-slate-400">${emptySubtitle}</p>
                 </div>`;
             return;
         }
@@ -421,11 +449,32 @@
         });
     }
 
-    function updateUnreadBadge() {
-        const total = state.conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
+    function updateTabBadges() {
+        const humanItems = state.conversations.filter(c => c.status !== 'closed' && (c.status === 'escalated' || c.bot_paused === 1 || Number(c.unread_count || 0) > 0));
+        const botItems = state.conversations.filter(c => c.status === 'open' && c.bot_paused === 0 && c.status !== 'escalated');
+        const closedItems = state.conversations.filter(c => c.status === 'closed');
+
+        const unreadCount = humanItems.length;
+        const hasEscalations = humanItems.some(c => c.status === 'escalated');
+
         if (dom.unreadFilterBadge) {
-            dom.unreadFilterBadge.textContent = total > 0 ? `(${total})` : '';
-            dom.unreadFilterBadge.className = total > 0 ? 'ml-0.5 text-[9px] font-mono text-emerald-700 font-bold' : 'ml-0.5 text-[9px] font-mono text-slate-400';
+            if (unreadCount > 0) {
+                dom.unreadFilterBadge.textContent = hasEscalations ? `🚨 ${unreadCount}` : String(unreadCount);
+                dom.unreadFilterBadge.className = hasEscalations
+                    ? 'text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-bold animate-pulse'
+                    : 'text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-600 text-white font-bold';
+                dom.unreadFilterBadge.classList.remove('hidden');
+            } else {
+                dom.unreadFilterBadge.classList.add('hidden');
+            }
+        }
+
+        if (dom.botFilterBadge) {
+            dom.botFilterBadge.textContent = botItems.length > 0 ? `(${botItems.length})` : '';
+        }
+
+        if (dom.closedFilterBadge) {
+            dom.closedFilterBadge.textContent = closedItems.length > 0 ? `(${closedItems.length})` : '';
         }
     }
 
@@ -453,7 +502,7 @@
         state.activeConversation = conv;
         if (conv && conv.unread_count > 0) {
             conv.unread_count = 0;
-            updateUnreadBadge();
+            updateTabBadges();
         }
 
         // Update Header
@@ -600,45 +649,39 @@
     async function handleResolveEscalation() {
         if (!state.activePhone) return;
         try {
+            const conv = state.conversations.find(c => c.phone === state.activePhone);
+            const convId = conv ? conv.id : (state.activeConversation ? state.activeConversation.id : 0);
             const res = await fetch(`${API_BASE}/escalations.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ action: 'resolve', phone: state.activePhone })
+                body: JSON.stringify({ action: 'resolve', phone: state.activePhone, conversation_id: convId })
             });
             const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Failed to resolve');
+            if (!data.ok) throw new Error(data.error || 'Failed to resolve escalation');
 
             stopBuzzerLoop();
-            dom.chatEscalationBanner.classList.add('hidden');
-            dom.chatActiveEscalatedBadge.classList.add('hidden');
-            const conv = state.conversations.find(c => c.phone === state.activePhone);
+            if (window.WhatsAlerts) {
+                window.WhatsAlerts.stopBuzzer();
+            }
+
+            if (dom.chatEscalationBanner) dom.chatEscalationBanner.classList.add('hidden');
+            if (dom.chatActiveEscalatedBadge) dom.chatActiveEscalatedBadge.classList.add('hidden');
+
             if (conv) {
                 conv.status = 'open';
                 conv.escalation_reason = null;
+                conv.bot_paused = 1;
             }
+            if (state.activeConversation) {
+                state.activeConversation.status = 'open';
+                state.activeConversation.escalation_reason = null;
+                state.activeConversation.bot_paused = 1;
+            }
+
+            updateBotToggleUi(1);
             fetchConversations(true);
         } catch (err) {
-            alert('Error: ' + err.message);
-        }
-    }
-
-    async function handleManualEscalate() {
-        if (!state.activePhone) return;
-        const reason = prompt('Enter reason for escalating this conversation:', 'Agent requested priority attention');
-        if (reason === null) return;
-
-        try {
-            const res = await fetch(`${API_BASE}/escalations.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ action: 'escalate_manually', phone: state.activePhone, reason: reason || 'manual_agent_escalation' })
-            });
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error || 'Failed to escalate');
-
-            fetchConversations(true);
-        } catch (err) {
-            alert('Error: ' + err.message);
+            alert('Error resolving escalation: ' + err.message);
         }
     }
 
@@ -739,39 +782,53 @@
         const isOutbound = msg.sender_type === 'agent' || msg.sender_type === 'bot';
         const isBot = msg.sender_type === 'bot';
         const statusSvg = isOutbound ? getStatusSvg(msg.status) : '';
+        const timeStr = msg.time || msg.formatted_time || '';
 
         let mediaHtml = '';
         if (msg.media_url) {
             if (msg.message_type === 'image') {
-                mediaHtml = `<div class="mb-1.5"><a href="${escapeHtml(msg.media_url)}" target="_blank"><img src="${escapeHtml(msg.media_url)}" alt="Photo" class="rounded-lg max-h-60 max-w-full object-cover"></a></div>`;
+                mediaHtml = `
+                    <div class="mb-1 rounded-lg overflow-hidden max-w-sm">
+                        <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer">
+                            <img src="${escapeHtml(msg.media_url)}" alt="Photo" class="rounded-lg max-h-64 max-w-full object-cover hover:opacity-95 transition-opacity">
+                        </a>
+                    </div>`;
             } else if (msg.message_type === 'video') {
-                mediaHtml = `<div class="mb-1.5"><video controls src="${escapeHtml(msg.media_url)}" class="rounded-lg max-h-60 max-w-full"></video></div>`;
+                mediaHtml = `
+                    <div class="mb-1 rounded-lg overflow-hidden max-w-sm">
+                        <video controls src="${escapeHtml(msg.media_url)}" class="rounded-lg max-h-64 max-w-full bg-black"></video>
+                    </div>`;
             } else if (msg.message_type === 'audio') {
-                mediaHtml = `<div class="mb-1.5"><audio controls src="${escapeHtml(msg.media_url)}" class="h-8 max-w-[260px]"></audio></div>`;
+                mediaHtml = `
+                    <div class="my-1">
+                        <audio controls src="${escapeHtml(msg.media_url)}" class="h-8 max-w-[240px]"></audio>
+                    </div>`;
             } else {
                 const fileName = msg.media_url.split('/').pop() || 'Attachment';
                 mediaHtml = `
-                    <div class="mb-1.5">
-                        <a href="${escapeHtml(msg.media_url)}" target="_blank" class="inline-flex items-center gap-2 p-2 bg-black/5 rounded-lg text-xs font-mono font-medium hover:bg-black/10 transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            <span class="truncate max-w-[180px]">${escapeHtml(fileName)}</span>
+                    <div class="mb-1">
+                        <a href="${escapeHtml(msg.media_url)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 p-2 bg-black/5 hover:bg-black/10 rounded-lg text-xs font-mono font-medium transition-colors">
+                            <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span class="truncate max-w-[200px] text-slate-800">${escapeHtml(fileName)}</span>
                         </a>
                     </div>`;
             }
         }
 
         const bodyHtml = escapeHtml(msg.body).replace(/\n/g, '<br>');
+        const bubbleBg = isOutbound ? 'bg-[#d9fdd3] text-[#111b21]' : 'bg-white text-[#111b21]';
+        const bubbleCorners = isOutbound ? 'rounded-2xl rounded-tr-xs' : 'rounded-2xl rounded-tl-xs';
 
         return `
-            <div id="msg-${msg.id}" class="flex ${isOutbound ? 'justify-end' : 'justify-start'}">
-                <div class="max-w-[78%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-2xs relative select-text ${isOutbound ? (isBot ? 'bg-[#DCF8C6]/80 text-slate-900 border border-[#b8e49c]' : 'bg-[#DCF8C6] text-slate-900 border border-[#b8e49c]') : 'bg-white text-slate-900 border border-slate-200/70'}">
-                    ${isBot ? '<div class="text-[9px] font-bold text-emerald-800 font-mono uppercase tracking-wider mb-0.5">🤖 AI Assistant</div>' : ''}
+            <div id="msg-${msg.id}" class="flex ${isOutbound ? 'justify-end' : 'justify-start'} my-0.5">
+                <div class="max-w-[85%] sm:max-w-[70%] md:max-w-[62%] ${bubbleCorners} px-3 py-1.5 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] relative select-text ${bubbleBg}">
+                    ${isBot ? '<div class="text-[10px] font-bold text-emerald-800 uppercase tracking-wide mb-1 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>AI Assistant</div>' : ''}
                     ${mediaHtml}
-                    ${bodyHtml ? `<p class="text-xs font-sans leading-relaxed break-words">${bodyHtml}</p>` : ''}
-                    <div class="flex items-center justify-end gap-1 mt-1 select-none">
-                        <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(msg.formatted_time || '')}</span>
+                    ${bodyHtml ? `<span class="text-[13px] leading-[19px] break-words whitespace-pre-wrap">${bodyHtml}</span>` : ''}
+                    <span class="float-right ml-2.5 mt-1 -mb-0.5 inline-flex items-center gap-1 text-[11px] text-slate-400 font-mono select-none">
+                        <span>${escapeHtml(timeStr)}</span>
                         ${statusSvg}
-                    </div>
+                    </span>
                 </div>
             </div>`;
     }
@@ -797,14 +854,13 @@
         // Optimistic UI representation
         const optimisticId = 'opt-' + Date.now();
         const tempBubbleHtml = `
-            <div id="${optimisticId}" class="flex justify-end opacity-70">
-                <div class="max-w-[78%] md:max-w-[65%] rounded-2xl px-3.5 py-2 shadow-2xs relative select-text bg-[#DCF8C6] text-slate-900 border border-[#b8e49c]">
+            <div id="${optimisticId}" class="flex justify-end my-0.5 opacity-80">
+                <div class="max-w-[85%] sm:max-w-[70%] md:max-w-[62%] rounded-2xl rounded-tr-xs px-3 py-1.5 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] relative select-text bg-[#d9fdd3] text-[#111b21]">
                     ${file ? `<div class="mb-1 text-[11px] font-mono text-slate-600">📎 Uploading ${escapeHtml(file.name)}...</div>` : ''}
-                    <p class="text-xs font-sans leading-relaxed break-words">${escapeHtml(text).replace(/\n/g, '<br>')}</p>
-                    <div class="flex items-center justify-end gap-1 mt-1">
-                        <span class="text-[10px] text-slate-400 font-mono">sending...</span>
+                    ${text ? `<span class="text-[13px] leading-[19px] break-words whitespace-pre-wrap">${escapeHtml(text).replace(/\n/g, '<br>')}</span>` : ''}
+                    <span class="float-right ml-2.5 mt-1 -mb-0.5 inline-flex items-center gap-1 text-[11px] text-slate-400 font-mono select-none">
                         <svg class="w-3 h-3 animate-spin text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    </div>
+                    </span>
                 </div>
             </div>`;
         dom.messagesContainer.insertAdjacentHTML('beforeend', tempBubbleHtml);
@@ -913,6 +969,11 @@
     // Buzzer control button (toggle mute & test tone / permissions)
     if (dom.btnBuzzerControl) {
         dom.btnBuzzerControl.addEventListener('click', () => {
+            if (window.WhatsAlerts) {
+                state.buzzerMuted = window.WhatsAlerts.toggleMute();
+                updateBuzzerButtonUi();
+                return;
+            }
             initAudioContext();
             requestDesktopNotifications();
 
@@ -932,16 +993,10 @@
     dom.btnToggleBot.addEventListener('click', handleToggleBot);
 
     // Escalation actions
-    if (dom.btnAcknowledgeEscalation) {
-        dom.btnAcknowledgeEscalation.addEventListener('click', handleAcknowledgeEscalation);
-    }
-    if (dom.btnResolveEscalation) {
+        if (dom.btnResolveEscalation) {
         dom.btnResolveEscalation.addEventListener('click', handleResolveEscalation);
     }
-    if (dom.btnManualEscalate) {
-        dom.btnManualEscalate.addEventListener('click', handleManualEscalate);
-    }
-
+    
     // Close / Reopen Chat
     if (dom.btnCloseChat) {
         dom.btnCloseChat.addEventListener('click', () => handleCloseOrReopenChat());
@@ -966,14 +1021,14 @@
         fetchConversations(false);
     });
 
-    // Filter buttons (All / Escalated / Unread / Closed)
+    // Filter buttons (Unread / Bot / Closed)
     dom.filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             dom.filterBtns.forEach(b => {
-                b.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all font-semibold shrink-0';
+                b.className = 'chat-filter-btn px-2.5 py-1 rounded-md hover:bg-slate-200/70 text-slate-600 transition-all font-semibold shrink-0 flex items-center gap-1';
             });
-            btn.className = 'chat-filter-btn px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0';
-            state.currentFilter = btn.getAttribute('data-filter') || 'all';
+            btn.className = 'chat-filter-btn px-2.5 py-1 rounded-md bg-slate-900 text-white font-bold transition-all shadow-2xs shrink-0 flex items-center gap-1';
+            state.currentFilter = btn.getAttribute('data-filter') || 'unread';
             renderConversations();
         });
     });
@@ -984,7 +1039,7 @@
     dom.btnNewChat.addEventListener('click', () => {
         dom.newChatModal.classList.remove('hidden');
         if (!dom.newChatPhone.value || dom.newChatPhone.value.trim() === '') {
-            dom.newChatPhone.value = '91';
+            dom.newChatPhone.value = DEFAULT_DIAL;
         }
         dom.newChatPhone.focus();
         const len = dom.newChatPhone.value.length;
@@ -993,7 +1048,7 @@
 
     function closeNewChatModal() {
         dom.newChatModal.classList.add('hidden');
-        dom.newChatPhone.value = '91';
+        dom.newChatPhone.value = DEFAULT_DIAL;
         dom.newChatName.value = '';
     }
 

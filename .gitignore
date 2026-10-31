@@ -25,13 +25,3 @@ __pycache__/
 /scratch/
 /test.php
 /public/test.php
-# Local test scripts & diagnostic utilities
-fix_*.php
-check.php
-whatsapp_api.sql
-*.exe
-public/api_test*.php
-public/api_test*.html
-# Obsolete feature remnants
-src/lib/BirthdayTasks.php
-public/assets/*birthday-task*.csv

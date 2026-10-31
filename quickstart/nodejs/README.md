@@ -1,4 +1,4 @@
-# ⚡ Node.js Quickstart — WhatsGateway
+# ⚡ Node.js Quickstart — WhatsApp API Hub
 
 A production-ready Node.js client built with **zero external npm dependencies** (uses Node 18+ native `fetch`).
 

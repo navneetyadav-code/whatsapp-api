@@ -12,6 +12,7 @@ $healthEndpoint = public_url('api/health.php');
 $contactsEndpoint = public_url('api/contacts.php');
 $contactsBatchEndpoint = public_url('api/contacts-batch.php');
 $contactsDeleteEndpoint = public_url('api/contacts-delete.php');
+$memoryEndpoint = public_url('api/memory.php');
 ?>
 <!DOCTYPE html>
 <html lang="en" class="h-full scroll-smooth">
@@ -1038,6 +1039,57 @@ def verify_webhook(raw_body_bytes, signature_header, secret_key):
                         <li><strong>Read-Only Scope:</strong> Uses only <code class="bg-white px-1 py-0.5 rounded font-mono text-sky-900">contacts.readonly</code> to import opted-in phone numbers.</li>
                         <li><strong>Zero Third-Party Sharing:</strong> Synced contact records are stored locally and never sold to advertisers or data brokers.</li>
                     </ul>
+                </div>
+            </section>
+
+            <!-- SECTION 14.5: AI MEMORY & SMART TRAINING API -->
+            <section id="ai-memory-api" class="doc-section mb-14">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">14.5. AI Memory & Smart Training API</h2>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200">REST JSON</span>
+                </div>
+                <p class="text-sm text-slate-600 leading-relaxed mb-4">
+                    Manage the AI agent's long-term fact memory, customer attributes, and few-shot in-context training examples programmatically via <code class="font-mono text-xs bg-slate-100 text-slate-800 px-1.5 py-0.5 rounded"><?= e($memoryEndpoint) ?></code>:
+                </p>
+
+                <!-- Actions Table -->
+                <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs mb-5">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                            <tr>
+                                <th class="py-2.5 px-4">Action</th>
+                                <th class="py-2.5 px-4">Method</th>
+                                <th class="py-2.5 px-4">Payload / Parameters</th>
+                                <th class="py-2.5 px-4">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-slate-700">
+                            <tr>
+                                <td class="py-2.5 px-4 font-mono font-bold text-fuchsia-700">list</td>
+                                <td class="py-2.5 px-4"><span class="px-1.5 py-0.5 rounded font-mono font-bold bg-slate-100">GET</span></td>
+                                <td class="py-2.5 px-4 font-mono text-[11px] text-slate-500">?action=list</td>
+                                <td class="py-2.5 px-4">Returns all active memories and few-shot training pairs.</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2.5 px-4 font-mono font-bold text-emerald-700">save_memory</td>
+                                <td class="py-2.5 px-4"><span class="px-1.5 py-0.5 rounded font-mono font-bold bg-emerald-50 text-emerald-700">POST</span></td>
+                                <td class="py-2.5 px-4 font-mono text-[11px] text-slate-500">{"key", "value", "contact_phone", "is_durable", "ttl_days"}</td>
+                                <td class="py-2.5 px-4">Upserts a permanent or auto-expiring fact.</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2.5 px-4 font-mono font-bold text-rose-700">delete_memory</td>
+                                <td class="py-2.5 px-4"><span class="px-1.5 py-0.5 rounded font-mono font-bold bg-rose-50 text-rose-700">POST</span></td>
+                                <td class="py-2.5 px-4 font-mono text-[11px] text-slate-500">{"id"} OR {"key", "contact_phone"}</td>
+                                <td class="py-2.5 px-4">Removes a fact permanently from memory notebook.</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2.5 px-4 font-mono font-bold text-indigo-700">save_training</td>
+                                <td class="py-2.5 px-4"><span class="px-1.5 py-0.5 rounded font-mono font-bold bg-indigo-50 text-indigo-700">POST</span></td>
+                                <td class="py-2.5 px-4 font-mono text-[11px] text-slate-500">{"user_query", "ideal_response", "negative_constraint"}</td>
+                                <td class="py-2.5 px-4">Saves golden in-context training examples.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </section>
 

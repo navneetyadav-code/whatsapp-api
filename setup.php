@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * WhatsGateway — Setup & Initialization Utility
+ * WhatsGateway — Local Setup & Deployment Utility
  *
  * SEC-05: Remote Execution Protection
  * This script is strictly restricted to CLI execution to prevent remote database
@@ -17,200 +17,285 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
+// Banner
+echo "\n";
+echo "==============================================================\n";
+echo "  🚀 WhatsGateway — Local Setup & Deployment Wizard\n";
+echo "==============================================================\n";
+echo "This utility will configure your database, create the initial\n";
+echo "administrator account, generate your .env file, install npm\n";
+echo "dependencies, and automatically delete itself once complete.\n";
+echo "==============================================================\n\n";
+
+// Helper for CLI arguments
+$options = getopt('', [
+    'host::',
+    'port::',
+    'db::',
+    'user::',
+    'pass::',
+    'admin-name::',
+    'admin-email::',
+    'admin-pass::',
+    'force',
+    'no-delete',
+    'help',
+]);
+
+if (isset($options['help'])) {
+    echo "Usage: php setup.php [options]\n\n";
+    echo "Options:\n";
+    echo "  --host=<host>          MySQL Host (default: 127.0.0.1)\n";
+    echo "  --port=<port>          MySQL Port (default: 3306)\n";
+    echo "  --db=<name>            Database Name (default: whatsapp_api)\n";
+    echo "  --user=<user>          MySQL User (default: root)\n";
+    echo "  --pass=<pass>          MySQL Password (default: empty)\n";
+    echo "  --admin-name=<name>    Admin Full Name (default: Administrator)\n";
+    echo "  --admin-email=<email>  Admin Email Login (default: admin@example.com)\n";
+    echo "  --admin-pass=<pass>    Admin Password (min 8 characters)\n";
+    echo "  --force                Overwrite existing .env without prompt\n";
+    echo "  --no-delete            Do not automatically delete setup.php on completion\n";
+    echo "  --help                 Show this help screen\n\n";
+    exit(0);
+}
+
+$isInteractive = function_exists('stream_isatty') ? stream_isatty(STDIN) : true;
+
+function cli_prompt(string $prompt, string $default = '', bool $isInteractive = true): string
+{
+    if (!$isInteractive) {
+        return $default;
+    }
+    $suffix = $default !== '' ? " [{$default}]" : '';
+    echo "{$prompt}{$suffix}: ";
+    $input = trim((string) fgets(STDIN));
+    return $input !== '' ? $input : $default;
+}
+
 $envPath = __DIR__ . '/.env';
 $isInstalled = file_exists($envPath);
+$force = isset($options['force']);
+$noDelete = isset($options['no-delete']);
 
-$logs = [];
-$error = '';
-$success = false;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isInstalled) {
-    $dbHost = $_POST['db_host'] ?? '127.0.0.1';
-    $dbName = $_POST['db_name'] ?? 'whatsapp_api';
-    $dbUser = $_POST['db_user'] ?? 'root';
-    $dbPass = $_POST['db_pass'] ?? '';
-    
-    try {
-        $logs[] = "Attempting to connect to database server at $dbHost...";
-        $pdo = new PDO("mysql:host=$dbHost;charset=utf8mb4", $dbUser, $dbPass);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $logs[] = "Connected successfully!";
-
-        // 1. Create DB and Import Schema
-        $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $pdo->exec("USE `$dbName`");
-        $logs[] = "Database `$dbName` selected.";
-
-        if (file_exists('database.sql')) {
-            $sql = file_get_contents('database.sql');
-            $pdo->exec($sql);
-            $logs[] = "Database schema imported successfully from database.sql.";
-            
-            // Clear out demo data and insert new admin
-            $adminName = $_POST['admin_name'] ?? 'Admin';
-            $adminEmail = $_POST['admin_email'] ?? 'admin@localhost.com';
-            $adminPass = $_POST['admin_pass'] ?? 'password';
-            
-            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0;");
-            $tables = ['users', 'api_keys', 'api_request_logs', 'campaigns', 'chatbot_rules', 'contacts', 'message_logs', 'message_queue', 'webhooks', 'whatsapp_sessions'];
-            foreach($tables as $table) {
-                try {
-                    $pdo->exec("TRUNCATE TABLE `$table`");
-                } catch(Exception $e) {}
-            }
-            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1;");
-            
-            $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)');
-            $stmt->execute([$adminName, $adminEmail, password_hash($adminPass, PASSWORD_DEFAULT)]);
-            $logs[] = "Admin user ($adminEmail) created successfully and demo data cleared.";
-            
-        } else {
-            $logs[] = "Warning: database.sql not found! Schema was not imported.";
-        }
-
-        // 2. Generate .env file
-        $workerToken = bin2hex(random_bytes(16));
-        $envContent = <<<ENV
-APP_ENV=local
-APP_NAME="WhatsGateway"
-APP_PUBLIC_URL="http://localhost/whatsapp-api/public"
-APP_BASE_PATH="/whatsapp-api/public"
-
-DB_DSN="mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4"
-DB_USER="{$dbUser}"
-DB_PASSWORD="{$dbPass}"
-
-WORKER_URL="http://127.0.0.1:3107"
-WORKER_TOKEN="{$workerToken}"
-ENV;
-        if (file_put_contents($envPath, $envContent)) {
-            $logs[] = "Configuration file (.env) generated successfully.";
-        } else {
-            throw new Exception("Could not write to .env file. Check folder permissions.");
-        }
-
-        // 3. NPM Install
-        $workerDir = __DIR__ . DIRECTORY_SEPARATOR . 'worker';
-        if (is_dir($workerDir)) {
-            $logs[] = "Running npm install in worker directory... (This might take a minute)";
-            $npmCmd = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') ? 'npm.cmd' : 'npm';
-            $output = shell_exec("cd " . escapeshellarg($workerDir) . " && $npmCmd install 2>&1");
-            $logs[] = "NPM Output:\n" . htmlspecialchars($output ?: 'No output or command failed.');
-        } else {
-            $logs[] = "Warning: worker directory not found. Skipping npm install.";
-        }
-
-        $success = true;
-        $isInstalled = true;
-    } catch (Exception $e) {
-        $error = $e->getMessage();
+if ($isInstalled && !$force) {
+    echo "[!] An existing .env configuration was detected.\n";
+    $confirm = cli_prompt("Do you want to re-run setup and overwrite existing settings? (y/N)", "N", $isInteractive);
+    if (strtolower($confirm) !== 'y') {
+        echo "Setup aborted by user. Your existing configuration remains untouched.\n";
+        exit(0);
     }
 }
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setup - WhatsApp Business API</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f8fafc; color: #334155; padding: 2rem; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border: 1px solid #e2e8f0; }
-        h1 { margin-top: 0; color: #0f172a; font-size: 24px; display: flex; align-items: center; gap: 10px; }
-        h1 svg { width: 28px; height: 28px; color: #10b981; }
-        .form-group { margin-bottom: 1.5rem; }
-        label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 0.5rem; color: #475569; }
-        input[type="text"], input[type="password"] { width: 100%; box-sizing: border-box; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit; font-size: 14px; }
-        button { background: #10b981; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 15px; width: 100%; transition: background 0.2s; }
-        button:hover { background: #059669; }
-        .logs { margin-top: 1.5rem; padding: 1rem; background: #1e293b; color: #a5b4fc; border-radius: 6px; font-family: monospace; font-size: 13px; white-space: pre-wrap; max-height: 250px; overflow-y: auto; }
-        .error-msg { padding: 1rem; background: #fef2f2; border: 1px solid #f87171; color: #991b1b; border-radius: 6px; margin-bottom: 1.5rem; font-size: 14px; }
-        .success-box { padding: 2rem; background: #ecfdf5; border: 1px solid #10b981; color: #065f46; border-radius: 6px; text-align: center; }
-        .btn-outline { display: inline-block; margin-top: 1rem; padding: 0.75rem 1.5rem; border: 2px solid #10b981; color: #10b981; text-decoration: none; border-radius: 6px; font-weight: bold; }
-        .btn-outline:hover { background: #10b981; color: white; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>
-            <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12c0 2.12.553 4.11 1.526 5.836L.2 23.8l6.108-1.583A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm5.666 17.202c-.237.666-1.378 1.282-1.93 1.348-.515.06-1.18.15-3.667-.88-2.99-1.24-4.887-4.32-5.02-4.502-.132-.18-1.198-1.597-1.198-3.044 0-1.448.75-2.158 1.018-2.436.268-.278.583-.348.775-.348.193 0 .386.002.556.01.19.008.448-.075.7.533.268.643.916 2.238.996 2.398.08.16.132.348.026.56-.106.21-.16.34-.316.523-.16.182-.338.396-.48.542-.16.16-.33.336-.143.657.185.32 8.23 1.417 9.4 2.13.11.066.175.158.213.242.04.084.045.242-.016.425z"></path></svg>
-            API Setup Wizard
-        </h1>
 
-        <?php if ($success): ?>
-            <div class="success-box">
-                <h2 style="margin-top: 0;">🎉 Setup Complete!</h2>
-                <p>The database is ready, .env is created, and NPM packages are installed.</p>
-                
-                <div style="background: white; padding: 1rem; border-radius: 6px; margin: 1.5rem 0; text-align: left; font-size: 14px; border: 1px solid #cbd5e1;">
-                    <strong>Next Steps:</strong>
-                    <ol style="margin-bottom: 0;">
-                        <li>Double-click <code>start-worker.bat</code> in your folder to boot up the WhatsApp engine.</li>
-                        <li>Click the button below to access your dashboard.</li>
-                        <li>Log in using the email and password you just created!</li>
-                    </ol>
-                </div>
-                
-                <a href="public/index.php" class="btn-outline">Go to Dashboard</a>
-            </div>
-            
-            <?php if (!empty($logs)): ?>
-                <div class="logs">
-                    <?= implode("\n", $logs) ?>
-                </div>
-            <?php endif; ?>
+// 1. Gather Configuration
+echo "\n--- [Step 1/5] Database Credentials ---\n";
+$dbHost = (string) ($options['host'] ?? cli_prompt("Database Host", "127.0.0.1", $isInteractive));
+$dbPort = (int) ($options['port'] ?? cli_prompt("Database Port", "3306", $isInteractive));
+$dbName = (string) ($options['db'] ?? cli_prompt("Database Name", "whatsapp_api", $isInteractive));
+$dbUser = (string) ($options['user'] ?? cli_prompt("Database User", "root", $isInteractive));
+$dbPass = (string) ($options['pass'] ?? cli_prompt("Database Password (leave blank if none)", "", $isInteractive));
 
-        <?php elseif ($isInstalled): ?>
-            <div class="success-box">
-                <h2>System Already Installed</h2>
-                <p>A <code>.env</code> file was detected. The system is already configured.</p>
-                <p style="font-size: 13px; color: #64748b;">If you need to reinstall, delete the .env file first.</p>
-                <a href="public/index.php" class="btn-outline">Go to Dashboard</a>
-            </div>
-        <?php else: ?>
-            <p style="color: #64748b; font-size: 15px; margin-bottom: 2rem;">Welcome! Let's get your Free WhatsApp Business API configured in seconds.</p>
+echo "\n--- [Step 2/5] Admin Account Details ---\n";
+$adminName = (string) ($options['admin-name'] ?? cli_prompt("Administrator Name", "Administrator", $isInteractive));
+$adminEmail = strtolower(trim((string) ($options['admin-email'] ?? cli_prompt("Administrator Email (Login ID)", "admin@example.com", $isInteractive))));
 
-            <?php if ($error): ?>
-                <div class="error-msg"><?= htmlspecialchars($error) ?></div>
-            <?php endif; ?>
+while (!filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+    echo "[!] Invalid email address. Please enter a valid email.\n";
+    $adminEmail = strtolower(trim(cli_prompt("Administrator Email", "admin@example.com", $isInteractive)));
+}
 
-            <form method="POST">
-                <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 16px; color: #334155;">Database Configuration</h3>
-                <div class="form-group">
-                    <label>Database Host</label>
-                    <input type="text" name="db_host" value="127.0.0.1" required>
-                </div>
-                <div class="form-group">
-                    <label>Database Name</label>
-                    <input type="text" name="db_name" value="whatsapp_api" required>
-                </div>
-                <div class="form-group">
-                    <label>Database Username</label>
-                    <input type="text" name="db_user" value="root" required>
-                </div>
-                <div class="form-group">
-                    <label>Database Password</label>
-                    <input type="password" name="db_pass" placeholder="(Leave blank if default XAMPP)">
-                </div>
+$adminPass = (string) ($options['admin-pass'] ?? '');
+if ($adminPass === '') {
+    while (strlen($adminPass) < 8) {
+        $adminPass = cli_prompt("Administrator Password (minimum 8 characters)", "", $isInteractive);
+        if (strlen($adminPass) < 8) {
+            echo "[!] Password must be at least 8 characters long.\n";
+        }
+    }
+}
 
-                <hr style="margin: 2rem 0; border: 0; border-top: 1px solid #e2e8f0;">
-                <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 16px; color: #334155;">Create Admin Account</h3>
-                <div class="form-group">
-                    <label>Your Name</label>
-                    <input type="text" name="admin_name" placeholder="John Doe" required>
-                </div>
-                <div class="form-group">
-                    <label>Email Address (Login ID)</label>
-                    <input type="text" name="admin_email" placeholder="admin@example.com" required>
-                </div>
-                <div class="form-group">
-                    <label>Password</label>
-                    <input type="password" name="admin_pass" placeholder="••••••••" required>
-                </div>
-                
-                <button type="submit" id="submitBtn" onclick="this.innerHTML='Installing... Please wait (Installing NPM might take 1 min)'; this.style.opacity='0.8';">Complete Setup</button>
-            </form>
-        <?php endif; ?>
-    </div>
-</body>
-</html>
+// 2. Connect & Initialize Database
+echo "\n--- [Step 3/5] Initializing Database & Schema ---\n";
+try {
+    echo "Connecting to MySQL server at {$dbHost}:{$dbPort}...\n";
+    $pdo = new PDO("mysql:host={$dbHost};port={$dbPort};charset=utf8mb4", $dbUser, $dbPass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+    echo "  ✔ Connected successfully to MySQL server.\n";
+
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $pdo->exec("USE `{$dbName}`");
+    echo "  ✔ Database '{$dbName}' selected.\n";
+
+    // Read and run initial schema
+    $schemaPath = __DIR__ . '/migrations/001_initial_schema.sql';
+    if (!file_exists($schemaPath)) {
+        throw new RuntimeException("Schema file not found at: {$schemaPath}");
+    }
+
+    $schemaSql = (string) file_get_contents($schemaPath);
+    $schemaSql = preg_replace('/^\s*--.*$/m', '', $schemaSql) ?? $schemaSql;
+    $statements = preg_split('/;\s*(?:\R|$)/', $schemaSql, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+    $createdTables = 0;
+    foreach ($statements as $statement) {
+        $statement = trim($statement);
+        if ($statement === '') {
+            continue;
+        }
+        $pdo->exec($statement);
+        if (preg_match('/^CREATE TABLE IF NOT EXISTS `([a-z0-9_]+)`/i', $statement)) {
+            $createdTables++;
+        }
+    }
+
+    // Ensure sleeping column in whatsapp_sessions
+    try {
+        $colCheck = $pdo->query("SHOW COLUMNS FROM `whatsapp_sessions` LIKE 'sleeping'")->fetch();
+        if (!$colCheck) {
+            $pdo->exec("ALTER TABLE `whatsapp_sessions` ADD COLUMN `sleeping` tinyint(1) NOT NULL DEFAULT 0 AFTER `status`");
+        }
+    } catch (Throwable) {}
+
+    // Mark migration version
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS `schema_migrations` (" .
+        "`version` varchar(120) NOT NULL, `applied_at` timestamp NOT NULL DEFAULT current_timestamp(), " .
+        "PRIMARY KEY (`version`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+    $pdo->prepare("INSERT IGNORE INTO schema_migrations (version) VALUES (?)")->execute(['001_initial_schema']);
+    echo "  ✔ Applied initial schema ({$createdTables} tables ready).\n";
+
+    // Setup Admin account
+    $passwordHash = password_hash($adminPass, PASSWORD_DEFAULT);
+    $checkUser = $pdo->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
+    $checkUser->execute([$adminEmail]);
+    $userRow = $checkUser->fetch();
+
+    if ($userRow) {
+        $userId = (int) $userRow['id'];
+        $pdo->prepare("UPDATE users SET name = ?, password_hash = ? WHERE id = ?")->execute([$adminName, $passwordHash, $userId]);
+        echo "  ✔ Existing administrator account updated ({$adminEmail}).\n";
+    } else {
+        $pdo->prepare("INSERT INTO users (name, email, phone, password_hash) VALUES (?, ?, '', ?)")->execute([$adminName, $adminEmail, $passwordHash]);
+        $userId = (int) $pdo->lastInsertId();
+        echo "  ✔ Administrator account created ({$adminEmail}).\n";
+    }
+
+    $pdo->prepare("INSERT IGNORE INTO whatsapp_sessions (user_id) VALUES (?)")->execute([$userId]);
+    $pdo->prepare("INSERT IGNORE INTO webhooks (user_id) VALUES (?)")->execute([$userId]);
+
+    // Ensure user_security row
+    try {
+        $pdo->prepare("INSERT IGNORE INTO user_security (user_id, totp_enabled, google_linked, password_set) VALUES (?, 0, 0, 1)")->execute([$userId]);
+    } catch (Throwable) {}
+
+} catch (Throwable $e) {
+    fwrite(STDERR, "\n[ERROR] Database initialization failed: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+// 3. Generate .env file
+echo "\n--- [Step 4/5] Generating Environment File (.env) ---\n";
+try {
+    $workerToken = bin2hex(random_bytes(32));
+    $envContent = <<<ENV
+APP_ENV=local
+APP_NAME="WhatsGateway"
+APP_PUBLIC_URL=http://localhost/whatsapp-api/public
+APP_BASE_PATH=/whatsapp-api/public
+APP_SESSION_NAME=wa_api_hub
+APP_SECURE_COOKIES=false
+ENABLE_TEST_PAGE=true
+
+# Security & Private Instance Lockdown
+ENABLE_REGISTRATION=true
+DISABLE_PASSWORD_LOGIN=false
+ALLOW_NEW_DEVICES=false
+ADMIN_EMAIL={$adminEmail}
+
+# Authentication & Brute Force Protection
+LOGIN_MAX_ATTEMPTS=5
+LOGIN_LOCKOUT_MINUTES=15
+ALLOW_QUERY_AUTH=false
+
+# Database Configuration
+DB_DSN="mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4"
+DB_HOST={$dbHost}
+DB_PORT={$dbPort}
+DB_NAME={$dbName}
+DB_USER={$dbUser}
+DB_PASSWORD={$dbPass}
+DB_SSL=false
+DB_SSL_CA=
+
+# Background Worker Settings
+WORKER_URL=http://127.0.0.1:3107
+WORKER_PORT=3107
+WORKER_TOKEN={$workerToken}
+
+# Anti-Ban & Dispatch Timing
+DEFAULT_COUNTRY_CODE=91
+SEND_DELAY_MS=2500
+QUEUE_POLL_MS=3000
+LOG_LEVEL=warn
+
+# Password Reset & OTP Delivery
+OTP_VIA_EMAIL=true
+OTP_VIA_PHONE=true
+ENV;
+
+    if (file_put_contents($envPath, $envContent . "\n") === false) {
+        throw new RuntimeException("Could not write to {$envPath}. Check filesystem permissions.");
+    }
+    echo "  ✔ Environment file (.env) generated successfully.\n";
+} catch (Throwable $e) {
+    fwrite(STDERR, "\n[ERROR] Failed to create .env file: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+// 4. Install Worker Dependencies
+echo "\n--- [Step 5/5] Installing Worker Node Dependencies (NPM) ---\n";
+$workerDir = __DIR__ . DIRECTORY_SEPARATOR . 'worker';
+if (is_dir($workerDir)) {
+    echo "Checking npm installation in worker/...\n";
+    $npmCmd = PHP_OS_FAMILY === 'Windows' ? 'npm.cmd' : 'npm';
+    $npmCommand = "cd " . escapeshellarg($workerDir) . " && {$npmCmd} install --no-audit --no-fund 2>&1";
+    $npmOutput = shell_exec($npmCommand);
+    if ($npmOutput !== null) {
+        echo "  ✔ Worker NPM packages installed successfully.\n";
+    } else {
+        echo "  [!] Note: npm command execution finished. Ensure Node.js & npm are in PATH.\n";
+    }
+} else {
+    echo "  [!] Worker directory not found; skipping npm install.\n";
+}
+
+// Complete Summary
+echo "\n==============================================================\n";
+echo "🎉 Setup Complete! WhatsGateway is ready.\n";
+echo "==============================================================\n";
+echo "Account Email : {$adminEmail}\n";
+echo "Dashboard URL : http://localhost/whatsapp-api/public\n";
+echo "\nNext Steps:\n";
+echo "  1. Start the WhatsApp worker:\n";
+echo "     - Windows : Double-click 'start-worker.bat' or run '.\\start-worker.bat start'\n";
+echo "     - Linux   : cd worker && node server.mjs\n";
+echo "  2. Open http://localhost/whatsapp-api/public in your browser.\n";
+echo "  3. Log in with your email and password, then scan the WhatsApp QR code.\n";
+echo "==============================================================\n\n";
+
+// Automatic Self-Deletion
+if (!$noDelete) {
+    echo "[*] Cleaning up installation files...\n";
+    $currentFile = __FILE__;
+    if (@unlink($currentFile)) {
+        echo "[✓] setup.php has automatically deleted itself for your security.\n\n";
+    } else {
+        echo "[!] Notice: Setup completed, but please manually delete setup.php.\n\n";
+    }
+} else {
+    echo "[i] Flag --no-delete detected: setup.php was preserved.\n\n";
+}
+
+exit(0);

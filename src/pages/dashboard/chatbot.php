@@ -1,939 +1,527 @@
-    <!-- Page Header & Tab Navigation -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">AI Agent, RAG & Automation Studio</h1>
-            <p class="text-[13px] text-slate-500 mt-0.5 font-medium">Configure intelligent multi-provider LLMs, company knowledge retrieval, keyword rules, and human escalation alarms.</p>
-        </div>
-        <div class="flex items-center gap-2">
-            <a href="<?= e(base_url('index.php?page=live-chat')) ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition-all active:scale-[0.98]">
-                <span>💬 Open Live Chat</span>
-            </a>
-        </div>
-    </div>
+<?php
+/**
+ * AI Assistant Studio — Compact Dashboard View
+ * Redesigned per ui-ux-pro-max guidelines:
+ * - Minimal, high-aesthetic split-pane layout (knobs on left, prompt on right)
+ * - Zero explanatory clutter, concise labels
+ * - Strict SVG icons (zero emojis as icons)
+ * - High density & low scroll overhead
+ */
 
-    <!-- Navigation Tabs -->
-    <div class="flex items-center gap-1.5 border-b border-slate-200/90 pb-3 mb-6 overflow-x-auto">
-        <a href="<?= e(base_url('index.php?page=chatbot&tab=rules')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'rules' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
-            ⚡ Keyword Triggers (<?= count($chatbotRules) ?>)
-        </a>
-        <a href="<?= e(base_url('index.php?page=chatbot&tab=ai-agent')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'ai-agent' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
-            🤖 AI Persona & Providers
-        </a>
-        <a href="<?= e(base_url('index.php?page=chatbot&tab=knowledge')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'knowledge' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
-            📚 Company Knowledge (RAG) (<?= count($knowledgeChunks) ?>)
-        </a>
-        <a href="<?= e(base_url('index.php?page=chatbot&tab=escalations')) ?>" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all <?= $activeTab === 'escalations' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900' ?>">
-            🚨 Escalations & Buzzer Logs
-        </a>
-    </div>
+$activePriority = $aiSettings['provider_priority'] ?? 'gemini';
+$pOrder = match ($activePriority) {
+    'groq' => ['groq', 'gemini', 'openrouter'],
+    'openrouter' => ['openrouter', 'gemini', 'groq'],
+    default => ['gemini', 'groq', 'openrouter'],
+};
+$pNames = [
+    'gemini' => 'Google Gemini',
+    'groq' => 'Groq LPU',
+    'openrouter' => 'OpenRouter',
+];
+$activeMode = $aiSettings['agent_mode'] ?? 'support';
+?>
 
-    <?php if ($activeTab === 'rules'): ?>
-    <!-- ========================================== -->
-    <!-- TAB 1: KEYWORD AUTOMATION RULES            -->
-    <!-- ========================================== -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <!-- Active Rules Column -->
-        <div class="lg:col-span-2 space-y-4">
-            <?php foreach ($chatbotRules as $rule): ?>
-                <div class="bg-white rounded-xl border <?= $rule['status'] === 'active' ? 'border-slate-200/80 shadow-card' : 'border-slate-200/50 opacity-60' ?> p-5 transition-all">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="flex items-center gap-2">
-                            <?php if ($rule['match_type'] === 'catch_all'): ?>
-                                <span class="bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded border border-purple-200 uppercase tracking-wider">Catch All</span>
-                                <h3 class="font-bold text-slate-900 text-[14px]">Default Fallback Reply</h3>
-                            <?php else: ?>
-                                <span class="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded border border-blue-200 uppercase tracking-wider"><?= e(str_replace('_', ' ', $rule['match_type'])) ?></span>
-                                <h3 class="font-bold text-slate-900 text-[14px]">"<?= e($rule['keyword']) ?>"</h3>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <div class="flex items-center gap-1.5">
-                            <form method="post" action="<?= e(base_url('index.php?page=chatbot-status')) ?>">
-                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                                <input type="hidden" name="id" value="<?= (int) $rule['id'] ?>">
-                                <input type="hidden" name="status" value="<?= $rule['status'] === 'active' ? 'disabled' : 'active' ?>">
-                                <button type="submit" class="text-[11px] font-semibold px-2.5 py-1 rounded-md border <?= $rule['status'] === 'active' ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' ?> transition-colors shadow-subtle btn-tactile active:scale-[0.98]">
-                                    <?= $rule['status'] === 'active' ? 'Pause' : 'Resume' ?>
-                                </button>
-                            </form>
-                            <form method="post" action="<?= e(base_url('index.php?page=chatbot-delete')) ?>" onsubmit="return confirm('Delete this chatbot rule?');">
-                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                                <input type="hidden" name="id" value="<?= (int) $rule['id'] ?>">
-                                <button type="submit" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded transition-colors" title="Delete rule">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-slate-50/80 border border-slate-200/70 rounded-lg p-3">
-                        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Bot Response</div>
-                        <p class="text-[12px] text-slate-800 whitespace-pre-wrap font-sans leading-relaxed"><?= e($rule['reply_text']) ?></p>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-            
-            <?php if (!$chatbotRules): ?>
-                <div class="bg-white border border-slate-200/80 rounded-xl p-10 text-center shadow-card">
-                    <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto mb-3 border border-slate-100 text-slate-400">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-                    </div>
-                    <h3 class="text-[14px] font-bold text-slate-900 mb-0.5">No Chatbot Automation Rules</h3>
-                    <p class="text-[12px] text-slate-500">Create your first keyword trigger to automate WhatsApp replies.</p>
-                </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Sticky Create Rule Panel -->
-        <div>
-            <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card sticky top-6">
-                <h2 class="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                    Create Automation Rule
-                </h2>
-                <form method="post" action="<?= e(base_url('index.php?page=chatbot-create')) ?>" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                    
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Match Type</label>
-                        <select name="match_type" onchange="document.getElementById('keyword_container').style.display = this.value === 'catch_all' ? 'none' : 'block'" class="w-full text-[12px] px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-subtle transition-shadow">
-                            <option value="exact">Exact Match (e.g. "pricing")</option>
-                            <option value="contains">Contains (e.g. "what is your pricing")</option>
-                            <option value="starts_with">Starts With (e.g. "price ...")</option>
-                            <option value="catch_all">Catch All (Default Reply)</option>
-                        </select>
-                    </div>
-
-                    <div id="keyword_container">
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Keyword Trigger</label>
-                        <input type="text" name="keyword" placeholder="e.g. pricing" class="w-full text-[12px] px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-subtle transition-shadow">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Bot Automated Response</label>
-                        <textarea name="reply_text" rows="4" required placeholder="Type the automated response message..." class="w-full text-[12px] px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-subtle transition-shadow resize-none font-sans"></textarea>
-                    </div>
-
-                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-[12px] font-bold py-2.5 px-4 rounded-lg transition-colors shadow-subtle btn-tactile active:scale-[0.98]">
-                        Create Automation
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <?php elseif ($activeTab === 'ai-agent'): ?>
-    <!-- ========================================== -->
-    <!-- TAB 2: AI AGENT & MULTI-PROVIDER ENGINE    -->
-    <!-- ========================================== -->
-    <div class="max-w-4xl bg-white rounded-xl border border-slate-200/80 p-6 shadow-card mb-8">
-        <div class="flex items-center justify-between pb-4 border-b border-slate-200/80 mb-6">
+<div class="space-y-4 mb-6 max-w-7xl mx-auto">
+    <!-- Top Action Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div class="flex items-center gap-3">
             <div>
-                <h2 class="text-base font-bold text-slate-900">AI Support Agent Configuration</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Customize your AI assistant persona, API keys, and multi-provider fallback cascade.</p>
-            </div>
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold <?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200' ?>">
-                <span class="w-2 h-2 rounded-full <?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400' ?>"></span>
-                <span><?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'Autonomous AI Active' : 'Autonomous AI Paused' ?></span>
-            </span>
-        </div>
-
-        <form method="post" action="<?= e(base_url('index.php?page=ai-agent-save')) ?>" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-
-            <!-- Master Toggles -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-200/80">
-                <label class="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" name="auto_reply_enabled" value="1" <?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'checked' : '' ?> class="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
-                    <div>
-                        <span class="block text-xs font-bold text-slate-900">Enable Autonomous AI Replies</span>
-                        <span class="block text-[11px] text-slate-500">When checked, incoming customer questions are answered automatically by the AI Agent using your Knowledge Base.</span>
-                    </div>
-                </label>
-                <label class="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" name="enabled" value="1" <?= (int) ($aiSettings['enabled'] ?? 1) === 1 ? 'checked' : '' ?> class="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
-                    <div>
-                        <span class="block text-xs font-bold text-slate-900">Master AI Agent Activation</span>
-                        <span class="block text-[11px] text-slate-500">Enables LLM provider initialization and sentiment/frustration analysis.</span>
-                    </div>
-                </label>
-            </div>
-
-            <!-- System Role & Persona Description with AI Generator / Polish -->
-            <div class="space-y-2">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-800">
-                            System Role & Persona Description
-                        </label>
-                        <p class="text-[11px] text-slate-500">Write rough notes about your business below (services, hours, delivery, policies). Click <strong>"✨ Rewrite with AI"</strong> to transform it into an enterprise persona.</p>
-                    </div>
-
-                    <!-- AI Action Controls -->
-                    <div class="flex items-center gap-2 shrink-0">
-                        <select id="personaToneSelect" class="text-[11px] font-semibold py-1 px-2.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-slate-900 transition-colors cursor-pointer" title="Select persona tone style">
-                            <option value="professional_warm">Professional & Warm</option>
-                            <option value="friendly_hinglish">Friendly & Hinglish</option>
-                            <option value="formal_authoritative">Formal & Corporate</option>
-                            <option value="concise_direct">Concise & Direct</option>
-                        </select>
-                        <button type="button" id="btnEnhancePersona" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs transition-all active:scale-[0.98]" title="Transform your rough notes into an enterprise WhatsApp Persona">
-                            <span id="enhanceIcon">✨</span>
-                            <span id="enhanceLabel">Rewrite with AI</span>
-                        </button>
-                        <button type="button" id="btnUndoPersona" class="hidden text-[11px] font-semibold text-slate-500 hover:text-slate-800 underline transition-colors">
-                            Undo
-                        </button>
-                    </div>
-                </div>
-
-                <div class="relative">
-                    <textarea id="systemPromptTextarea" name="system_prompt" rows="7" required class="w-full text-xs px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 shadow-subtle font-sans leading-relaxed custom-scrollbar"><?= e($aiSettings['system_prompt'] ?? '') ?></textarea>
-                    
-                    <!-- Feedback notification pill -->
-                    <div id="personaFeedbackPill" class="hidden mt-1.5 p-2.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-900 text-[11px] flex items-center justify-between shadow-2xs">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs">✨</span>
-                            <span><strong>Polished by AI (<span id="enhancedProviderName">AI Model</span>):</strong> Persona optimized with closed-domain boundaries, formatting, and Hinglish fluency. Click <strong>"Save AI Agent Settings"</strong> below to apply.</span>
-                        </div>
-                        <button type="button" onclick="document.getElementById('personaFeedbackPill').classList.add('hidden')" class="text-violet-500 hover:text-violet-800 font-bold ml-2">✕</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Provider Priority Cascade -->
-            <div>
-                <label class="block text-xs font-bold text-slate-800 mb-1">Provider Cascade Priority</label>
-                <p class="text-[11px] text-slate-500 mb-2">If your primary provider encounters rate limits or network errors, WhatsGateway automatically cascades to the secondary and tertiary providers in real time.</p>
-                <select name="provider_priority" class="w-full sm:w-80 text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-subtle font-semibold">
-                    <option value="gemini" <?= ($aiSettings['provider_priority'] ?? '') === 'gemini' ? 'selected' : '' ?>>1. Google Gemini ➔ 2. Groq ➔ 3. OpenRouter</option>
-                    <option value="groq" <?= ($aiSettings['provider_priority'] ?? '') === 'groq' ? 'selected' : '' ?>>1. Groq (Llama 3.3) ➔ 2. Gemini ➔ 3. OpenRouter</option>
-                    <option value="openrouter" <?= ($aiSettings['provider_priority'] ?? '') === 'openrouter' ? 'selected' : '' ?>>1. OpenRouter (Free LLMs) ➔ 2. Gemini ➔ 3. Groq</option>
-                </select>
-            </div>
-
-            <!-- Provider API Keys Grid -->
-            <div class="border border-slate-200/90 rounded-xl p-4 space-y-4 bg-slate-50/50">
-                <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Multi-Provider API Keys</h3>
-
-                <!-- Google Gemini -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Google Gemini API Key</label>
-                        <input type="password" name="gemini_api_key" placeholder="<?= !empty($aiSettings['gemini_api_key']) ? '•••••••••••••••••••• (Saved)' : 'Enter Google Gemini API Key' ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Gemini Model ID</label>
-                        <input type="text" name="gemini_model" value="<?= e($aiSettings['gemini_model'] ?? 'gemini-1.5-flash') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    </div>
-                </div>
-
-                <!-- Groq -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Groq API Key</label>
-                        <input type="password" name="groq_api_key" placeholder="<?= !empty($aiSettings['groq_api_key']) ? '•••••••••••••••••••• (Saved)' : 'Enter Groq API Key' ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Groq Model ID</label>
-                        <input type="text" name="groq_model" value="<?= e($aiSettings['groq_model'] ?? 'llama-3.3-70b-versatile') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    </div>
-                </div>
-
-                <!-- OpenRouter -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">OpenRouter API Key (Free Models Supported)</label>
-                        <input type="password" name="openrouter_api_key" placeholder="<?= !empty($aiSettings['openrouter_api_key']) ? '•••••••••••••••••••• (Saved)' : 'Enter OpenRouter API Key' ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">OpenRouter Model ID</label>
-                        <input type="text" name="openrouter_model" value="<?= e($aiSettings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tuning Parameters -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">Temperature (Creativity / Precision)</label>
-                    <input type="number" step="0.05" min="0.0" max="1.0" name="temperature" value="<?= e($aiSettings['temperature'] ?? '0.40') ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    <p class="text-[10px] text-slate-400 mt-1">Recommended: 0.2 - 0.4 for factual support grounded strictly in knowledge base.</p>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">Max Output Tokens</label>
-                    <input type="number" step="50" min="100" max="2000" name="max_tokens" value="<?= e($aiSettings['max_tokens'] ?? 500) ?>" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-mono">
-                    <p class="text-[10px] text-slate-400 mt-1">Keeps WhatsApp messages readable and cost-effective.</p>
-                </div>
-            </div>
-
-            <div class="pt-4 border-t border-slate-200 flex justify-end">
-                <button type="submit" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-xs transition-all active:scale-[0.98]">
-                    Save AI Agent Settings
-                </button>
-            </div>
-        </form>
-    </div>
-
-        <?php elseif ($activeTab === 'knowledge'): ?>
-    <!-- ========================================== -->
-    <!-- TAB 3: COMPANY KNOWLEDGE BASE (RAG)        -->
-    <!-- ========================================== -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <!-- Knowledge Chunks List Column -->
-        <div class="lg:col-span-2 space-y-4">
-            <div class="bg-blue-50/70 border border-blue-200/80 rounded-xl p-4 text-xs text-blue-900 flex items-start gap-3">
-                <span class="text-base">💡</span>
-                <div>
-                    <strong>Zero-Cloud Vector Retrieval (Option A):</strong>
-                    <p class="text-[11px] text-blue-800 mt-0.5 leading-relaxed">Each document chunk below is converted into a high-dimensional vector. When a customer messages your WhatsApp number, our Node.js worker performs in-memory Cosine Similarity ranking in sub-millisecond time and injects only the top-matching factual excerpts into the LLM prompt.</p>
-                </div>
-            </div>
-
-            <?php if (!empty($knowledgeChunks)): ?>
-            <!-- Dynamic Search Bar (Only Search Bar) -->
-            <div class="relative w-full">
-                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </div>
-                <input 
-                    id="knowledgeSearchInput" 
-                    type="text" 
-                    placeholder="Search knowledge documents by title or keywords..." 
-                    autocomplete="off"
-                    class="w-full pl-10 pr-9 py-2.5 text-xs border border-slate-200 rounded-xl bg-white shadow-subtle focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 placeholder:text-slate-400 transition-all"
-                >
-                <button 
-                    type="button" 
-                    id="knowledgeSearchClear" 
-                    class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                    title="Clear search"
-                >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-            <?php endif; ?>
-
-            <!-- Knowledge Chunks List Container -->
-            <div id="knowledgeChunksList" class="space-y-4">
-                <?php foreach ($knowledgeChunks as $chunk): ?>
-                    <div class="knowledge-chunk-card bg-white rounded-xl border border-slate-200/80 p-5 shadow-card transition-all"
-                         data-id="<?= (int) $chunk['id'] ?>"
-                         data-title="<?= e($chunk['title']) ?>">
-                        <textarea class="chunk-raw-content hidden"><?= e($chunk['content']) ?></textarea>
-                        <div class="flex items-start justify-between gap-3 mb-2">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                                <h3 class="text-sm font-bold text-slate-900 truncate chunk-title"><?= e($chunk['title']) ?></h3>
-                            </div>
-                            <div class="flex items-center gap-1 shrink-0">
-                                <button type="button" class="btn-edit-chunk text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition-colors" title="Edit document">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                </button>
-                                <form method="post" action="<?= e(base_url('index.php?page=ai-knowledge-delete')) ?>" onsubmit="return confirm('Delete this knowledge chunk?');" class="inline">
-                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                                    <input type="hidden" name="id" value="<?= (int) $chunk['id'] ?>">
-                                    <button type="submit" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition-colors" title="Delete chunk">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                        <div class="bg-slate-50 border border-slate-200/70 rounded-lg p-3 text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed chunk-content">
-                            <?= e($chunk['content']) ?>
-                        </div>
-                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-2">
-                            <span class="chunk-chars">Characters: <?= strlen($chunk['content']) ?></span>
-                            <span>Model: <?= e($chunk['embedding_model'] ?? 'local-tfidf') ?></span>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Empty Search Results State -->
-            <div id="noKnowledgeSearchResults" class="hidden bg-white border border-slate-200/80 rounded-xl p-8 text-center shadow-card">
-                <div class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mx-auto mb-2 text-slate-400">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </div>
-                <h3 class="text-sm font-bold text-slate-900">No matching documents</h3>
-                <p class="text-xs text-slate-500 mt-0.5">No knowledge chunks match your search query.</p>
-                <button type="button" id="btnResetSearch" class="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700 underline">Clear search filter</button>
-            </div>
-
-            <!-- Dynamic Pagination Footer -->
-            <?php if (!empty($knowledgeChunks)): ?>
-            <div id="knowledgePaginationContainer" class="bg-white border border-slate-200/80 rounded-xl p-3 px-4 shadow-card flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <div id="knowledgePaginationSummary" class="text-slate-500 font-medium">
-                    Showing <span id="pagStart" class="font-bold text-slate-900">1</span> to <span id="pagEnd" class="font-bold text-slate-900"><?= min(6, count($knowledgeChunks)) ?></span> of <span id="pagTotal" class="font-bold text-slate-900"><?= count($knowledgeChunks) ?></span> documents
-                </div>
-                <div class="flex items-center gap-1.5" id="knowledgePaginationControls">
-                    <button type="button" id="pagPrevBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                        ← Previous
-                    </button>
-                    <div id="pagNumberPills" class="flex items-center gap-1">
-                        <!-- Dynamically populated page pills -->
-                    </div>
-                    <button type="button" id="pagNextBtn" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-                        Next →
-                    </button>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <?php if (!$knowledgeChunks): ?>
-                <div class="bg-white border border-slate-200/80 rounded-xl p-10 text-center shadow-card">
-                    <div class="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center mx-auto mb-3 border border-slate-100 text-slate-400 text-xl">
-                        📖
-                    </div>
-                    <h3 class="text-sm font-bold text-slate-900 mb-0.5">No Company Knowledge Chunks</h3>
-                    <p class="text-xs text-slate-500 max-w-sm mx-auto">Add your company FAQs, product catalogs, refund policies, or business hours to ground your AI assistant in truth.</p>
-                </div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Add Knowledge Chunk Form -->
-        <div>
-            <div class="bg-white rounded-xl border border-slate-200/80 p-5 shadow-card sticky top-6">
-                <h2 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                    <span class="text-emerald-600">+</span>
-                    Add Knowledge Document / FAQ
-                </h2>
-                <form method="post" action="<?= e(base_url('index.php?page=ai-knowledge-create')) ?>" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Topic / Title</label>
-                        <input type="text" name="title" required placeholder="e.g. Return & Refund Policy" class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-medium">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-semibold text-slate-700 mb-1">Document Content / Details</label>
-                        <textarea name="content" rows="8" required placeholder="Paste full policy text, pricing breakdown, business hours, or support answers..." class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none resize-none font-sans leading-relaxed"></textarea>
-                    </div>
-
-                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 px-4 rounded-lg shadow-xs transition-all active:scale-[0.98]">
-                        Save Knowledge Chunk
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Edit Knowledge Chunk Dialog -->
-    <div id="editKnowledgeModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 relative">
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                    <h3 class="text-sm font-bold text-slate-900">Edit Knowledge Document</h3>
-                </div>
-                <button type="button" id="btnCloseEditKnowledgeModal" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-            <p class="text-xs text-slate-500 mb-4">Update the topic title and content details. The AI Agent will immediately reference this updated knowledge.</p>
-            
-            <form id="editKnowledgeForm" method="post" action="<?= e(base_url('index.php?page=ai-knowledge-update')) ?>" class="space-y-4">
-                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                <input type="hidden" name="id" id="editKnowledgeId" value="">
-
-                <div>
-                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">Topic / Title</label>
-                    <input type="text" name="title" id="editKnowledgeTitle" required class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none font-medium">
-                </div>
-
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <label class="block text-[11px] font-semibold text-slate-700">Document Content / Details</label>
-                        <span id="editKnowledgeCharCount" class="text-[10px] text-slate-400 font-mono">0 characters</span>
-                    </div>
-                    <textarea name="content" id="editKnowledgeContent" rows="8" required class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none resize-none font-sans leading-relaxed"></textarea>
-                </div>
-
-                <div id="editKnowledgeFeedback" class="hidden p-2.5 rounded-lg text-xs font-medium"></div>
-
-                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" id="btnCancelEditKnowledge" class="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancel</button>
-                    <button type="submit" id="btnSubmitEditKnowledge" class="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-xs transition-all active:scale-[0.98]">Save Changes</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Floating Toast Notification -->
-    <div id="knowledgeToast" class="fixed bottom-6 right-6 z-50 transform translate-y-10 opacity-0 pointer-events-none transition-all duration-200 ease-out flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-medium shadow-xl">
-        <span class="text-emerald-400 text-sm">✓</span>
-        <span id="knowledgeToastText">Knowledge document updated successfully.</span>
-    </div>
-
-    <?php elseif ($activeTab === 'escalations'): ?>
-    <!-- ========================================== -->
-    <!-- TAB 4: HUMAN ESCALATIONS & BUZZER LOGS     -->
-    <!-- ========================================== -->
-    <div class="bg-white rounded-xl border border-slate-200/80 shadow-card overflow-hidden mb-8">
-        <div class="p-4 border-b border-slate-200/80 flex items-center justify-between">
-            <div>
-                <h2 class="text-sm font-bold text-slate-900">Recent Escalation Alarms</h2>
-                <p class="text-xs text-slate-500">Log of customer frustration triggers, human takeover requests, and buzzer events.</p>
-            </div>
-            <a href="<?= e(base_url('index.php?page=live-chat')) ?>" class="text-xs font-bold text-emerald-700 hover:text-emerald-800">Go to Live Chat ➔</a>
-        </div>
-
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-                <thead class="bg-slate-50 border-b border-slate-200/70 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                    <tr>
-                        <th class="px-4 py-3">Timestamp</th>
-                        <th class="px-4 py-3">Customer</th>
-                        <th class="px-4 py-3">Trigger Reason</th>
-                        <th class="px-4 py-3">Trigger Excerpt</th>
-                        <th class="px-4 py-3">Status</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <?php foreach ($recentEscalations as $esc): ?>
-                        <tr class="hover:bg-slate-50/70 transition-colors">
-                            <td class="px-4 py-3 text-slate-500 font-mono text-[11px] whitespace-nowrap"><?= e($esc['created_at']) ?></td>
-                            <td class="px-4 py-3 font-semibold text-slate-900">
-                                <div><?= e($esc['contact_name'] ?: '+' . $esc['phone']) ?></div>
-                                <div class="text-[10px] text-slate-400 font-mono">+<?= e($esc['phone']) ?></div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold <?= $esc['status'] === 'active' ? 'bg-rose-100 text-rose-800 border border-rose-300' : 'bg-slate-100 text-slate-700' ?>">
-                                    <?= e($esc['reason_code']) ?>
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 text-slate-600 max-w-xs truncate" title="<?= e($esc['trigger_text'] ?? '') ?>">
-                                <?= e($esc['trigger_text'] ?? '—') ?>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold <?= $esc['status'] === 'active' ? 'bg-rose-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200' ?>">
-                                    <?= e(strtoupper($esc['status'])) ?>
-                                </span>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-
-                    <?php if (!$recentEscalations): ?>
-                        <tr>
-                            <td colspan="5" class="px-4 py-8 text-center text-slate-400">
-                                No escalations recorded yet.
-                            </td>
-                        </tr>
+                <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>AI Assistant Studio</span>
+                    <?php if ($deviceConnected): ?>
+                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Online <?= $devicePhone ? '(' . e($devicePhone) . ')' : '' ?>
+                        </span>
+                    <?php else: ?>
+                        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            Offline
+                        </span>
                     <?php endif; ?>
-                </tbody>
-            </table>
+                </h1>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <a href="<?= e(base_url('index.php?page=ai-credentials')) ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer">
+                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                <span>AI Keys & SMTP</span>
+            </a>
+            <button type="button" onclick="document.getElementById('aiAgentForm').requestSubmit()" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-xs transition-all active:scale-[0.98] cursor-pointer">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                <span>Save Changes</span>
+            </button>
         </div>
     </div>
-    <?php endif; ?>
 
-    <!-- Persona AI Rewrite Client Script -->
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // ==========================================
-        // Knowledge Base: Search, Pagination & Edit
-        // ==========================================
-        (function initKnowledgeBase() {
-            const searchInput = document.getElementById('knowledgeSearchInput');
-            const searchClear = document.getElementById('knowledgeSearchClear');
-            const btnResetSearch = document.getElementById('btnResetSearch');
-            const cardsList = document.getElementById('knowledgeChunksList');
-            const noResults = document.getElementById('noKnowledgeSearchResults');
-            const pagContainer = document.getElementById('knowledgePaginationContainer');
-            const pagStart = document.getElementById('pagStart');
-            const pagEnd = document.getElementById('pagEnd');
-            const pagTotal = document.getElementById('pagTotal');
-            const pagPrevBtn = document.getElementById('pagPrevBtn');
-            const pagNextBtn = document.getElementById('pagNextBtn');
-            const pagNumberPills = document.getElementById('pagNumberPills');
+    <!-- Main Settings Form -->
+    <form id="aiAgentForm" method="post" action="<?= e(base_url('index.php?page=ai-agent-save')) ?>">
+        <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
-            const editModal = document.getElementById('editKnowledgeModal');
-            const editForm = document.getElementById('editKnowledgeForm');
-            const editId = document.getElementById('editKnowledgeId');
-            const editTitle = document.getElementById('editKnowledgeTitle');
-            const editContent = document.getElementById('editKnowledgeContent');
-            const editCharCount = document.getElementById('editKnowledgeCharCount');
-            const editFeedback = document.getElementById('editKnowledgeFeedback');
-            const btnCloseModal = document.getElementById('btnCloseEditKnowledgeModal');
-            const btnCancelModal = document.getElementById('btnCancelEditKnowledge');
-            const btnSubmit = document.getElementById('btnSubmitEditKnowledge');
+        <!-- Compact 2-Column Responsive Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            
+            <!-- Left Column: Mode, Cascade & Parameters (5 cols) -->
+            <div class="lg:col-span-5 space-y-4">
+                
+                <!-- Card 1: Engine Status & Operating Mode -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3.5">
+                    <!-- Engine Master Toggle -->
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div class="flex items-center gap-2">
+                            <span class="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+                            </span>
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Engine Status</h3>
+                                <span id="masterStatusBadge" class="text-[11px] font-semibold <?= !empty($aiSettings['enabled']) ? 'text-emerald-700' : 'text-slate-400' ?>">
+                                    <?= !empty($aiSettings['enabled']) ? 'Active & Ready' : 'Paused' ?>
+                                </span>
+                            </div>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="enabled" value="1" <?= !empty($aiSettings['enabled']) ? 'checked' : '' ?> onchange="document.getElementById('masterStatusBadge').textContent = this.checked ? 'Active & Ready' : 'Paused'; document.getElementById('masterStatusBadge').className = this.checked ? 'text-[11px] font-semibold text-emerald-700' : 'text-[11px] font-semibold text-slate-400';" class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                        </label>
+                    </div>
 
-            const toast = document.getElementById('knowledgeToast');
-            const toastText = document.getElementById('knowledgeToastText');
+                    <!-- Mode Segmented Control -->
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600">Operating Mode</label>
+                        <div class="grid grid-cols-2 p-1 bg-slate-100/90 rounded-lg gap-1 border border-slate-200/80">
+                            <!-- Support Option -->
+                            <label id="btnModeSupport" class="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer <?= $activeMode === 'support' ? 'bg-white text-slate-900 shadow-2xs font-bold border border-slate-200/80' : 'text-slate-600 hover:text-slate-900' ?>">
+                                <input type="radio" name="agent_mode" value="support" <?= $activeMode === 'support' ? 'checked' : '' ?> class="sr-only">
+                                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                <span>Support Bot</span>
+                            </label>
 
-            if (!cardsList) return;
+                            <!-- Personal Option -->
+                            <label id="btnModePersonal" class="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer <?= $activeMode === 'personal' ? 'bg-white text-emerald-800 shadow-2xs font-bold border border-emerald-200' : 'text-slate-600 hover:text-slate-900' ?>">
+                                <input type="radio" name="agent_mode" value="personal" <?= $activeMode === 'personal' ? 'checked' : '' ?> class="sr-only">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                <span>Personal Assistant (24/7)</span>
+                            </label>
+                        </div>
+                    </div>
 
-            const cards = Array.from(cardsList.querySelectorAll('.knowledge-chunk-card'));
-            if (cards.length === 0) return;
+                    <!-- Mode Modifiers: Salute, Feedback & Always-on -->
+                    <div class="space-y-2 pt-1">
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Owner Name / Salute</label>
+                            <input type="text" id="ownerNameInput" name="owner_name" value="<?= e($aiSettings['owner_name'] ?? 'Boss') ?>" placeholder="Boss" class="w-full text-xs px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors">
+                        </div>
 
-            const PAGE_SIZE = 6;
-            let currentPage = 1;
-            let currentFilterCards = [...cards];
-            let currentEditingCard = null;
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                            <label class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200/80 cursor-pointer">
+                                <span class="text-[11px] font-semibold text-slate-700">24/7 Always Active</span>
+                                <input type="checkbox" name="is_always_on" value="1" <?= (int) ($aiSettings['is_always_on'] ?? 1) === 1 ? 'checked' : '' ?> class="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500">
+                            </label>
 
-            function showToast(msg) {
-                if (!toast || !toastText) return;
-                toastText.textContent = msg;
-                toast.classList.remove('translate-y-10', 'opacity-0', 'pointer-events-none');
-                setTimeout(() => {
-                    toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
-                }, 3000);
-            }
+                            <label id="feedbackRow" class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200/80 cursor-pointer transition-opacity <?= $activeMode === 'personal' ? 'opacity-40 cursor-not-allowed' : '' ?>">
+                                <span class="text-[11px] font-semibold text-slate-700">Feedback Survey</span>
+                                <input type="checkbox" id="feedbackEnabledCheckbox" name="feedback_enabled" value="1" <?= (int) ($aiSettings['feedback_enabled'] ?? 1) === 1 && $activeMode !== 'personal' ? 'checked' : '' ?> <?= $activeMode === 'personal' ? 'disabled' : '' ?> class="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-emerald-500">
+                            </label>
+                        </div>
+                    </div>
 
-            function renderPagination() {
-                const total = currentFilterCards.length;
-                const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                    <!-- Mode Switch Toast -->
+                    <div id="modeStatusPill" class="hidden p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-center justify-between">
+                        <span id="modeStatusText"></span>
+                        <button type="button" onclick="document.getElementById('modeStatusPill').classList.add('hidden')" class="text-emerald-700 font-bold ml-2">✕</button>
+                    </div>
+                </div>
 
-                if (currentPage > totalPages) {
-                    currentPage = totalPages;
-                }
+                <!-- Card 2: Priority Failover Cascade -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Priority Failover</h3>
+                        <span id="cascadeSummaryPill" class="text-[10px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                            <?= $pNames[$pOrder[0]] ?> → <?= $pNames[$pOrder[1]] ?> → <?= $pNames[$pOrder[2]] ?>
+                        </span>
+                    </div>
 
-                const startIndex = (currentPage - 1) * PAGE_SIZE;
-                const endIndex = Math.min(startIndex + PAGE_SIZE, total);
+                    <div class="space-y-1.5">
+                        <!-- Gemini -->
+                        <?php $gRank = array_search('gemini', $pOrder, true) + 1; ?>
+                        <label id="cardProvider_gemini" class="flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer <?= $activePriority === 'gemini' ? 'bg-emerald-50/50 border-emerald-500 text-slate-900' : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100/60' ?>">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.286L13 21l-2.286-6.857L5 12l5.714-2.286L13 3z"/></svg>
+                                <span class="text-xs font-bold">Google Gemini</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span id="badgePriority_gemini" class="px-2 py-0.5 rounded text-[10px] <?= $gRank === 1 ? 'font-bold bg-emerald-100 text-emerald-800' : 'font-semibold bg-slate-200/80 text-slate-600' ?>">
+                                    <?= $gRank === 1 ? '#1 Primary' : '#' . $gRank . ' Fallback' ?>
+                                </span>
+                                <input type="radio" name="provider_priority" value="gemini" <?= $activePriority === 'gemini' ? 'checked' : '' ?> class="sr-only">
+                            </div>
+                        </label>
 
-                cards.forEach(card => {
-                    const indexInFiltered = currentFilterCards.indexOf(card);
-                    if (indexInFiltered >= startIndex && indexInFiltered < endIndex) {
-                        card.style.display = '';
-                    } else {
-                        card.style.display = 'none';
-                    }
-                });
+                        <!-- Groq -->
+                        <?php $qRank = array_search('groq', $pOrder, true) + 1; ?>
+                        <label id="cardProvider_groq" class="flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer <?= $activePriority === 'groq' ? 'bg-emerald-50/50 border-emerald-500 text-slate-900' : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100/60' ?>">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                <span class="text-xs font-bold">Groq LPU</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span id="badgePriority_groq" class="px-2 py-0.5 rounded text-[10px] <?= $qRank === 1 ? 'font-bold bg-emerald-100 text-emerald-800' : 'font-semibold bg-slate-200/80 text-slate-600' ?>">
+                                    <?= $qRank === 1 ? '#1 Primary' : '#' . $qRank . ' Fallback' ?>
+                                </span>
+                                <input type="radio" name="provider_priority" value="groq" <?= $activePriority === 'groq' ? 'checked' : '' ?> class="sr-only">
+                            </div>
+                        </label>
 
-                if (total === 0) {
-                    if (noResults) noResults.classList.remove('hidden');
-                    if (pagContainer) pagContainer.classList.add('hidden');
-                } else {
-                    if (noResults) noResults.classList.add('hidden');
-                    if (pagContainer) {
-                        pagContainer.classList.remove('hidden');
-                        if (pagStart) pagStart.textContent = String(startIndex + 1);
-                        if (pagEnd) pagEnd.textContent = String(endIndex);
-                        if (pagTotal) pagTotal.textContent = String(total);
+                        <!-- OpenRouter -->
+                        <?php $oRank = array_search('openrouter', $pOrder, true) + 1; ?>
+                        <label id="cardProvider_openrouter" class="flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer <?= $activePriority === 'openrouter' ? 'bg-emerald-50/50 border-emerald-500 text-slate-900' : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100/60' ?>">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                                <span class="text-xs font-bold">OpenRouter</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span id="badgePriority_openrouter" class="px-2 py-0.5 rounded text-[10px] <?= $oRank === 1 ? 'font-bold bg-emerald-100 text-emerald-800' : 'font-semibold bg-slate-200/80 text-slate-600' ?>">
+                                    <?= $oRank === 1 ? '#1 Primary' : '#' . $oRank . ' Fallback' ?>
+                                </span>
+                                <input type="radio" name="provider_priority" value="openrouter" <?= $activePriority === 'openrouter' ? 'checked' : '' ?> class="sr-only">
+                            </div>
+                        </label>
+                    </div>
+                </div>
 
-                        if (pagPrevBtn) {
-                            pagPrevBtn.disabled = (currentPage === 1);
-                        }
-                        if (pagNextBtn) {
-                            pagNextBtn.disabled = (currentPage === totalPages);
-                        }
+                <!-- Card 3: Parameters (Temperature, Max Output, Autonomous) -->
+                <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Generation Controls</h3>
+                    
+                    <div class="grid grid-cols-2 gap-3 items-center">
+                        <!-- Temperature -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-[11px] font-semibold text-slate-700">Temperature</label>
+                                <span id="tempVal" class="font-mono text-xs font-bold text-emerald-700"><?= e($aiSettings['temperature'] ?? '0.40') ?></span>
+                            </div>
+                            <input type="range" name="temperature" min="0.0" max="1.0" step="0.05" value="<?= e($aiSettings['temperature'] ?? '0.40') ?>" oninput="document.getElementById('tempVal').innerText = parseFloat(this.value).toFixed(2)" class="w-full accent-emerald-600 cursor-pointer">
+                        </div>
 
-                        if (pagNumberPills) {
-                            pagNumberPills.innerHTML = '';
-                            for (let p = 1; p <= totalPages; p++) {
-                                if (totalPages > 7) {
-                                    if (p !== 1 && p !== totalPages && Math.abs(p - currentPage) > 2) {
-                                        if (p === 2 || p === totalPages - 1) {
-                                            const dot = document.createElement('span');
-                                            dot.className = 'px-1 text-slate-400 font-bold select-none text-[11px]';
-                                            dot.textContent = '…';
-                                            pagNumberPills.appendChild(dot);
-                                        }
-                                        continue;
-                                    }
-                                }
+                        <!-- Max Output Tokens -->
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Max Tokens</label>
+                            <input type="number" name="max_tokens" min="100" max="2000" step="50" value="<?= (int) ($aiSettings['max_tokens'] ?? 500) ?>" class="w-full text-xs font-mono px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors">
+                        </div>
+                    </div>
 
-                                const btn = document.createElement('button');
-                                btn.type = 'button';
-                                btn.className = (p === currentPage)
-                                    ? 'w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold bg-slate-900 text-white shadow-xs'
-                                    : 'w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors';
-                                btn.textContent = String(p);
-                                btn.addEventListener('click', () => {
-                                    currentPage = p;
-                                    renderPagination();
-                                    scrollToSearch();
-                                });
-                                pagNumberPills.appendChild(btn);
-                            }
-                        }
-                    }
-                }
-            }
+                    <!-- Autonomous Toggle -->
+                    <label class="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/80 cursor-pointer">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            <span class="text-xs font-bold text-slate-900">Enable Autonomous Replies</span>
+                        </div>
+                        <input type="checkbox" name="auto_reply_enabled" value="1" <?= (int) ($aiSettings['auto_reply_enabled'] ?? 1) === 1 ? 'checked' : '' ?> class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                    </label>
+                </div>
 
-            function scrollToSearch() {
-                if (searchInput) {
-                    const rect = searchInput.getBoundingClientRect();
-                    if (rect.top < 0 || rect.bottom > window.innerHeight) {
-                        searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }
-            }
+            </div>
 
-            if (pagPrevBtn) {
-                pagPrevBtn.addEventListener('click', () => {
-                    if (currentPage > 1) {
-                        currentPage--;
-                        renderPagination();
-                        scrollToSearch();
-                    }
-                });
-            }
+            <!-- Right Column: System Prompt & AI Rewrite (7 cols) -->
+            <div class="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex flex-col space-y-3 min-h-[580px]">
+                
+                <!-- Prompt Toolbar -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">System Prompt</h3>
+                        <span id="promptStats" class="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded">0 chars</span>
+                    </div>
 
-            if (pagNextBtn) {
-                pagNextBtn.addEventListener('click', () => {
-                    const totalPages = Math.ceil(currentFilterCards.length / PAGE_SIZE);
-                    if (currentPage < totalPages) {
-                        currentPage++;
-                        renderPagination();
-                        scrollToSearch();
-                    }
-                });
-            }
+                    <!-- Presets & AI Rewrite Tools -->
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button type="button" onclick="loadPromptTemplate('personal')" class="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-emerald-700 bg-slate-50 hover:bg-emerald-50 border border-slate-200 rounded-md transition-colors cursor-pointer">
+                            Personal
+                        </button>
+                        <button type="button" onclick="loadPromptTemplate('support')" class="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-emerald-700 bg-slate-50 hover:bg-emerald-50 border border-slate-200 rounded-md transition-colors cursor-pointer">
+                            Support
+                        </button>
+                        
+                        <div class="h-3 w-px bg-slate-200 mx-0.5"></div>
 
-            // Dynamic Search Filter
-            function applySearch() {
-                const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
-                if (searchClear) {
-                    if (query !== '') {
-                        searchClear.classList.remove('hidden');
-                    } else {
-                        searchClear.classList.add('hidden');
-                    }
-                }
+                        <select id="aiRewriteTone" class="text-[11px] font-medium px-2 py-1 bg-white border border-slate-200 rounded-md text-slate-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer">
+                            <option value="professional_warm">Professional & Warm</option>
+                            <option value="friendly_hinglish">Friendly Hinglish</option>
+                            <option value="concise_direct">Concise & Direct</option>
+                            <option value="formal_authoritative">Formal Corporate</option>
+                        </select>
 
-                if (query === '') {
-                    currentFilterCards = [...cards];
-                } else {
-                    currentFilterCards = cards.filter(card => {
-                        const title = (card.getAttribute('data-title') || '').toLowerCase();
-                        const rawContent = (card.querySelector('.chunk-raw-content')?.value || '').toLowerCase();
-                        return title.includes(query) || rawContent.includes(query);
-                    });
-                }
+                        <button type="button" id="btnAiRewrite" onclick="rewritePromptWithAI()" class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-md shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
+                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                            <span>AI Rewrite</span>
+                        </button>
+                    </div>
+                </div>
 
-                currentPage = 1;
-                renderPagination();
-            }
+                <!-- Status Toast for AI Rewrite -->
+                <div id="aiRewriteStatus" class="hidden p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between">
+                    <span id="aiRewriteStatusText"></span>
+                    <button type="button" onclick="document.getElementById('aiRewriteStatus').classList.add('hidden')" class="text-emerald-700 font-bold ml-2">✕</button>
+                </div>
 
-            if (searchInput) {
-                searchInput.addEventListener('input', applySearch);
-            }
+                <!-- Prompt Textarea -->
+                <div class="flex-1 flex flex-col">
+                    <textarea id="systemPromptTextarea" name="system_prompt" required class="w-full flex-1 min-h-[380px] text-xs font-mono px-3.5 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-y leading-relaxed bg-slate-50/50 hover:bg-white focus:bg-white transition-colors text-slate-800"><?= e($aiSettings['system_prompt'] ?? '') ?></textarea>
+                </div>
 
-            if (searchClear) {
-                searchClear.addEventListener('click', () => {
-                    if (searchInput) {
-                        searchInput.value = '';
-                        applySearch();
-                        searchInput.focus();
-                    }
-                });
-            }
+                <!-- Submit Action in Panel Footer -->
+                <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span class="text-[11px] text-slate-400">Settings take effect immediately upon save.</span>
+                    <button type="submit" class="inline-flex items-center gap-1.5 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-xs transition-all active:scale-[0.98] cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span>Save AI Configuration</span>
+                    </button>
+                </div>
 
-            if (btnResetSearch) {
-                btnResetSearch.addEventListener('click', () => {
-                    if (searchInput) {
-                        searchInput.value = '';
-                        applySearch();
-                        searchInput.focus();
-                    }
-                });
-            }
+            </div>
 
-            // Initial render
-            renderPagination();
+        </div>
+    </form>
+</div>
 
-            // Edit modal open/close
-            function openEditModal(card) {
-                currentEditingCard = card;
-                const id = card.getAttribute('data-id') || '';
-                const title = card.getAttribute('data-title') || '';
-                const content = card.querySelector('.chunk-raw-content')?.value || '';
+<script>
+    const personalPromptTemplate = `You are the dedicated, highly capable Personal AI Executive Assistant & Chief of Staff to your Boss.
 
-                editId.value = id;
-                editTitle.value = title;
-                editContent.value = content;
-                if (editCharCount) {
-                    editCharCount.textContent = content.length + ' characters';
-                }
-                if (editFeedback) {
-                    editFeedback.className = 'hidden p-2.5 rounded-lg text-xs font-medium';
-                    editFeedback.textContent = '';
-                }
+DIRECTIVES:
+1. Executive Role: You work directly and exclusively for your Boss. Address them respectfully as "Boss" or "Sir". Be proactive, loyal, dependable, and efficient.
+2. 24/7 Availability: You are active 24/7 around the clock. No closed periods.
+3. Capabilities: Assist with daily tasks, schedules, reminders, math, coding, search, research, and WhatsApp communication.
+4. Function Calling: Proactively trigger tools when real-time facts or calculations are needed.
+5. NO Surveys: NEVER request customer ratings or feedback surveys.
+6. NO Escalation: You handle all tasks directly. Never offer to transfer to another agent or human.
+7. Style: Structured, bold key points (*bold*), clean bullets, and concise messages.`;
 
-                editModal.classList.remove('hidden');
-                editTitle.focus();
-            }
+    const supportPromptTemplate = `You are the friendly, professional, and knowledgeable AI Support Assistant for our business on WhatsApp.
 
-            function closeEditModal() {
-                if (editModal) {
-                    editModal.classList.add('hidden');
-                }
-                currentEditingCard = null;
-            }
+DIRECTIVES:
+1. Customer Service: Warmly answer customer questions about our services, products, pricing, working hours, and policies.
+2. Verified Information: Ground all factual answers in our official knowledge base.
+3. Escalation: If specific information is unavailable, politely offer to connect them with our human support team.
+4. Style: Courteous, helpful, structured bullets, bold highlights (*bold*), and concise formatting.`;
 
-            cards.forEach(card => {
-                const editBtn = card.querySelector('.btn-edit-chunk');
-                if (editBtn) {
-                    editBtn.addEventListener('click', () => openEditModal(card));
-                }
-            });
-
-            if (editContent && editCharCount) {
-                editContent.addEventListener('input', () => {
-                    editCharCount.textContent = editContent.value.length + ' characters';
-                });
-            }
-
-            if (btnCloseModal) btnCloseModal.addEventListener('click', closeEditModal);
-            if (btnCancelModal) btnCancelModal.addEventListener('click', closeEditModal);
-
-            if (editModal) {
-                editModal.addEventListener('click', (e) => {
-                    if (e.target === editModal) closeEditModal();
-                });
-            }
-
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && editModal && !editModal.classList.contains('hidden')) {
-                    closeEditModal();
-                }
-            });
-
-            // Handle Edit form submission with AJAX and fallback
-            if (editForm) {
-                editForm.addEventListener('submit', async function(e) {
-                    e.preventDefault();
-                    const submitBtn = btnSubmit;
-                    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : 'Save Changes';
-
-                    if (submitBtn) {
-                        submitBtn.disabled = true;
-                        submitBtn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin text-white inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Saving...`;
-                    }
-
-                    try {
-                        const formData = new FormData(editForm);
-                        const res = await fetch(editForm.action, {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            },
-                            body: formData
-                        });
-
-                        const data = await res.json();
-                        if (!res.ok || !data.success) {
-                            throw new Error(data.error || 'Failed to update knowledge chunk.');
-                        }
-
-                        // Update card in DOM
-                        if (currentEditingCard && data.chunk) {
-                            currentEditingCard.setAttribute('data-title', data.chunk.title);
-                            const titleEl = currentEditingCard.querySelector('.chunk-title');
-                            if (titleEl) titleEl.textContent = data.chunk.title;
-
-                            const rawEl = currentEditingCard.querySelector('.chunk-raw-content');
-                            if (rawEl) rawEl.value = data.chunk.content;
-
-                            const contentEl = currentEditingCard.querySelector('.chunk-content');
-                            if (contentEl) contentEl.textContent = data.chunk.content;
-
-                            const charsEl = currentEditingCard.querySelector('.chunk-chars');
-                            if (charsEl) charsEl.textContent = 'Characters: ' + data.chunk.char_count;
-                        }
-
-                        closeEditModal();
-                        showToast('Knowledge document updated successfully.');
-                        applySearch();
-
-                    } catch (err) {
-                        if (editFeedback) {
-                            editFeedback.className = 'p-2.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-800 border border-rose-200 block';
-                            editFeedback.textContent = err.message || 'Error updating document.';
-                        } else {
-                            alert(err.message);
-                        }
-                    } finally {
-                        if (submitBtn) {
-                            submitBtn.disabled = false;
-                            submitBtn.innerHTML = originalBtnHtml;
-                        }
-                    }
-                });
-            }
-        })();
-
-    
-        const btnEnhance = document.getElementById('btnEnhancePersona');
-        const btnUndo = document.getElementById('btnUndoPersona');
+    function updatePromptStats() {
         const textarea = document.getElementById('systemPromptTextarea');
-        const toneSelect = document.getElementById('personaToneSelect');
-        const feedbackPill = document.getElementById('personaFeedbackPill');
-        const providerSpan = document.getElementById('enhancedProviderName');
-        const enhanceIcon = document.getElementById('enhanceIcon');
-        const enhanceLabel = document.getElementById('enhanceLabel');
+        const stats = document.getElementById('promptStats');
+        if (!textarea || !stats) return;
+        const len = textarea.value.length;
+        const words = textarea.value.trim() ? textarea.value.trim().split(/\s+/).length : 0;
+        stats.innerText = `${len} chars · ${words} words`;
+    }
 
-        let previousText = '';
+    const promptArea = document.getElementById('systemPromptTextarea');
+    if (promptArea) {
+        promptArea.addEventListener('input', updatePromptStats);
+        updatePromptStats();
+    }
 
-        if (!btnEnhance || !textarea) return;
+    function loadPromptTemplate(mode) {
+        const textarea = document.getElementById('systemPromptTextarea');
+        if (mode === 'personal') {
+            textarea.value = personalPromptTemplate;
+        } else {
+            textarea.value = supportPromptTemplate;
+        }
+        updatePromptStats();
+    }
 
-        btnEnhance.addEventListener('click', async function() {
-            const rawText = textarea.value.trim();
-            if (!rawText) {
-                alert('Please write some rough details about your business in the text box first.');
-                textarea.focus();
-                return;
+    // AI Rewrite
+    async function rewritePromptWithAI() {
+        const textarea = document.getElementById('systemPromptTextarea');
+        const toneSelect = document.getElementById('aiRewriteTone');
+        const btn = document.getElementById('btnAiRewrite');
+        const statusBox = document.getElementById('aiRewriteStatus');
+        const statusText = document.getElementById('aiRewriteStatusText');
+
+        const rawText = (textarea.value || '').trim();
+        if (!rawText) {
+            alert('Please enter some notes or your current prompt text first.');
+            return;
+        }
+
+        const originalBtnHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="w-3 h-3 animate-spin text-emerald-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> <span>Rewriting...</span>`;
+
+        statusBox.classList.remove('hidden');
+        statusText.innerText = 'AI is optimizing your system prompt...';
+
+        try {
+            const res = await fetch('<?= e(base_url('api/chat/enhance-prompt.php')) ?>', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    raw_text: rawText,
+                    tone: toneSelect ? toneSelect.value : 'professional_warm'
+                })
+            });
+            const data = await res.json();
+            if (data.ok && data.enhanced_prompt) {
+                textarea.value = data.enhanced_prompt;
+                updatePromptStats();
+                statusText.innerText = 'Prompt rewritten successfully via ' + (data.provider || 'AI Engine') + '.';
+                setTimeout(() => { statusBox.classList.add('hidden'); }, 4000);
+            } else {
+                statusText.innerText = 'Rewrite note: ' + (data.error || 'Failed to rewrite prompt.');
+            }
+        } catch (e) {
+            statusText.innerText = 'Network error: ' + e.message;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHtml;
+        }
+    }
+
+    // Priority Cascade Switcher
+    function updatePriorityCascade(selectedPriority) {
+        const providers = ['gemini', 'groq', 'openrouter'];
+        let priorityOrder = [];
+        if (selectedPriority === 'gemini') {
+            priorityOrder = ['gemini', 'groq', 'openrouter'];
+        } else if (selectedPriority === 'groq') {
+            priorityOrder = ['groq', 'gemini', 'openrouter'];
+        } else {
+            priorityOrder = ['openrouter', 'gemini', 'groq'];
+        }
+
+        const providerNames = {
+            gemini: 'Google Gemini',
+            groq: 'Groq LPU',
+            openrouter: 'OpenRouter'
+        };
+
+        providers.forEach(p => {
+            const card = document.getElementById('cardProvider_' + p);
+            const badge = document.getElementById('badgePriority_' + p);
+            const rank = priorityOrder.indexOf(p) + 1;
+
+            if (badge) {
+                if (rank === 1) {
+                    badge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800';
+                    badge.innerText = '#1 Primary';
+                } else if (rank === 2) {
+                    badge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200/80 text-slate-600';
+                    badge.innerText = '#2 Fallback';
+                } else {
+                    badge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-200/80 text-slate-600';
+                    badge.innerText = '#3 Fallback';
+                }
             }
 
-            previousText = textarea.value;
-
-            // Loading state
-            btnEnhance.disabled = true;
-            enhanceIcon.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin text-white inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
-            enhanceLabel.textContent = 'Polishing...';
-
-            try {
-                const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
-                const res = await fetch(`${basePath}/api/chat/enhance-prompt.php`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        raw_text: rawText,
-                        tone: toneSelect ? toneSelect.value : 'professional_warm'
-                    })
-                });
-
-                const data = await res.json();
-                if (!data.ok) throw new Error(data.error || 'Failed to enhance persona prompt.');
-
-                textarea.value = data.enhanced_prompt;
-                if (providerSpan && data.provider) {
-                    providerSpan.textContent = data.provider;
+            if (card) {
+                if (p === selectedPriority) {
+                    card.className = 'flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer bg-emerald-50/50 border-emerald-500 text-slate-900';
+                } else {
+                    card.className = 'flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100/60';
                 }
-                if (feedbackPill) {
-                    feedbackPill.classList.remove('hidden');
-                }
-                if (btnUndo) {
-                    btnUndo.classList.remove('hidden');
-                }
-
-                // Adjust rows height dynamically
-                textarea.rows = Math.min(18, Math.max(8, data.enhanced_prompt.split('\n').length + 2));
-            } catch (err) {
-                alert('AI Polish Error: ' + err.message);
-            } finally {
-                btnEnhance.disabled = false;
-                enhanceIcon.textContent = '✨';
-                enhanceLabel.textContent = 'Rewrite with AI';
             }
         });
 
-        if (btnUndo) {
-            btnUndo.addEventListener('click', function() {
-                if (previousText) {
-                    textarea.value = previousText;
-                    btnUndo.classList.add('hidden');
-                    if (feedbackPill) feedbackPill.classList.add('hidden');
-                }
-            });
+        const cascadePill = document.getElementById('cascadeSummaryPill');
+        if (cascadePill) {
+            cascadePill.innerText = `${providerNames[priorityOrder[0]]} → ${providerNames[priorityOrder[1]]} → ${providerNames[priorityOrder[2]]}`;
         }
-    });
-    </script>
+    }
 
-    <!-- Footer Spacer -->
-    <div class="h-8"></div>
+    document.querySelectorAll('input[name="provider_priority"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            updatePriorityCascade(this.value);
+        });
+    });
+
+    // Operating Mode Switcher
+    function updateModeButtonStyles(activeMode) {
+        const btnSupport = document.getElementById('btnModeSupport');
+        const btnPersonal = document.getElementById('btnModePersonal');
+        const feedbackRow = document.getElementById('feedbackRow');
+        const feedbackCheckbox = document.getElementById('feedbackEnabledCheckbox');
+
+        if (activeMode === 'personal') {
+            if (btnPersonal) btnPersonal.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer bg-white text-emerald-800 shadow-2xs border border-emerald-200';
+            if (btnSupport) btnSupport.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer text-slate-600 hover:text-slate-900';
+            if (feedbackCheckbox) {
+                feedbackCheckbox.checked = false;
+                feedbackCheckbox.disabled = true;
+            }
+            if (feedbackRow) {
+                feedbackRow.classList.add('opacity-40', 'cursor-not-allowed');
+            }
+        } else {
+            if (btnSupport) btnSupport.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-md text-xs font-bold transition-all cursor-pointer bg-white text-slate-900 shadow-2xs border border-slate-200/80';
+            if (btnPersonal) btnPersonal.className = 'flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer text-slate-600 hover:text-slate-900';
+            if (feedbackCheckbox) {
+                feedbackCheckbox.disabled = false;
+                feedbackCheckbox.checked = true;
+            }
+            if (feedbackRow) {
+                feedbackRow.classList.remove('opacity-40', 'cursor-not-allowed');
+            }
+        }
+
+        // Instantly toggle Support Bot category & navbar Live Chat in the DOM
+        const supportBotCategory = document.getElementById('sidebarCategorySupportBot');
+        const navbarLiveChat = document.getElementById('navbarLiveChatLink');
+        const escalationBanner = document.getElementById('globalEscalationBanner');
+        if (activeMode === 'personal') {
+            if (supportBotCategory) supportBotCategory.style.display = 'none';
+            if (navbarLiveChat) navbarLiveChat.style.display = 'none';
+            if (escalationBanner) escalationBanner.classList.add('hidden');
+            if (window.AppConfig) window.AppConfig.agentMode = 'personal';
+            document.body.setAttribute('data-agent-mode', 'personal');
+        } else {
+            if (supportBotCategory) supportBotCategory.style.display = '';
+            if (navbarLiveChat) navbarLiveChat.style.display = '';
+            if (window.AppConfig) window.AppConfig.agentMode = 'support';
+            document.body.setAttribute('data-agent-mode', 'support');
+        }
+        window.dispatchEvent(new CustomEvent('whatsAgentModeChange', { detail: { mode: activeMode } }));
+    }
+
+    async function triggerModeSwitch(targetMode) {
+        const ownerName = document.getElementById('ownerNameInput').value || 'Boss';
+        const pill = document.getElementById('modeStatusPill');
+        const text = document.getElementById('modeStatusText');
+
+        pill.classList.remove('hidden');
+        text.innerText = 'Switching operating mode...';
+
+        try {
+            const res = await fetch('<?= e(base_url('api/chat/switch-mode.php')) ?>', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mode: targetMode,
+                    owner_name: ownerName,
+                    apply_prompt: true
+                })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                text.innerText = data.message;
+                const radio = document.querySelector(`input[name="agent_mode"][value="${targetMode}"]`);
+                if (radio) radio.checked = true;
+                updateModeButtonStyles(targetMode);
+
+                if (data.system_prompt) {
+                    document.getElementById('systemPromptTextarea').value = data.system_prompt;
+                    updatePromptStats();
+                }
+            } else {
+                text.innerText = 'Failed: ' + (data.error || 'Unknown error');
+            }
+        } catch (e) {
+            text.innerText = 'Error: ' + e.message;
+        }
+    }
+
+    document.querySelectorAll('input[name="agent_mode"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            triggerModeSwitch(this.value);
+        });
+    });
+</script>

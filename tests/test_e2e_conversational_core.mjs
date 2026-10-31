@@ -123,7 +123,7 @@ async function runEndToEndVerification() {
   const convClosed = convRowsClosed[0];
 
   // Session 2: Fresh inquiry after closure
-  const session2 = await resolveActiveSession(db, testUserId, testPhone, 'Test Contact', '/start');
+  const session2 = await resolveActiveSession(db, testUserId, testPhone, 'Test Contact');
   const session2Uuid = session2.sessionUuid;
   console.log(`✔ Session 2 Created after closure: ${session2Uuid}`);
 

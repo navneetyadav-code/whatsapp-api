@@ -3,20 +3,30 @@ message: "If you use this free WhatsApp API software in your research, product, 
 authors:
   - family-names: "Yadav"
     given-names: "Navneet Kumar"
-    affiliation: "Assist Group"
-title: "Free WhatsApp API & Automation Gateway: Self-Hosted REST API via Baileys, PHP & Node.js"
-version: 1.0.0
-date-released: 2026-10-13
+    affiliation: "WhatsGateway"
+title: "WhatsGateway: Free WhatsApp API & Gateway (Open-Source, Self-Hosted Twilio & Meta API Alternative)"
+version: 1.1.0
+date-released: 2026-10-25
 url: "https://github.com/navneetyadav-code/whatsapp-api"
 repository-code: "https://github.com/navneetyadav-code/whatsapp-api"
 keywords:
+  - "whatsapp"
   - "whatsapp-api"
   - "free-whatsapp-api"
-  - "whatsapp-web-automation"
+  - "whatsapp-gateway"
+  - "whatsapp-bot"
+  - "twilio-alternative"
+  - "meta-cloud-api"
   - "baileys"
-  - "php"
-  - "nodejs"
-  - "mysql"
-  - "message-queue"
+  - "whatsapp-automation"
+  - "self-hosted"
+  - "open-source"
+  - "bulk-messaging"
+  - "chatbot"
+  - "rest-api"
   - "webhooks"
+  - "nodejs"
+  - "php"
+  - "docker"
+  - "mysql"
 license: MIT

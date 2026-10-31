@@ -39,3 +39,7 @@ $readinessScore = (int) round(($readySignals / 4) * 100);
 $lastActivity = $messages[0]['created_at'] ?? 'No activity yet';
 $nextAction = $deviceConnected ? 'Send test message' : 'Pair WhatsApp device';
 $nextActionUrl = $deviceConnected ? base_url('index.php?page=queue') : base_url('index.php?page=device');
+
+// Preload 7-day message analytics for instant chart rendering
+$initialPeriod = '7d';
+$chartStats = get_dashboard_analytics_stats((int) $user['id'], $initialPeriod);

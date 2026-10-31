@@ -1,5 +1,5 @@
 ================================================================================
-WHATSGATEWAY — API ENDPOINT REFERENCE & CHEAT SHEET
+WHATSAPP API HUB — API ENDPOINT REFERENCE & CHEAT SHEET
 ================================================================================
 Author: Navneet Kumar Yadav (https://github.com/navneetyadav-code/whatsapp-api)
 Support / Inquiries: info.assistgroupofficial@gmail.com

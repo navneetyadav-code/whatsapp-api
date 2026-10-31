@@ -1,4 +1,4 @@
-# 🐹 Go Quickstart — WhatsGateway
+# 🐹 Go Quickstart — WhatsApp API Hub
 
 A high-performance Go client with **zero external dependencies** (uses only standard library `net/http` and `encoding/json`).
 

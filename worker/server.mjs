@@ -8,7 +8,7 @@ import dns from 'dns/promises';
 import net from 'net';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
 import { rm } from 'fs/promises';
-import { basename, dirname, join, resolve, sep } from 'path';
+import { dirname, join, resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import makeWASocket, {
   Browsers,
@@ -25,10 +25,13 @@ import {
 } from './ai-agent.mjs';
 import { globalDebouncer } from './chat-debouncer.mjs';
 import { globalGreetingCache } from './chat-greeting-cache.mjs';
-import { resolveActiveSession, closeSession, isWakeupTrigger } from './chat-session-manager.mjs';
+import { generateSessionUuid, resolveActiveSession, closeSession, isWakeupTrigger, isTopicResetTrigger } from './chat-session-manager.mjs';
 import { ChatMemoryEngine } from './chat-memory.mjs';
+import { ChatFactMemory } from './chat-fact-memory.mjs';
 import { ChatPresenceManager } from './chat-presence.mjs';
 import { ChatResolutionEngine } from './chat-resolution.mjs';
+import { detectIntents, composeSkillsAndTools } from './intent-router.mjs';
+import { UniversalToolsRegistry } from './tools-engine.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv(resolve(__dirname, '..', '.env'));
@@ -77,11 +80,18 @@ const SESSION_DIR = process.env.WA_SESSION_DIR && !process.env.WA_SESSION_DIR.in
   : defaultSessionDir;
 const sessions = new Map();
 let supportsSleepingColumn = true;
+let supportsTimelockColumns = true;
 
 function isMissingSleepingColumnError(error) {
   return error?.code === 'ER_BAD_FIELD_ERROR'
     && typeof error?.sqlMessage === 'string'
     && error.sqlMessage.includes('sleeping');
+}
+
+function isMissingTimelockColumnError(error) {
+  return error?.code === 'ER_BAD_FIELD_ERROR'
+    && typeof error?.sqlMessage === 'string'
+    && error.sqlMessage.includes('reachout_timelock');
 }
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
 
@@ -120,6 +130,7 @@ function createMemoryCache(maxEntries = 2000, ttlMs = 15 * 60 * 1000) {
 }
 
 const msgRetryCounterCache = createMemoryCache(2000, 15 * 60 * 1000);
+const inboundDedupeCache = createMemoryCache(5000, 10 * 60 * 1000);
 const memoryMessageStore = new Map();
 const MAX_MEMORY_MESSAGE_STORE = 2000;
 const recipientLookupCache = new Map();
@@ -346,12 +357,14 @@ function emptySession(userId) {
     lastActivityAt: Date.now(),
     qr: null,
     hasQr: false,
+    pairingCode: null,
     phone: null,
     pushName: null,
     error: null,
     sock: null,
     starting: null,
-    reconnectTimer: null
+    reconnectTimer: null,
+    reachoutTimelock: null
   };
 }
 
@@ -365,10 +378,12 @@ function publicSession(session) {
     last_activity_at: session.lastActivityAt || Date.now(),
     qr: session.qr,
     hasQr: Boolean(session.qr),
+    pairingCode: session.pairingCode || null,
     phone: session.phone,
     pushName: session.pushName,
-      profilePicture: session.profilePicture,
-    error: session.error
+    profilePicture: session.profilePicture,
+    error: session.error,
+    reachout_timelock: session.reachoutTimelock || null
   };
 }
 
@@ -439,6 +454,34 @@ function parseEmojiPool(rawValue) {
 
 async function updateSessionRecord(userId, session) {
   try {
+    if (supportsSleepingColumn && supportsTimelockColumns) {
+      await db.execute(
+        `UPDATE whatsapp_sessions
+         SET status = ?, sleeping = ?, phone = ?, push_name = ?,
+             connected_at = IF(? = 'connected', NOW(), connected_at),
+             disconnected_at = IF(? IN ('disconnected', 'error', 'idle'), NOW(), disconnected_at),
+             last_error = ?,
+             reachout_timelock_active = ?,
+             reachout_timelock_ends_at = ?,
+             reachout_timelock_type = ?
+         WHERE user_id = ?`,
+        [
+          session.state,
+          Number(Boolean(session.sleeping)),
+          session.phone,
+          session.pushName,
+          session.state,
+          session.state,
+          session.error,
+          session.reachoutTimelock?.isActive ? 1 : 0,
+          session.reachoutTimelock?.timeEnforcementEnds || null,
+          session.reachoutTimelock?.enforcementType || null,
+          userId
+        ]
+      );
+      return;
+    }
+
     if (supportsSleepingColumn) {
       await db.execute(
         `UPDATE whatsapp_sessions
@@ -462,6 +505,11 @@ async function updateSessionRecord(userId, session) {
       [session.state, session.phone, session.pushName, session.state, session.state, session.error, userId]
     );
   } catch (error) {
+    if (supportsTimelockColumns && isMissingTimelockColumnError(error)) {
+      supportsTimelockColumns = false;
+      await updateSessionRecord(userId, session);
+      return;
+    }
     if (supportsSleepingColumn && isMissingSleepingColumnError(error)) {
       supportsSleepingColumn = false;
       await updateSessionRecord(userId, session);
@@ -755,7 +803,7 @@ async function startSession(userId, force = false, waitForReady = true) {
 
   try {
     const [prefRows] = await db.execute(
-      'SELECT auto_sleep_enabled, auto_sleep_timeout_seconds, phone, push_name FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
+      'SELECT auto_sleep_enabled, auto_sleep_timeout_seconds, phone, push_name, reachout_timelock_active, reachout_timelock_ends_at, reachout_timelock_type FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
       [userId]
     );
     if (prefRows && prefRows[0]) {
@@ -767,9 +815,26 @@ async function startSession(userId, force = false, waitForReady = true) {
       }
       if (!session.phone && prefRows[0].phone) session.phone = prefRows[0].phone;
       if (!session.pushName && prefRows[0].push_name) session.pushName = prefRows[0].push_name;
+      if (prefRows[0].reachout_timelock_active !== undefined) {
+        const isActive = Number(prefRows[0].reachout_timelock_active) === 1;
+        const endsAt = prefRows[0].reachout_timelock_ends_at ? new Date(prefRows[0].reachout_timelock_ends_at) : null;
+        if (isActive && (!endsAt || endsAt.getTime() > Date.now())) {
+          session.reachoutTimelock = {
+            isActive: true,
+            timeEnforcementEnds: endsAt,
+            enforcementType: prefRows[0].reachout_timelock_type || 'DEFAULT'
+          };
+        } else {
+          session.reachoutTimelock = {
+            isActive: false,
+            timeEnforcementEnds: null,
+            enforcementType: null
+          };
+        }
+      }
     }
   } catch (err) {
-    logger.warn({ err: err.message, userId }, 'Could not read auto_sleep settings from database in startSession');
+    logger.warn({ err: err.message, userId }, 'Could not read settings from database in startSession');
   }
 
   if (!force && ((session.state === 'connected' && session.sock) || session.starting)) {
@@ -856,7 +921,25 @@ async function startSession(userId, force = false, waitForReady = true) {
       }
 
       try {
-        const { connection, lastDisconnect, qr } = update;
+        const { connection, lastDisconnect, qr, reachoutTimeLock } = update;
+
+        if (reachoutTimeLock) {
+          session.reachoutTimelock = {
+            isActive: Boolean(reachoutTimeLock.isActive),
+            timeEnforcementEnds: reachoutTimeLock.timeEnforcementEnds ? new Date(reachoutTimeLock.timeEnforcementEnds) : null,
+            enforcementType: reachoutTimeLock.enforcementType || 'DEFAULT'
+          };
+          if (reachoutTimeLock.isActive) {
+            logger.warn({
+              userId,
+              endsAt: session.reachoutTimelock.timeEnforcementEnds,
+              type: session.reachoutTimelock.enforcementType
+            }, '⚠️ WhatsApp Reachout Timelock is ACTIVE on this account!');
+          } else {
+            logger.info({ userId }, 'WhatsApp Reachout Timelock lifted / clear.');
+          }
+          await updateSessionRecord(userId, session);
+        }
 
         if (session.sleeping) {
           session.qr = null;
@@ -892,11 +975,17 @@ async function startSession(userId, force = false, waitForReady = true) {
           session.sleeping = false;
           session.qr = null;
           session.hasQr = false;
+          session.pairingCode = null;
           session.error = null;
           const rawId = sock.user?.id || '';
           session.phone = rawId ? rawId.split(':')[0].split('@')[0] : null;
           session.pushName = sock.user?.name || sock.user?.verifiedName || null;
           try { session.profilePicture = await sock.profilePictureUrl(sock.user.id, 'image'); } catch(e) { session.profilePicture = null; }
+          if (typeof sock.fetchAccountReachoutTimelock === 'function') {
+            sock.fetchAccountReachoutTimelock().catch(err => {
+              logger.warn({ err: err?.message, userId }, 'Could not probe account reachout timelock');
+            });
+          }
           await updateSessionRecord(userId, session);
         }
 
@@ -920,6 +1009,7 @@ async function startSession(userId, force = false, waitForReady = true) {
             session.state = 'idle';
             session.qr = null;
             session.hasQr = false;
+            session.pairingCode = null;
             session.phone = null;
             session.pushName = null;
             session.profilePicture = null;
@@ -936,6 +1026,7 @@ async function startSession(userId, force = false, waitForReady = true) {
             session.error = null;
             session.qr = null;
             session.hasQr = false;
+            session.pairingCode = null;
             await updateSessionRecord(userId, session);
             session.reconnectTimer = setTimeout(() => {
               session.reconnectTimer = null;
@@ -1222,6 +1313,16 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
         for (const msg of m.messages) {
           if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
 
+          // Deduplication Guard: Ignore duplicate inbound packets from Baileys / WhatsApp retries
+          if (msg.key.id && !msg.key.fromMe) {
+            const dedupeKey = `${userId}_${msg.key.remoteJid}_${msg.key.id}`;
+            if (inboundDedupeCache.get(dedupeKey)) {
+              logger.info({ messageId: msg.key.id }, '⚡ Skipping duplicate inbound message (in-memory dedupe)');
+              continue;
+            }
+            inboundDedupeCache.set(dedupeKey, true);
+          }
+
           // 0. Sync outgoing messages sent from the physical phone app
           if (msg.key.fromMe) {
             const recipientPhone = await resolveJidToPhone(userId, msg.key.remoteJid, session);
@@ -1284,8 +1385,20 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
               );
               const preConv = preConvRows && preConvRows.length > 0 ? preConvRows[0] : null;
 
+              // Check if user has personal assistant mode or feedback surveys disabled
+              const [userSettingsRows] = await db.execute(
+                'SELECT agent_mode, feedback_enabled FROM ai_agent_settings WHERE user_id = ? LIMIT 1',
+                [userId]
+              );
+              const isPersonalModeSetting = userSettingsRows && userSettingsRows.length > 0 && userSettingsRows[0].agent_mode === 'personal';
+              const feedbackAllowedSetting = !isPersonalModeSetting && (!userSettingsRows || userSettingsRows.length === 0 || Number(userSettingsRows[0].feedback_enabled ?? 1) === 1);
+
+              if (preConv && Number(preConv.awaiting_feedback) === 1 && !feedbackAllowedSetting) {
+                await db.execute('UPDATE chat_conversations SET awaiting_feedback = 0 WHERE id = ?', [preConv.id]);
+              }
+
               // Check if contact is responding with 5-star rating feedback
-              if (preConv && Number(preConv.awaiting_feedback) === 1) {
+              if (feedbackAllowedSetting && preConv && Number(preConv.awaiting_feedback) === 1) {
                 const rawBody = (norm.body || '').trim();
                 let parsedRating = null;
 
@@ -1374,6 +1487,17 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
               }
 
               if (conversationId) {
+                if (norm.messageId) {
+                  const [existingInConv] = await db.execute(
+                    'SELECT id FROM chat_messages WHERE conversation_id = ? AND wa_message_id = ? LIMIT 1',
+                    [conversationId, norm.messageId]
+                  );
+                  if (existingInConv && existingInConv.length > 0) {
+                    logger.info({ conversationId, messageId: norm.messageId }, 'Inbound message already recorded in conversation; skipping duplicate handling');
+                    continue;
+                  }
+                }
+
                 const mediaUrl = norm.payload?.media_url || norm.payload?.file_url || null;
                 await db.execute(
                   `INSERT INTO chat_messages
@@ -1486,12 +1610,52 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                 logger.error({ err: err.message, userId }, 'Failed to record inbound opt-in');
               }
             }
-            continue;
+            if (!isWakeupTrigger(rawText)) {
+              continue;
+            }
           }
 
+          // Pre-fetch active AI agent settings to resolve persona mode & admin caller role
+          const [aiSettingsRows] = await db.execute(
+            'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
+            [userId]
+          );
+          const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
+          const isPersonalMode = aiSettings?.agent_mode === 'personal';
+          const ownerName = aiSettings?.owner_name || 'Boss';
+
+          let hasConfiguredAiKeys = Boolean(aiSettings && (aiSettings.gemini_api_key || aiSettings.groq_api_key || aiSettings.openrouter_api_key));
+          if (!hasConfiguredAiKeys) {
+            try {
+              const [keyCheck] = await db.execute(
+                'SELECT 1 FROM ai_provider_keys WHERE user_id = ? AND is_active = 1 LIMIT 1',
+                [userId]
+              );
+              if (keyCheck && keyCheck.length > 0) {
+                hasConfiguredAiKeys = true;
+              }
+            } catch (e) {}
+          }
+
+          let toolsConfig = null;
+          if (aiSettings?.tools_config) {
+            try {
+              toolsConfig = typeof aiSettings.tools_config === 'string'
+                ? JSON.parse(aiSettings.tools_config)
+                : aiSettings.tools_config;
+            } catch (e) {}
+          }
+          const adminPhones = Array.isArray(toolsConfig?.admin_phones) && toolsConfig.admin_phones.length > 0
+            ? toolsConfig.admin_phones
+            : (process.env.ADMIN_WHITELIST_PHONES ? process.env.ADMIN_WHITELIST_PHONES.split(',').map(s => s.trim()) : []);
+          const cleanPhone = (senderPhone || '').replace(/[^\d]/g, '');
+          const isAdminCaller = isPersonalMode || adminPhones.some(p => cleanPhone.includes(p.replace(/[^\d]/g, '')));
+
           // 6. Escalation & Frustration check
+          // STRICT RESTRICTION: In Personal Assistant mode OR when communicating with the Admin/Boss,
+          // customer support desk escalation is 100% strictly disabled!
           let wasEscalated = false;
-          if (!feedbackHandled && senderPhone) {
+          if (!feedbackHandled && senderPhone && !isPersonalMode && !isAdminCaller) {
             const escCheck = detectFrustrationAndEscalation(norm.body);
             if (escCheck.shouldEscalate) {
               wasEscalated = true;
@@ -1541,48 +1705,88 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
           // 7. Enterprise AI Agent with Debouncer, Memory, Typing Presence, & Auto-Resolution
           let aiHandled = false;
-          if (!feedbackHandled && isBotPaused !== 1 && convStatus === 'open') {
-            const rawInboundText = (norm.body || '').trim();
+          const rawInboundText = (norm.body || '').trim();
+
+          // Intercept wake-up trigger (/start or start): ALWAYS resets bot_paused, starts a fresh session ticket, and sends dynamic greeting
+          if (rawInboundText && isWakeupTrigger(rawInboundText)) {
+            logger.info({ userId, senderPhone, isPersonalMode }, '⚡ Wake-up command received (/start or start) - unpausing bot and starting fresh session');
+            currentSessionUuid = generateSessionUuid();
+            await db.execute(
+              'UPDATE chat_conversations SET session_uuid = ?, bot_paused = 0, status = "open", escalation_reason = NULL, awaiting_feedback = 0 WHERE user_id = ? AND phone = ?',
+              [currentSessionUuid, userId, senderPhone]
+            );
+            isBotPaused = 0;
+            convStatus = 'open';
+
+            const welcomeText = isPersonalMode
+              ? `Hello ${ownerName}! 👋 I am your 24/7 Personal AI Executive Assistant.\n\n` +
+                `I am ready to assist you with tasks, live web searches, weather updates, math calculations, drafting messages, and daily planning.\n\n` +
+                `How can I help you right now? ⚡`
+              : `Hello! 👋 Welcome to our support desk.\n\n` +
+                `I am your virtual assistant, ready to assist you with inquiries, services, and support.\n\n` +
+                `How can I help you today? ✨`;
+            try {
+              const sentWelcome = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
+              await db.execute(
+                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                [userId, conversationId, currentSessionUuid, welcomeText, sentWelcome?.key?.id || null]
+              );
+              await db.execute(
+                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
+                [welcomeText.slice(0, 200), conversationId]
+              );
+              aiHandled = true;
+            } catch (sendErr) {
+              logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch start welcome greeting');
+            }
+            continue;
+          }
+
+          // Intercept topic reset triggers (/clear, /new, /reset, etc.): Wipes working context, starts a fresh topic session
+          if (rawInboundText && isTopicResetTrigger(rawInboundText)) {
+            logger.info({ userId, senderPhone, isPersonalMode }, '🧹 Topic reset command received (/clear, /new, /reset) - generating fresh session UUID');
+            currentSessionUuid = generateSessionUuid();
+            await db.execute(
+              'UPDATE chat_conversations SET session_uuid = ?, bot_paused = 0, status = "open", escalation_reason = NULL, awaiting_feedback = 0, consecutive_bot_replies = 0, last_message_at = NOW() WHERE user_id = ? AND phone = ?',
+              [currentSessionUuid, userId, senderPhone]
+            );
+            isBotPaused = 0;
+            convStatus = 'open';
+
+            const resetReplyText = isPersonalMode
+              ? `🧹 *Working Context Cleared!*\nStarting a fresh topic session. How can I assist you now, ${ownerName}?`
+              : '🧹 *Conversation Context Cleared!*\nHow can I help you with a fresh inquiry today?';
+            try {
+              const sentReset = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: resetReplyText });
+              await db.execute(
+                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                [userId, conversationId, currentSessionUuid, resetReplyText, sentReset?.key?.id || null]
+              );
+              await db.execute(
+                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
+                [resetReplyText.slice(0, 200), conversationId]
+              );
+              aiHandled = true;
+            } catch (sendErr) {
+              logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch topic reset confirmation');
+            }
+            continue;
+          }
+
+          if (!feedbackHandled && (isPersonalMode || (isBotPaused !== 1 && convStatus === 'open'))) {
             if (rawInboundText) {
               try {
-                // Intercept wake-up trigger (/start or start)
-                if (isWakeupTrigger(rawInboundText)) {
-                  logger.info({ userId, senderPhone }, '⚡ Wake-up command received (/start) - sending branded greeting');
-                  const welcomeText = `Hello! 👋 Welcome to *Aadi Shree Classes*.\n\n` +
-                    `I am your virtual counselor, ready to assist you with our courses, fee structure, batch timings, admissions, and scholarships.\n\n` +
-                    `How can I help you today? 📚✨`;
-                  try {
-                    await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
-                    await db.execute(
-                      `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                       VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                      [userId, conversationId, currentSessionUuid, welcomeText]
-                    );
-                    await db.execute(
-                      `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
-                      [welcomeText.slice(0, 200), conversationId]
-                    );
-                    aiHandled = true;
-                  } catch (sendErr) {
-                    logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch start welcome greeting');
-                  }
-                  continue;
-                }
-
-                const [aiSettingsRows] = await db.execute(
-                  'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
-                  [userId]
-                );
-                const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
-
-                if (aiSettings && (aiSettings.gemini_api_key || aiSettings.groq_api_key || aiSettings.openrouter_api_key)) {
+                if (aiSettings && hasConfiguredAiKeys) {
                   const [convCheck] = await db.execute(
                     'SELECT id, session_uuid, consecutive_bot_replies, status, bot_paused FROM chat_conversations WHERE user_id = ? AND phone = ? LIMIT 1',
                     [userId, senderPhone]
                   );
                   if (convCheck && convCheck.length > 0) {
                     const conv = convCheck[0];
-                    if (conv.status === 'open' && conv.bot_paused !== 1 && Number(conv.consecutive_bot_replies || 0) < 8) {
+                    const canReply = isPersonalMode || (conv.status === 'open' && conv.bot_paused !== 1 && Number(conv.consecutive_bot_replies || 0) < 8);
+                    if (canReply) {
                       
                       // Step A: Dispatch to 2.5s sliding debouncer to consolidate rapid fragmented messages
                       globalDebouncer.enqueue(userId, msg.key.remoteJid, {
@@ -1593,44 +1797,81 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                         sessionUuid: conv.session_uuid
                       }, async ({ consolidatedText, primaryItem }) => {
                         try {
+                          const isPersonalMode = aiSettings?.agent_mode === 'personal';
+
                           // Double-check conversation status on flush
                           const [freshConv] = await db.execute(
                             'SELECT id, session_uuid, status, bot_paused FROM chat_conversations WHERE id = ? LIMIT 1',
                             [conv.id]
                           );
-                          if (!freshConv || freshConv.length === 0 || freshConv[0].status === 'escalated' || freshConv[0].bot_paused === 1) {
+                          if (!freshConv || freshConv.length === 0) {
                             return;
+                          }
+                          if (!isPersonalMode && (freshConv[0].status === 'escalated' || freshConv[0].bot_paused === 1)) {
+                            return;
+                          }
+                          if (isPersonalMode && (freshConv[0].status === 'escalated' || freshConv[0].bot_paused === 1)) {
+                            await db.execute(
+                              'UPDATE chat_conversations SET status = "open", bot_paused = 0, escalation_reason = NULL WHERE id = ?',
+                              [conv.id]
+                            );
                           }
 
                           const activeSessionUuid = freshConv[0].session_uuid;
 
-                          // Step B: Retrieve recent multi-turn conversation memory
-                          const historyTurns = await ChatMemoryEngine.getRecentTurns(db, conv.id, activeSessionUuid, 8);
+                          // Step B: Retrieve recent multi-turn conversation memory (enforces 45-min rolling TTL decay)
+                          const historyTurns = await ChatMemoryEngine.getRecentTurns(db, conv.id, activeSessionUuid, 6, 45);
 
                           // Step C: Check for query resolution / customer satisfaction
-                          const resolutionCheck = ChatResolutionEngine.detectResolution(consolidatedText, historyTurns);
-                          if (resolutionCheck.isResolved) {
-                            logger.info({ userId, convId: conv.id, remark: resolutionCheck.remark }, '🎉 Inquiry resolved! Auto-closing session.');
-                            await closeSession(db, conv.id, resolutionCheck.remark, true);
+                          // In Personal Assistant mode, customer feedback surveys and auto-closing are completely disabled!
+                          const feedbackAllowed = !isPersonalMode && Number(aiSettings?.feedback_enabled ?? 1) === 1;
 
-                            const closureMsg = ChatResolutionEngine.getClosureMessage();
-                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
-                            await db.execute(
-                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                               VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
-                              [userId, conv.id, activeSessionUuid, closureMsg]
-                            );
-                            await db.execute(
-                              `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?`,
-                              [closureMsg.slice(0, 200), conv.id]
-                            );
-                            return;
+                          if (!isPersonalMode && feedbackAllowed) {
+                            const resolutionCheck = ChatResolutionEngine.detectResolution(consolidatedText, historyTurns);
+                            if (resolutionCheck.isResolved) {
+                              logger.info({ userId, convId: conv.id, remark: resolutionCheck.remark }, '🎉 Inquiry resolved! Auto-closing session.');
+                              await closeSession(db, conv.id, resolutionCheck.remark, true, true);
+
+                              const closureMsg = ChatResolutionEngine.getClosureMessage();
+                              await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
+                              await db.execute(
+                                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+                                 VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
+                                [userId, conv.id, activeSessionUuid, closureMsg]
+                              );
+                              await db.execute(
+                                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?`,
+                                [closureMsg.slice(0, 200), conv.id]
+                              );
+                              return;
+                            }
                           }
 
-                          // Step D: Token Burn Optimizer - Intercept repeated greetings
-                          const greetingCheck = globalGreetingCache.evaluate(userId, senderPhone, consolidatedText, activeSessionUuid);
+                          // Check for active pending draft in this conversation (for 2-phase confirmation routing)
+                          let pendingDraft = null;
+                          try {
+                            const [draftRows] = await db.execute(
+                              `SELECT id, draft_code, action_type, recipient, subject, body_content, status
+                               FROM ai_action_drafts
+                               WHERE user_id = ? AND conversation_id = ? AND status = 'pending' AND expires_at > NOW()
+                               ORDER BY id DESC LIMIT 1`,
+                              [userId, conv.id]
+                            );
+                            if (draftRows && draftRows.length > 0) {
+                              pendingDraft = draftRows[0];
+                            }
+                          } catch (draftErr) {
+                            console.warn('[Server] Failed to query pending drafts:', draftErr.message);
+                          }
+
+                          // Step D: Token Burn Optimizer - Intercept repeated greetings & low-entropy acknowledgments
+                          const greetingCheck = globalGreetingCache.evaluate(userId, senderPhone, consolidatedText, activeSessionUuid, {
+                            isPersonalMode,
+                            ownerName,
+                            hasPendingDraft: Boolean(pendingDraft)
+                          });
                           if (greetingCheck.shouldIntercept && greetingCheck.replyText) {
-                            logger.info({ userId, senderPhone }, '⚡ Intercepted repeated greeting locally - saved LLM tokens!');
+                            logger.info({ userId, senderPhone }, '⚡ Intercepted greeting/acknowledgment locally - saved LLM tokens!');
                             await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: greetingCheck.replyText });
                             await db.execute(
                               `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
@@ -1645,24 +1886,72 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                           let replyText = null;
                           try {
-                            const relevantChunks = await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
+                            // Hybrid Intent Routing & Dynamic Tool/Skill Composition
+                            const detectedIntents = await detectIntents(consolidatedText, { pendingDraft });
+                            const allUserTools = await UniversalToolsRegistry.loadUserTools(userId, db);
+                            const { activeIntents, filteredTools, skillDirectives } = composeSkillsAndTools(detectedIntents, allUserTools, isPersonalMode, { pendingDraft, messageText: consolidatedText });
+
+                            // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
+                            const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
+                            const userFacts = await ChatFactMemory.loadUserFacts(db, userId, {
+                              contactPhone: isPersonalMode ? '' : (senderPhone || ''),
+                              queryText: consolidatedText,
+                              maxFacts: 3
+                            });
+                            const trainingData = await ChatFactMemory.loadTrainingExamples(db, userId, null, 2);
+
                             const { systemPrompt, userMessage } = buildPromptWithRag(
                               aiSettings.system_prompt,
                               relevantChunks,
-                              consolidatedText
+                              consolidatedText,
+                              {
+                                agentMode: aiSettings.agent_mode || 'support',
+                                ownerName: aiSettings.owner_name || 'Boss',
+                                skillDirectives,
+                                factsText: userFacts.factsText,
+                                sessionSummary: conv.session_summary || null,
+                                examplesText: trainingData.examplesText,
+                                constraintsText: trainingData.constraintsText
+                              }
                             );
 
-                            replyText = await generateAiReply(aiSettings, systemPrompt, userMessage, historyTurns);
+                            let callerRole = 'guest';
+                            if (isAdminCaller) {
+                              callerRole = 'admin';
+                            } else {
+                              const [custRows] = await db.execute(
+                                'SELECT id FROM contacts WHERE user_id = ? AND (phone = ? OR phone LIKE ?) LIMIT 1',
+                                [userId, senderPhone, `%${cleanPhone.slice(-10)}%`]
+                              );
+                              if (custRows && custRows.length > 0) {
+                                callerRole = 'customer';
+                              }
+                            }
+
+                            const toolsContext = {
+                              db,
+                              userId,
+                              conversationId: conv.id,
+                              callerPhone: senderPhone,
+                              callerRole,
+                              isPersonalMode,
+                              agentMode: aiSettings.agent_mode || 'support',
+                              ownerName: aiSettings.owner_name || 'Boss',
+                              toolsConfig,
+                              scopedTools: filteredTools
+                            };
+
+                            replyText = await generateAiReply(aiSettings, systemPrompt, userMessage, historyTurns, toolsContext);
                           } finally {
                             await stopTyping();
                           }
 
                           if (replyText && replyText.trim()) {
-                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
+                            const sentAi = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
                             await db.execute(
-                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                              [userId, conv.id, activeSessionUuid, replyText.trim()]
+                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                              [userId, conv.id, activeSessionUuid, replyText.trim(), sentAi?.key?.id || null]
                             );
                             await db.execute(
                               `UPDATE chat_conversations
@@ -1676,6 +1965,15 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           }
                         } catch (debouncedErr) {
                           logger.error({ debouncedErr: debouncedErr.message, userId }, 'Error executing debounced AI reply');
+                          try {
+                            const failNotice = "⚠️ *Temporary AI Service Notice*\nI'm encountering high API load with the AI provider right now. Please try again in a few moments.";
+                            const sentNotice = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: failNotice });
+                            await db.execute(
+                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                              [userId, conv.id, activeSessionUuid, failNotice, sentNotice?.key?.id || null]
+                            );
+                          } catch (_) {}
                         }
                       });
 
@@ -1816,18 +2114,12 @@ async function safelyCleanupAttachment(message, payload) {
       return;
     }
 
-    const attachmentPath = resolve(String(attachment.path));
-    const allowedUploadsDir = resolve(__dirname, '..', 'public', 'uploads');
-    const isWithinUploads = attachmentPath === allowedUploadsDir || attachmentPath.startsWith(allowedUploadsDir + sep);
-    const filename = basename(attachmentPath);
-
-    if (!isWithinUploads || filename === '.htaccess' || filename.startsWith('.')) {
-      return;
-    }
-
+    const attachmentPath = resolve(attachment.path);
     if (!existsSync(attachmentPath)) {
       return;
     }
+
+    const filename = basename(attachmentPath);
 
     // 1. If part of an active campaign, retain media until campaign finishes or cancels
     if (payload?.campaign_id) {
@@ -2065,6 +2357,34 @@ async function sendQueuedMessage(message) {
         await db.execute('UPDATE message_queue SET status = "queued", locked_at = NULL, locked_by = NULL, available_at = DATE_ADD(NOW(), INTERVAL 30 SECOND) WHERE id = ?', [message.id]);
         return;
       }
+    }
+  }
+
+  // 3. WhatsApp Reachout-Timelock Anti-Ban Protection
+  // If WhatsApp temporarily restricted this account from messaging new contacts (cold outreach),
+  // automatically defer campaign messages to protect the phone number from permanent ban!
+  if (session.reachoutTimelock?.isActive) {
+    const endsAt = session.reachoutTimelock.timeEnforcementEnds;
+    const isStillActive = !endsAt || (endsAt instanceof Date && endsAt.getTime() > Date.now());
+    if (isStillActive) {
+      const isCampaign = Boolean(payload?.campaign_id) || payload?.source === 'campaign';
+      if (isCampaign) {
+        logger.warn({ userId: message.user_id, messageId: message.id, endsAt }, 'Anti-Ban Safety: Account under WhatsApp Reachout Timelock. Deferring campaign broadcast.');
+        await db.execute(
+          `UPDATE message_queue
+           SET status = 'queued',
+               locked_at = NULL,
+               locked_by = NULL,
+               error_message = 'Anti-Ban Protection: Account is under temporary WhatsApp Reachout Timelock. Broadcast deferred.',
+               available_at = DATE_ADD(NOW(), INTERVAL 5 MINUTE)
+           WHERE id = ?`,
+          [message.id]
+        );
+        return;
+      }
+    } else {
+      session.reachoutTimelock.isActive = false;
+      await updateSessionRecord(message.user_id, session);
     }
   }
 
@@ -2437,7 +2757,7 @@ async function markMessageSent(message, result, normalizedTo) {
 
   // Ephemeral media cleanup with reference lifecycle management
   try {
-    const payload = message?.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+    const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
     await safelyCleanupAttachment(message, payload);
   } catch (_) {}
 }
@@ -2470,7 +2790,7 @@ async function markMessageFailed(message, error, normalizedTo = null, isUncertai
 
     // Cleanup temporary media with reference lifecycle management if final attempt failed
     try {
-      const payload = message?.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+      const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
       await safelyCleanupAttachment(message, payload);
     } catch (_) {}
   }
@@ -2626,6 +2946,96 @@ app.post('/sessions/:userId/start', async (req, res) => {
   }
 });
 
+app.post('/sessions/:userId/pair-code', async (req, res) => {
+  const userId = req.params.userId;
+  const rawPhone = String(req.body?.phone || req.body?.phoneNumber || '').trim();
+  const cleanPhone = rawPhone.replace(/\D/g, '');
+
+  if (!cleanPhone || cleanPhone.length < 8 || cleanPhone.length > 15) {
+    return res.status(400).json({
+      ok: false,
+      error: 'Please provide a valid phone number with country code (8 to 15 digits, e.g. 15551234567).'
+    });
+  }
+
+  try {
+    let session = getSession(userId);
+
+    if (session.state === 'connected' && session.phone) {
+      return res.status(400).json({
+        ok: false,
+        error: 'A device is already connected. Please logout before pairing a new device.'
+      });
+    }
+
+    const authDir = join(SESSION_DIR, `user_${userId}`);
+    const credsFile = join(authDir, 'creds.json');
+    let isRegistered = false;
+    if (existsSync(credsFile)) {
+      try {
+        const parsed = JSON.parse(readFileSync(credsFile, 'utf8') || '{}');
+        isRegistered = Boolean(parsed.registered);
+      } catch (_) {}
+    }
+
+    // If existing credentials are for an unlinked/stale registered session, clean them up
+    if (isRegistered || !session.sock || !['connecting', 'qr'].includes(session.state)) {
+      if (isRegistered) {
+        destroySocket(session);
+        try { await rm(authDir, { recursive: true, force: true }); } catch (_) {}
+      }
+      session = await startSession(userId, true, false);
+    }
+
+    if (session.starting) {
+      try {
+        await session.starting;
+      } catch (err) {
+        logger.warn({ userId, err: err.message }, 'Session starting encountered warning during pair-code request');
+      }
+    }
+
+    const sock = session.sock;
+    if (!sock) {
+      throw new Error('WhatsApp gateway socket failed to initialize.');
+    }
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timed out waiting for WhatsApp gateway.')), 15000)
+    );
+
+    await Promise.race([
+      sock.waitForSocketOpen(),
+      timeoutPromise
+    ]);
+
+    // Safety pause to allow WhatsApp server initial handshake
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const rawCode = await sock.requestPairingCode(cleanPhone);
+    const formattedCode = rawCode ? (rawCode.match(/.{1,4}/g)?.join('-') || rawCode) : rawCode;
+
+    session.pairingCode = formattedCode;
+    session.error = null;
+
+    res.json({
+      ok: true,
+      code: formattedCode,
+      rawCode,
+      session: publicSession(session)
+    });
+  } catch (error) {
+    logger.error({ userId, error: error.message }, 'Failed to generate WhatsApp pairing code');
+    const session = getSession(userId);
+    session.error = error.message;
+    res.status(500).json({
+      ok: false,
+      error: error.message || 'Failed to request pairing code from WhatsApp.',
+      session: publicSession(session)
+    });
+  }
+});
+
 app.post('/sessions/:userId/logout', async (req, res) => {
   const session = getSession(req.params.userId);
   const cleanUserId = String(parseInt(String(req.params.userId), 10));
@@ -2657,7 +3067,7 @@ app.post('/sessions/:userId/logout', async (req, res) => {
 app.post('/sessions/:userId/auto-sleep', async (req, res) => {
   const userId = req.params.userId;
   const session = getSession(userId);
-  const enabled = req.body?.auto_sleep_enabled !== undefined ? Boolean(req.body?.auto_sleep_enabled) : true;
+  const enabled = req.body?.auto_sleep_enabled !== undefined ? Boolean(req.body.auto_sleep_enabled) : true;
   const rawTimeout = Number(req.body?.auto_sleep_timeout_seconds) || 60;
   const timeoutSeconds = Math.max(15, Math.min(86400, rawTimeout));
 
@@ -2727,9 +3137,9 @@ app.post('/sessions/:userId/wake', async (req, res) => {
 
 app.post('/sessions/:userId/send', async (req, res) => {
   const session = getSession(req.params.userId);
-  const targetRecipient = await resolveJidToPhone(req.params.userId, req.body?.to, session);
-  const recipient = targetRecipient ? normalizeRecipient(targetRecipient) : normalizeRecipient(req.body?.to);
-  const message = String(req.body?.message || '').trim();
+  const targetRecipient = await resolveJidToPhone(req.params.userId, req.body.to, session);
+  const recipient = normalizeRecipient(targetRecipient || req.body.to);
+  const message = String(req.body.message || '').trim();
 
   if (!recipient.jid || !message) {
     res.status(422).json({
@@ -2830,7 +3240,7 @@ async function startWorker() {
 
   try {
     const [rows] = await db.execute(
-      'SELECT user_id, status, phone, push_name, sleeping, auto_sleep_enabled, auto_sleep_timeout_seconds FROM whatsapp_sessions'
+      'SELECT user_id, status, phone, push_name, sleeping, auto_sleep_enabled, auto_sleep_timeout_seconds, reachout_timelock_active, reachout_timelock_ends_at, reachout_timelock_type FROM whatsapp_sessions'
     );
     for (const row of rows) {
       const uid = String(row.user_id);
@@ -2844,6 +3254,17 @@ async function startWorker() {
       }
       if (row.auto_sleep_timeout_seconds) {
         s.autoSleepTimeoutSeconds = Math.max(15, Math.min(86400, Number(row.auto_sleep_timeout_seconds) || 60));
+      }
+      if (row.reachout_timelock_active !== undefined) {
+        const isActive = Number(row.reachout_timelock_active) === 1;
+        const endsAt = row.reachout_timelock_ends_at ? new Date(row.reachout_timelock_ends_at) : null;
+        if (isActive && (!endsAt || endsAt.getTime() > Date.now())) {
+          s.reachoutTimelock = {
+            isActive: true,
+            timeEnforcementEnds: endsAt,
+            enforcementType: row.reachout_timelock_type || 'DEFAULT'
+          };
+        }
       }
 
       // Auto-reconnect active sessions so WhatsApp Baileys sockets are restored on worker startup
@@ -2860,9 +3281,16 @@ async function startWorker() {
 
   const server = app.listen(PORT, '127.0.0.1', () => {
     console.info(`[worker] listener=http://127.0.0.1:${PORT} health_route=GET /health database=ready`);
-    console.info('[worker] ⭐ Star WhatsGateway on GitHub: https://github.com/navneetyadav-code/whatsapp-api');
     setInterval(processQueueOnce, QUEUE_POLL_MS);
     setInterval(processWebhookQueueOnce, QUEUE_POLL_MS);
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[worker] FATAL: Port ${PORT} is already in use by another instance. Exiting immediately.`);
+    } else {
+      console.error(`[worker] Server error:`, err);
+    }
+    process.exit(1);
   });
   attachClientErrorDiagnostics(server, logger);
 }
@@ -2870,6 +3298,6 @@ async function startWorker() {
 startWorker().catch(async (error) => {
   logger.error({ error_class: error?.name || 'Error', error_code: error?.code || null, error_message: safeErrorMessage(error) }, 'Worker startup failed; queue processor was not started');
   await db.end().catch(() => {});
-  process.exitCode = 1;
+  process.exit(1);
 });
 

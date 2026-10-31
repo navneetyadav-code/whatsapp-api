@@ -21,8 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
-// 1. Secret API Key - Loaded from environment or default configuration
-$API_SECRET = (string) (getenv('INFINITYFREE_API_SECRET') ?: 'ag_secret_infinity_key_2026');
+// 1. Secret API Key - Change this to any secret password you prefer!
+$API_SECRET = 'ag_secret_infinity_key_2026';
 
 // 2. Validate Authorization
 $providedKey = $_SERVER['HTTP_X_API_KEY'] ?? '';
@@ -35,8 +35,7 @@ if (!$providedKey && isset($_REQUEST['api_key'])) {
     $providedKey = (string)$_REQUEST['api_key'];
 }
 
-// Timing-safe constant-time evaluation to prevent side-channel timing attacks (CWE-208)
-if (!hash_equals($API_SECRET, $providedKey)) {
+if ($providedKey !== $API_SECRET) {
     http_response_code(401);
     echo json_encode([
         'ok' => false,

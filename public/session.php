@@ -28,7 +28,6 @@ if ($action === 'start') {
             'error' => (string) (app_config('app.restricted_notice') ?: 'New device linking is disabled on this instance.'),
         ], 403);
     }
-
     sync_session_status($userId, [
         'state' => 'connecting',
         'sleeping' => false,
@@ -36,6 +35,40 @@ if ($action === 'start') {
     ]);
 
     $response = worker_request('POST', "sessions/{$userId}/start");
+    if (!empty($response['ok'])) {
+        sync_session_status($userId, $response['session'] ?? []);
+    }
+    json_response($response, !empty($response['ok']) ? 200 : 502);
+}
+
+if ($action === 'pair-code') {
+    $allowNewDevices = (bool) app_config('app.allow_new_devices');
+
+    if (!$allowNewDevices && !is_owner($user)) {
+        json_response([
+            'ok' => false,
+            'error' => (string) (app_config('app.restricted_notice') ?: 'New device linking is disabled on this instance.'),
+        ], 403);
+    }
+
+    $input = request_json();
+    $phone = trim((string) ($input['phone'] ?? $input['phoneNumber'] ?? $_POST['phone'] ?? ''));
+    $cleanPhone = preg_replace('/\D+/', '', $phone);
+
+    if (strlen($cleanPhone) < 8 || strlen($cleanPhone) > 15) {
+        json_response([
+            'ok' => false,
+            'error' => 'Please provide a valid phone number with country code (8 to 15 digits).',
+        ], 422);
+    }
+
+    sync_session_status($userId, [
+        'state' => 'connecting',
+        'sleeping' => false,
+        'error' => null,
+    ]);
+
+    $response = worker_request('POST', "sessions/{$userId}/pair-code", ['phone' => $cleanPhone], 30);
     if (!empty($response['ok'])) {
         sync_session_status($userId, $response['session'] ?? []);
     }

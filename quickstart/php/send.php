@@ -19,7 +19,7 @@ function prompt(string $message): string
 $options = getopt('h', ['to:', 'message:', 'key:', 'url:', 'format::', 'no-humanize', 'help']);
 
 if (isset($options['help']) || isset($options['h'])) {
-    echo "WhatsGateway — PHP Quickstart\n"
+    echo "WhatsApp API Hub — PHP Quickstart\n"
        . "Usage:\n"
        . "  php send.php [options]\n\n"
        . "Options:\n"

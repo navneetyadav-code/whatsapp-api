@@ -1,4 +1,4 @@
-# ☕ Java Quickstart — WhatsGateway
+# ☕ Java Quickstart — WhatsApp API Hub
 
 A modern Java client compatible with Java 11, 17, and 21+ using standard `java.net.http.HttpClient` with **zero external dependencies**.
 

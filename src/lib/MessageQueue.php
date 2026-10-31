@@ -277,7 +277,7 @@ function create_campaign_for_contacts(
                         json_encode($payloadData, JSON_UNESCAPED_SLASHES),
                         $availableAt,
                     ]);
-                } elseif (!empty($attachment)) {
+                } else {
                     $queue = $pdo->prepare(
                         'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
                          VALUES (?, NULL, ?, ?, ?, ?, 1)'
@@ -286,17 +286,6 @@ function create_campaign_for_contacts(
                         $userId,
                         $recipientPhone,
                         $messageType,
-                        $body,
-                        json_encode($payloadData, JSON_UNESCAPED_SLASHES),
-                    ]);
-                } else {
-                    $queue = $pdo->prepare(
-                        'INSERT INTO message_queue (user_id, api_key_id, recipient, message_type, body, payload, priority)
-                         VALUES (?, NULL, ?, "text", ?, ?, 1)'
-                    );
-                    $queue->execute([
-                        $userId,
-                        $recipientPhone,
                         $body,
                         json_encode($payloadData, JSON_UNESCAPED_SLASHES),
                     ]);
@@ -531,4 +520,146 @@ function count_messages(int $userId): int
     $stmt = Database::pdo()->prepare('SELECT COUNT(*) FROM message_queue WHERE user_id = ?');
     $stmt->execute([$userId]);
     return (int) $stmt->fetchColumn();
+}
+
+
+/**
+ * Retrieves aggregated message analytics for dashboard charts (Sent vs Received, By Type, Top Chats)
+ * Period options: '24h', '7d', '30d'
+ */
+function get_dashboard_analytics_stats(int $userId, string $period = '24h'): array
+{
+    $pdo = Database::pdo();
+    $validPeriods = ['24h', '7d', '30d'];
+    if (!in_array($period, $validPeriods, true)) {
+        $period = '24h';
+    }
+
+    $dbNow = $pdo->query('SELECT NOW()')->fetchColumn() ?: date('Y-m-d H:i:s');
+    $baseTime = strtotime((string) $dbNow);
+
+    if ($period === '7d') {
+        $groupBy = '%Y-%m-%d';
+        $intervalSql = 'INTERVAL 7 DAY';
+    } elseif ($period === '30d') {
+        $groupBy = '%Y-%m-%d';
+        $intervalSql = 'INTERVAL 30 DAY';
+    } else { // 24h
+        $groupBy = '%Y-%m-%d %H:00';
+        $intervalSql = 'INTERVAL 24 HOUR';
+    }
+
+    // 1. Time Series (Sent vs Received from chat_messages)
+    $tsStmt = $pdo->prepare("
+        SELECT
+            DATE_FORMAT(created_at, '$groupBy') AS time_slot,
+            SUM(CASE WHEN sender_type IN ('bot', 'agent') THEN 1 ELSE 0 END) AS sent_count,
+            SUM(CASE WHEN sender_type = 'contact' THEN 1 ELSE 0 END) AS received_count,
+            SUM(CASE WHEN sender_type IN ('bot', 'agent') AND status IN ('delivered', 'read') THEN 1 ELSE 0 END) AS delivered_count,
+            SUM(CASE WHEN sender_type IN ('bot', 'agent') AND status = 'failed' THEN 1 ELSE 0 END) AS failed_count
+        FROM chat_messages
+        WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), $intervalSql)
+        GROUP BY time_slot
+        ORDER BY time_slot ASC
+    ");
+    $tsStmt->execute([$userId]);
+    $indexed = [];
+    foreach ($tsStmt->fetchAll(PDO::FETCH_ASSOC) as $pt) {
+        $indexed[$pt['time_slot']] = [
+            'sent' => (int) $pt['sent_count'],
+            'received' => (int) $pt['received_count'],
+            'delivered' => (int) $pt['delivered_count'],
+            'failed' => (int) $pt['failed_count'],
+        ];
+    }
+
+    $timeSeries = [];
+    if ($period === '24h') {
+        for ($i = 23; $i >= 0; $i--) {
+            $t = $baseTime - ($i * 3600);
+            $slotKey = date('Y-m-d H:00', $t);
+            $label = date('H:i', $t);
+            $timeSeries[] = [
+                'timestamp' => $slotKey,
+                'label' => $label,
+                'sent' => $indexed[$slotKey]['sent'] ?? 0,
+                'received' => $indexed[$slotKey]['received'] ?? 0,
+                'delivered' => $indexed[$slotKey]['delivered'] ?? 0,
+                'failed' => $indexed[$slotKey]['failed'] ?? 0,
+            ];
+        }
+    } else {
+        $days = ($period === '7d') ? 6 : 29;
+        for ($i = $days; $i >= 0; $i--) {
+            $t = $baseTime - ($i * 86400);
+            $slotKey = date('Y-m-d', $t);
+            $label = date('M j', $t);
+            $timeSeries[] = [
+                'timestamp' => $slotKey,
+                'label' => $label,
+                'sent' => $indexed[$slotKey]['sent'] ?? 0,
+                'received' => $indexed[$slotKey]['received'] ?? 0,
+                'delivered' => $indexed[$slotKey]['delivered'] ?? 0,
+                'failed' => $indexed[$slotKey]['failed'] ?? 0,
+            ];
+        }
+    }
+
+    // 2. By Message Type
+    $typeStmt = $pdo->prepare("
+        SELECT
+            COALESCE(NULLIF(message_type, ''), 'text') AS mtype,
+            COUNT(*) AS cnt
+        FROM chat_messages
+        WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), $intervalSql)
+        GROUP BY mtype
+    ");
+    $typeStmt->execute([$userId]);
+    $byType = ['text' => 0, 'image' => 0, 'document' => 0, 'audio' => 0, 'video' => 0];
+    foreach ($typeStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $mtype = strtolower((string) $row['mtype']);
+        if (!isset($byType[$mtype])) {
+            $byType[$mtype] = 0;
+        }
+        $byType[$mtype] += (int) $row['cnt'];
+    }
+
+    // 3. Top Active Chats
+    $topStmt = $pdo->prepare("
+        SELECT
+            c.id,
+            c.phone,
+            c.contact_name,
+            COUNT(m.id) AS message_count
+        FROM chat_conversations c
+        JOIN chat_messages m ON m.conversation_id = c.id
+        WHERE c.user_id = ? AND m.created_at >= DATE_SUB(NOW(), $intervalSql)
+        GROUP BY c.id, c.phone, c.contact_name
+        ORDER BY message_count DESC
+        LIMIT 8
+    ");
+    $topStmt->execute([$userId]);
+    $topChats = [];
+    foreach ($topStmt->fetchAll(PDO::FETCH_ASSOC) as $tc) {
+        $name = !empty($tc['contact_name']) ? (string) $tc['contact_name'] : (string) $tc['phone'];
+        $topChats[] = [
+            'chatId' => (string) $tc['phone'],
+            'name' => $name,
+            'count' => (int) $tc['message_count'],
+        ];
+    }
+
+    return [
+        'period' => $period,
+        'timeSeries' => $timeSeries,
+        'byType' => $byType,
+        'topChats' => $topChats,
+        'totals' => [
+            'sent' => array_sum(array_column($timeSeries, 'sent')),
+            'received' => array_sum(array_column($timeSeries, 'received')),
+            'delivered' => array_sum(array_column($timeSeries, 'delivered')),
+            'failed' => array_sum(array_column($timeSeries, 'failed')),
+            'total' => array_sum($byType),
+        ],
+    ];
 }

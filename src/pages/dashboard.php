@@ -22,7 +22,35 @@ declare(strict_types=1);
  */
 
 $user = $user ?? require_auth();
+$pdo = Database::pdo();
+$agentMode = 'support';
+try {
+    $modeStmt = $pdo->prepare('SELECT agent_mode FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
+    $modeStmt->execute([(int) $user['id']]);
+    $agentMode = (string) ($modeStmt->fetchColumn() ?: 'support');
+} catch (\Throwable $e) {}
+$isPersonalMode = ($agentMode === 'personal');
 $section = (string) ($page ?? ($_GET['page'] ?? 'dashboard'));
+
+// Personal Assistant Mode Guard: Redirect away if user directly visits Support Bot pages
+if ($isPersonalMode && in_array($section, ['live-chat', 'knowledge', 'escalations'], true)) {
+    flash('info', 'Company Knowledge Base, Live Chat, and Escalation Alarms are disabled while in Personal Assistant Mode.');
+    redirect_to('index.php?page=chatbot');
+}
+
+// Backward compatibility: gracefully map legacy ?page=chatbot&tab=... to separate dedicated pages
+if ($section === 'chatbot' && !empty($_GET['tab'])) {
+    $tab = trim((string) $_GET['tab']);
+    if ($tab === 'knowledge') {
+        $section = 'knowledge';
+    } elseif ($tab === 'tools') {
+        $section = 'tools';
+    } elseif ($tab === 'escalations') {
+        $section = 'escalations';
+    } elseif ($tab === 'presets' || $tab === 'app-store') {
+        $section = 'app-store';
+    }
+}
 $pdo = Database::pdo();
 
 // Section registry mapping route keys to data loaders and isolated view partials
@@ -38,7 +66,17 @@ $sections = [
     'campaigns' => ['data' => 'campaigns.data.php', 'view' => 'campaigns.php'],
     'webhooks'  => ['data' => 'webhooks.data.php',  'view' => 'webhooks.php'],
     'audit'     => ['data' => 'audit.data.php',     'view' => 'audit.php'],
-    'chatbot'   => ['data' => 'chatbot.data.php',   'view' => 'chatbot.php'],
+    'chatbot'     => ['data' => 'chatbot.data.php',     'view' => 'chatbot.php'],
+    'ai-agent'    => ['data' => 'chatbot.data.php',     'view' => 'chatbot.php'],
+    'knowledge'   => ['data' => 'knowledge.data.php',   'view' => 'knowledge.php'],
+    'tools'       => ['data' => 'tools.data.php',       'view' => 'tools.php'],
+    'app-store'   => ['data' => 'app-store.data.php',   'view' => 'app-store.php'],
+    'presets'     => ['data' => 'app-store.data.php',   'view' => 'app-store.php'],
+    'escalations' => ['data' => 'escalations.data.php', 'view' => 'escalations.php'],
+    'rules'     => ['data' => 'rules.data.php',     'view' => 'rules.php'],
+    'keyword-rules' => ['data' => 'rules.data.php', 'view' => 'rules.php'],
+    'ai-credentials' => ['data' => 'ai-credentials.data.php', 'view' => 'ai-credentials.php'],
+    'ai-keys'        => ['data' => 'ai-credentials.data.php', 'view' => 'ai-credentials.php'],
 ];
 
 if (!isset($sections[$section])) {

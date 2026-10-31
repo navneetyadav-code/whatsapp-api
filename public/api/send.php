@@ -75,6 +75,7 @@ if (isset($data['caption']) && is_string($data['caption'])) {
     $message = trim($data['caption']);
 } elseif (isset($data['message']) && is_string($data['message'])) {
     $message = trim($data['message']);
+
 } elseif (isset($data['text']) && is_array($data['text']) && isset($data['text']['body'])) {
     // Meta Cloud API text format
     $message = trim((string) $data['text']['body']);

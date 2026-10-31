@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-WhatsGateway — Python Quickstart
+WhatsApp API Hub — Python Quickstart
 Production-ready client supporting both Standard and Meta WhatsApp Cloud API formats.
 
 Usage:
@@ -107,7 +107,7 @@ class WhatsAppHubClient:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="WhatsGateway Python Quickstart")
+    parser = argparse.ArgumentParser(description="WhatsApp API Hub Python Quickstart")
     parser.add_argument("--to", help="Recipient phone number (e.g. 919876543210)")
     parser.add_argument("--message", help="Message content to send")
     parser.add_argument("--key", default=os.getenv("WA_API_KEY", ""), help="API Key (wa_live_...)")

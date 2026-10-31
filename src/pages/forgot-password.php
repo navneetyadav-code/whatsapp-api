@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (login_lockout_seconds($email) > 0) {
-            json_response(['ok' => false, 'error' => 'Too many failed attempts. Account is temporarily locked. Please try again in 15 minutes.'], 429);
+            json_response(['ok' => false, 'error' => 'Too many attempts. Account is temporarily locked. Please try again in 15 minutes.'], 429);
         }
 
         $pdo = Database::pdo();
@@ -76,14 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$email]);
         $user = $stmt->fetch();
         if (!$user) {
-            // Constant-time mitigation to prevent user enumeration
-            usleep(random_int(120000, 220000));
-            json_response([
-                'ok' => true,
-                'sent_via' => ['WhatsApp'],
-                'phone' => '*****' . substr(hash('sha256', $email), 0, 4),
-                'cooldown' => 60
-            ]);
+            // Constant response: do not disclose whether user exists
+            json_response(['ok' => true]);
         }
 
         $userId = (int) $user['id'];
@@ -187,16 +181,8 @@ It expires in 15 minutes.";
         $otp = trim((string) ($data['otp'] ?? ''));
         $newPassword = (string) ($data['new_password'] ?? '');
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            json_response(['ok' => false, 'error' => 'Invalid email address.'], 400);
-        }
-
         if (login_lockout_seconds($email) > 0) {
             json_response(['ok' => false, 'error' => 'Too many failed attempts. Account is temporarily locked. Please try again later.'], 429);
-        }
-
-        if (!preg_match('/^[0-9]{6}$/', $otp)) {
-            json_response(['ok' => false, 'error' => 'OTP must be a 6-digit number.'], 400);
         }
 
         if (strlen($newPassword) < 8) {
@@ -217,11 +203,10 @@ It expires in 15 minutes.";
 
             if ($failedCount >= 5) {
                 $pdo->prepare("DELETE FROM password_resets WHERE email = ?")->execute([$email]);
-                json_response(['ok' => false, 'error' => 'Too many failed OTP attempts. Your reset code has been invalidated for security. Please request a new one.'], 429);
+                json_response(['ok' => false, 'error' => 'Too many failed OTP attempts. Your reset code has been invalidated for security. Please request a new one later.'], 429);
             }
 
-            $remaining = max(1, 5 - $failedCount);
-            json_response(['ok' => false, 'error' => "Invalid or expired OTP. {$remaining} attempts remaining."], 400);
+            json_response(['ok' => false, 'error' => 'Invalid or expired OTP.'], 400);
         }
 
         $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE email = ?");
@@ -229,9 +214,6 @@ It expires in 15 minutes.";
 
         $stmt = $pdo->prepare("DELETE FROM password_resets WHERE email = ?");
         $stmt->execute([$email]);
-
-        // Ensure security flag is set
-        $pdo->prepare("INSERT INTO user_security (user_id, password_set) SELECT id, 1 FROM users WHERE email = ? ON DUPLICATE KEY UPDATE password_set = 1")->execute([$email]);
 
         clear_failed_logins($email);
         session_regenerate_id(true);
@@ -322,7 +304,7 @@ It expires in 15 minutes.";
 
         <!-- Top Logo -->
         <div class="relative z-10 flex items-center gap-2.5">
-            <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/20">
+            <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-contain shadow-sm border border-white/20">
             <span class="font-semibold text-white tracking-wide text-sm">WhatsGateway</span>
         </div>
 
@@ -374,7 +356,7 @@ It expires in 15 minutes.";
             
             <!-- Logo inside form (mobile branding) -->
             <div class="flex items-center gap-2 mb-6 lg:hidden">
-                <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-cover shadow-sm border border-gray-100">
+                <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-contain shadow-sm border border-gray-100">
                 <span class="font-bold text-gray-900 tracking-tight text-base">WhatsGateway</span>
             </div>
 

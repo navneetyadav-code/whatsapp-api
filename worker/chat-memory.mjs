@@ -3,19 +3,22 @@
  * -----------------------------------------------
  * Retrieves, windows, and structures recent conversation dialogue turns
  * from the database to give the AI engine human-like conversational memory.
- * Supports follow-up questions, pronoun resolution, and contextual continuity.
+ * Supports rolling Time-To-Live (TTL) decay to avoid 24/7 memory bloat.
  */
 
 export class ChatMemoryEngine {
   /**
-   * Fetch recent dialogue turns for the active session
+   * Fetch recent dialogue turns for the active working session
+   * Enforces rolling Time-To-Live (TTL) inactivity decay: if silence exceeds ttlMinutes,
+   * working memory resets to a fresh slate to prevent 24/7 context pollution.
    * @param {Object} db - MySQL connection/pool
    * @param {number|string} conversationId
    * @param {string} [sessionUuid]
-   * @param {number} [maxTurns=8] - Max historical messages to include
+   * @param {number} [maxTurns=6] - Max historical messages to include
+   * @param {number} [ttlMinutes=45] - Inactivity decay window in minutes (default 45)
    * @returns {Promise<Array<{ senderType: string, body: string, role: string }>>}
    */
-  static async getRecentTurns(db, conversationId, sessionUuid = null, maxTurns = 8) {
+  static async getRecentTurns(db, conversationId, sessionUuid = null, maxTurns = 6, ttlMinutes = 45) {
     if (!conversationId) return [];
 
     let query = `
@@ -33,8 +36,13 @@ export class ChatMemoryEngine {
       params.push(sessionUuid);
     }
 
-    const safeLimit = Math.max(2, Math.min(parseInt(maxTurns, 10) || 8, 20));
-    query += ' ORDER BY id DESC LIMIT ' + safeLimit;
+    if (ttlMinutes && Number(ttlMinutes) > 0) {
+      query += ' AND created_at >= NOW() - INTERVAL ? MINUTE';
+      params.push(Number(ttlMinutes));
+    }
+
+    query += ' ORDER BY id DESC LIMIT ?';
+    params.push(Math.max(2, Math.min(maxTurns, 20)));
 
     try {
       const [rows] = await db.execute(query, params);
@@ -43,15 +51,31 @@ export class ChatMemoryEngine {
       // Reverse to chronological order (oldest to newest)
       const chronological = rows.reverse();
 
-      return chronological.map(r => {
+      // Enforce token-safe sliding window: max 500 chars per turn, max 1,600 chars total
+      let accumulatedChars = 0;
+      const safeTurns = [];
+
+      // Process from newest to oldest to preserve the most recent context
+      for (let i = chronological.length - 1; i >= 0; i--) {
+        const r = chronological[i];
+        let body = (r.body || '').trim();
+        if (body.length > 500) {
+          body = body.slice(0, 497) + '...';
+        }
+        if (accumulatedChars + body.length > 1600) {
+          break; // Stop including older turns if budget is exceeded
+        }
+        accumulatedChars += body.length;
         const isUser = r.sender_type === 'contact';
-        return {
+        safeTurns.unshift({
           senderType: r.sender_type,
-          body: (r.body || '').trim(),
+          body,
           role: isUser ? 'user' : 'model',
           openAiRole: isUser ? 'user' : 'assistant'
-        };
-      });
+        });
+      }
+
+      return safeTurns;
     } catch (err) {
       console.warn('[ChatMemoryEngine] Failed to retrieve turns:', err.message);
       return [];
@@ -95,7 +119,6 @@ export class ChatMemoryEngine {
     // Ensure the current message is the final user turn
     const lastTurn = contents[contents.length - 1];
     if (lastTurn && lastTurn.role === 'user') {
-      // If last turn was already user, combine
       lastTurn.parts[0].text += `\n${currentMessage}`;
     } else {
       contents.push({

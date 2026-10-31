@@ -1,6 +1,6 @@
 <?php
 /**
- * WhatsGateway - Send Media & Message Example
+ * WhatsApp API Hub - Send Media & Message Example
  * Demonstrates sending Images, PDFs, Videos, or Audio via REST API.
  * 
  * Supports:
@@ -110,7 +110,7 @@ function sendLocalMediaFile(string $apiUrl, string $apiKey, string $to, string $
 // ==============================================================================
 // EXECUTION / DEMO RUN
 // ==============================================================================
-echo "--- WhatsGateway Media Sender ---\n";
+echo "--- WhatsApp API Hub Media Sender ---\n";
 
 // Example: Sending an Image via URL with a Caption
 $sampleImageUrl = 'https://images.unsplash.com/photo-1579202673506-ca3ce28943ef';

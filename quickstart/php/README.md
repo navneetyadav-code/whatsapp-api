@@ -1,4 +1,4 @@
-# 🐘 PHP Quickstart — WhatsGateway
+# 🐘 PHP Quickstart — WhatsApp API Hub
 
 A production-ready PHP client class with zero composer dependencies (uses PHP's built-in `cURL` extension).
 
