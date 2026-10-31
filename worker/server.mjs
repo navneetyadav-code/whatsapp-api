@@ -261,9 +261,8 @@ function databaseOptions() {
       else if (!['charset', 'unix_socket'].includes(key.trim())) throw new Error('DB_DSN contains an unsupported connection option.');
     }
   }
-  const isTiDB = options.host.toLowerCase().includes('tidbcloud.com') || options.port === 4000;
-  if (isTiDB && (!options.database || options.database === 'whatsapp_api')) {
-    options.database = 'test';
+  if (process.env.DB_NAME) {
+    options.database = process.env.DB_NAME;
   }
   if (!options.database) throw new Error('DB_NAME or DB_DSN must specify a database name.');
   if (!options.host || !Number.isInteger(options.port) || options.port < 1 || options.port > 65535) {
