@@ -2,7 +2,7 @@
 -- Allows users to customize the exact AI model per key instead of a fixed global provider model.
 
 ALTER TABLE `ai_provider_keys`
-  ADD COLUMN `model` varchar(120) DEFAULT NULL AFTER `api_key`;
+  ADD COLUMN `model` varchar(120) DEFAULT NULL;
 
 UPDATE `ai_provider_keys` k
 JOIN `ai_agent_settings` s ON k.user_id = s.user_id

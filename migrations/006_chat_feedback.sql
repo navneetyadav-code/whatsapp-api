@@ -2,9 +2,9 @@
 -- Adds status and awaiting_feedback flag to chat_conversations
 -- Creates chat_feedback table for 5-star customer ratings and reviews
 
-ALTER TABLE `chat_conversations` ADD COLUMN `status` enum('open', 'closed') NOT NULL DEFAULT 'open' AFTER `is_pinned`;
-ALTER TABLE `chat_conversations` ADD COLUMN `closed_at` timestamp NULL DEFAULT NULL AFTER `status`;
-ALTER TABLE `chat_conversations` ADD COLUMN `awaiting_feedback` tinyint(1) NOT NULL DEFAULT 0 AFTER `closed_at`;
+ALTER TABLE `chat_conversations` ADD COLUMN `status` enum('open', 'closed') NOT NULL DEFAULT 'open';
+ALTER TABLE `chat_conversations` ADD COLUMN `closed_at` timestamp NULL DEFAULT NULL;
+ALTER TABLE `chat_conversations` ADD COLUMN `awaiting_feedback` tinyint(1) NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS `chat_feedback` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
