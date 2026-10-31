@@ -62,7 +62,7 @@ function migrationRun(): void
                 } catch (PDOException $e) {
                     $code = (int) ($e->errorInfo[1] ?? 0);
                     // Ignore duplicate table (1050), duplicate column (1060), duplicate key (1061)
-                    if (!in_array($code, [1050, 1060, 1061], true)) {
+                    if (!in_array($code, [1050, 1060, 1061, 1091], true)) {
                         throw $e;
                     }
                 }

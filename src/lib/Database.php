@@ -45,12 +45,40 @@ final class Database
             $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
         }
 
-        self::$pdo = new PDO(
-            self::$config['dsn'],
-            self::$config['user'],
-            self::$config['password'],
-            $options
-        );
+        try {
+            self::$pdo = new PDO(
+                self::$config['dsn'],
+                self::$config['user'],
+                self::$config['password'],
+                $options
+            );
+        } catch (PDOException $e) {
+            $code = (int) ($e->errorInfo[1] ?? 0);
+            if ($code === 1049 && preg_match('/dbname=([^;]+)/i', (string) (self::$config['dsn'] ?? ''), $matches)) {
+                $dbName = trim($matches[1]);
+                $serverDsn = preg_replace('/dbname=[^;]+;?/i', '', (string) self::$config['dsn']);
+                try {
+                    $rootPdo = new PDO(
+                        $serverDsn,
+                        self::$config['user'],
+                        self::$config['password'],
+                        $options
+                    );
+                    $rootPdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                    unset($rootPdo);
+                    self::$pdo = new PDO(
+                        self::$config['dsn'],
+                        self::$config['user'],
+                        self::$config['password'],
+                        $options
+                    );
+                    return self::$pdo;
+                } catch (Throwable) {
+                    throw $e;
+                }
+            }
+            throw $e;
+        }
 
         return self::$pdo;
     }

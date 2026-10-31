@@ -6,10 +6,14 @@ RUN apt-get update && apt-get install -y \
     git \
     supervisor \
     ca-certificates \
+    libonig-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libxml2-dev \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
-    && docker-php-ext-install pdo pdo_mysql \
-    && a2enmod rewrite \
+    && docker-php-ext-install pdo pdo_mysql mbstring \
+    && a2enmod rewrite headers \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Point Apache DocumentRoot to /var/www/html/public with .htaccess overrides enabled
@@ -25,11 +29,14 @@ WORKDIR /var/www/html
 # Copy repository files
 COPY . /var/www/html
 
-# Create session directory, dummy .env, and set permissions
-RUN mkdir -p /var/www/html/whatsapp-api-data/sessions /var/log/supervisor \
+# Create session directory, uploads directory, dummy .env, and set permissions
+RUN mkdir -p /var/www/html/whatsapp-api-data/sessions \
+             /var/www/html/public/uploads \
+             /var/log/supervisor \
     && touch /var/www/html/.env \
     && ln -sf /var/www/html/public /var/www/html/public/public \
-    && chown -R www-data:www-data /var/www/html
+    && chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html/public/uploads
 
 # Install worker dependencies
 RUN cd /var/www/html/worker && npm install --omit=dev
