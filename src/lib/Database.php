@@ -60,19 +60,6 @@ final class Database
             }
 
             // Database was unknown (error 1049).
-            // 1. Direct fallback: connect to 'test' (standard TiDB Cloud default schema)
-            try {
-                $testDsn = preg_replace('/dbname=[^;]+/i', 'dbname=test', (string) self::$config['dsn']);
-                $testPdo = new PDO($testDsn, self::$config['user'], self::$config['password'], $options);
-                self::$pdo = $testPdo;
-                self::$config['dsn'] = $testDsn;
-                putenv('DB_NAME=test');
-                $_ENV['DB_NAME'] = 'test';
-                return self::$pdo;
-            } catch (Throwable) {
-                // Not using 'test' fallback, continue to dynamic discovery
-            }
-
             $requestedDb = 'whatsapp_api';
             if (preg_match('/dbname=([^;]+)/i', (string) (self::$config['dsn'] ?? ''), $matches)) {
                 $requestedDb = trim($matches[1]);
