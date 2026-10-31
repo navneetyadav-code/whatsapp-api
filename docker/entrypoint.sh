@@ -20,6 +20,18 @@ chown -R www-data:www-data /var/www/html/whatsapp-api-data \
 chmod 700 /var/www/html/whatsapp-api-data/sessions
 chmod 755 /var/www/html/public/uploads
 
+# Detect TiDB Cloud endpoint or port 4000
+if [[ "${DB_HOST:-}" == *"tidbcloud.com"* ]] || [[ "${DB_DSN:-}" == *"tidbcloud.com"* ]] || [ "${DB_PORT:-}" = "4000" ]; then
+    if [ -z "${DB_NAME:-}" ] || [ "${DB_NAME}" = "whatsapp_api" ]; then
+        export DB_NAME="test"
+        echo "[docker-entrypoint] TiDB Cloud detected: defaulting DB_NAME='test'."
+    fi
+    if [[ "${DB_DSN:-}" == *"dbname=whatsapp_api"* ]]; then
+        export DB_DSN="${DB_DSN//dbname=whatsapp_api/dbname=test}"
+        echo "[docker-entrypoint] TiDB Cloud detected: updated DB_DSN to use 'dbname=test'."
+    fi
+fi
+
 # 4. Export all runtime environment variables to .env and Apache mod_php PassEnv
 printenv | grep -E '^(APP_|DB_|WORKER_|DEFAULT_|LOGIN_|ENABLE_|DISABLE_|ALLOW_|ADMIN_|SMTP_|BREVO_|RESEND_|GOOGLE_|SYSTEM_|INITIAL_|SEND_|QUEUE_|LOG_)' > /var/www/html/.env || true
 chmod 600 /var/www/html/.env
@@ -61,6 +73,14 @@ if [ -n "$ACTIVE_DB" ]; then
     sed -i "s/^DB_NAME=.*/DB_NAME=${ACTIVE_DB}/" /var/www/html/.env
   else
     echo "DB_NAME=${ACTIVE_DB}" >> /var/www/html/.env
+  fi
+  if [ -n "${DB_DSN:-}" ]; then
+    export DB_DSN=$(echo "${DB_DSN}" | sed -E "s/dbname=[^;]+/dbname=${ACTIVE_DB}/")
+    if grep -q "^DB_DSN=" /var/www/html/.env 2>/dev/null; then
+      sed -i "s|^DB_DSN=.*|DB_DSN=${DB_DSN}|" /var/www/html/.env
+    else
+      echo "DB_DSN=${DB_DSN}" >> /var/www/html/.env
+    fi
   fi
 fi
 

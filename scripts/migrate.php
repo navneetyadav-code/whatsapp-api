@@ -47,10 +47,11 @@ function migrationRun(): void
         }
 
         $sql = preg_replace('/^\s*--.*$/m', '', $sql) ?? $sql;
+        $sql = preg_replace('/^\s*USE\s+`?[a-z0-9_]+`?\s*;/mi', '', $sql) ?? $sql;
         $statements = preg_split('/;\s*(?:\R|$)/', $sql, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         foreach ($statements as $statement) {
             $statement = trim($statement);
-            if ($statement === '') {
+            if ($statement === '' || preg_match('/^USE\s+/i', $statement)) {
                 continue;
             }
             if (preg_match('/^CREATE TABLE IF NOT EXISTS `([a-z0-9_]+)`/i', $statement, $matches)) {
