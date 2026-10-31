@@ -68,38 +68,33 @@ if (!ctype_digit((string) $dbPort) || (int) $dbPort < 1 || (int) $dbPort > 65535
     throw new RuntimeException('DB_PORT must be a valid TCP port number.');
 }
 
-$rawDsn = config_env('DB_DSN', '');
+$dbName = config_env('DB_NAME', 'whatsapp_api');
+$defaultDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
+$dbDsn = config_env('DB_DSN', $defaultDsn);
+
+if (config_env('DB_NAME') !== null && preg_match('/dbname=([^;]+)/i', $dbDsn, $dbMatch)) {
+    if ($dbMatch[1] !== $dbName) {
+        $dbDsn = preg_replace('/dbname=[^;]+/i', "dbname={$dbName}", $dbDsn);
+    }
+}
+
 $dsnHost = $dbHost;
 $dsnPort = (string) $dbPort;
-if ($rawDsn !== '') {
-    if (preg_match('/(?:^|;)host=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $rawDsn), $hostMatch)) {
-        $dsnHost = $hostMatch[1];
-    }
-    if (preg_match('/(?:^|;)port=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $rawDsn), $portMatch)) {
-        $dsnPort = $portMatch[1];
-    }
+if (preg_match('/(?:^|;)host=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $dbDsn), $hostMatch)) {
+    $dsnHost = $hostMatch[1];
+}
+if (preg_match('/(?:^|;)port=([^;]+)/i', (string) preg_replace('/^mysql:/i', '', $dbDsn), $portMatch)) {
+    $dsnPort = $portMatch[1];
 }
 
-$isTiDB = str_contains(strtolower((string) $dsnHost), 'tidbcloud.com') || (string) $dsnPort === '4000';
-$configuredDbName = config_env('DB_NAME');
-if ($isTiDB && ($configuredDbName === null || $configuredDbName === '' || $configuredDbName === 'whatsapp_api')) {
-    $dbName = 'test';
-} else {
-    $dbName = $configuredDbName ?? ($isTiDB ? 'test' : 'whatsapp_api');
-}
-
-$defaultDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
-$dbDsn = $rawDsn !== '' ? $rawDsn : $defaultDsn;
-if ($isTiDB && preg_match('/dbname=whatsapp_api(?=[;]|$)/i', $dbDsn)) {
-    $dbDsn = preg_replace('/dbname=whatsapp_api(?=[;]|$)/i', 'dbname=test', $dbDsn);
-}
+$isSsl = str_contains(strtolower((string) $dsnHost), 'tidbcloud.com') || (string) $dsnPort === '4000' || config_bool('DB_SSL');
 
 return [
     'db' => [
         'dsn' => $dbDsn,
         'user' => config_env('DB_USER', 'root'),
         'password' => config_env('DB_PASSWORD', ''),
-        'ssl' => $isTiDB || config_bool('DB_SSL'),
+        'ssl' => $isSsl,
         'ssl_ca' => config_env('DB_SSL_CA', ''),
     ],
     'app' => [
