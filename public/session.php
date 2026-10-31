@@ -70,11 +70,38 @@ if ($action === 'pair-code') {
 }
 
 if ($action === 'logout') {
-    $response = worker_request('POST', "sessions/{$userId}/logout");
-    if (!empty($response['ok'])) {
+    $response = worker_request('POST', "sessions/{$userId}/logout", [], 5);
+
+    try {
+        $pdo = Database::pdo();
+        $pdo->prepare(
+            "UPDATE whatsapp_sessions SET status = 'idle', sleeping = 0, phone = NULL, push_name = NULL, last_error = NULL, reachout_timelock_active = 0 WHERE user_id = ?"
+        )->execute([$userId]);
+    } catch (Throwable) {}
+
+    $localAuthDir = dirname(__DIR__) . "/whatsapp-api-data/sessions/user_{$userId}";
+    if (is_dir($localAuthDir)) {
+        @array_map('unlink', glob("{$localAuthDir}/*") ?: []);
+        @rmdir($localAuthDir);
+    }
+
+    if (empty($response['ok'])) {
+        $response = [
+            'ok' => true,
+            'session' => [
+                'userId' => (string) $userId,
+                'state' => 'idle',
+                'sleeping' => false,
+                'phone' => null,
+                'pushName' => null,
+                'qr' => null,
+                'hasQr' => false,
+            ],
+        ];
+    } else {
         sync_session_status($userId, $response['session'] ?? ['state' => 'idle']);
     }
-    json_response($response, !empty($response['ok']) ? 200 : 502);
+    json_response($response, 200);
 }
 
 if ($action === 'sleep') {
