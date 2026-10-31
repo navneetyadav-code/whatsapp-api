@@ -72,8 +72,8 @@ function renderStatus(data) {
     const state = session.state || 'idle';
     const isSleeping = Boolean(session.sleeping);
     const hasIdentity = Boolean(session.phone || session.pushName);
-    const isReconnecting = hasIdentity && ['connecting', 'disconnected'].includes(state);
-    const hasLinkedDevice = state === 'connected' || (isSleeping && hasIdentity) || isReconnecting;
+    const hasLinkedDevice = state === 'connected' || (isSleeping && hasIdentity);
+    const isReconnecting = !hasLinkedDevice && hasIdentity && state === 'connecting';
 
     const statusBadge = document.getElementById('statusBadge');
     const statusIndicator = document.getElementById('statusIndicator');
@@ -162,7 +162,7 @@ function renderStatus(data) {
         if (connectBtn) connectBtn.classList.remove('hidden');
         if (disconnectBtn) disconnectBtn.classList.add('hidden');
         if (resetBtn) {
-            if (['qr', 'disconnected', 'error', 'connecting'].includes(state) || Boolean(session.error)) {
+            if (['qr', 'disconnected', 'error', 'connecting', 'idle'].includes(state) || Boolean(session.error) || hasIdentity) {
                 resetBtn.classList.remove('hidden');
             } else {
                 resetBtn.classList.add('hidden');

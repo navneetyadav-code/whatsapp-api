@@ -79,6 +79,18 @@ const SESSION_DIR = process.env.WA_SESSION_DIR && !process.env.WA_SESSION_DIR.in
   ? resolve(process.env.WA_SESSION_DIR)
   : defaultSessionDir;
 const sessions = new Map();
+
+function hasValidSessionOnDisk(userId) {
+  try {
+    const authDir = join(SESSION_DIR, `user_${userId}`);
+    const credsFile = join(authDir, 'creds.json');
+    if (!existsSync(credsFile)) return false;
+    const creds = JSON.parse(readFileSync(credsFile, 'utf8') || '{}');
+    return Boolean(creds.registered);
+  } catch (_) {
+    return false;
+  }
+}
 let supportsSleepingColumn = true;
 let supportsTimelockColumns = true;
 
@@ -1061,13 +1073,21 @@ async function startSession(userId, force = false, waitForReady = true) {
             return;
           }
 
-          const wasConnected = session.state === 'connected' || Boolean(session.phone);
+          const hasSavedSession = hasValidSessionOnDisk(userId);
+          const wasConnected = session.state === 'connected' && hasSavedSession;
           const shouldReconnect = !session.sleeping && wasConnected;
           destroySocket(session);
           session.state = session.sleeping ? 'idle' : (shouldReconnect ? 'disconnected' : 'idle');
           session.qr = null;
           session.hasQr = false;
           session.error = lastDisconnect?.error?.message || null;
+
+          if (!hasSavedSession && (session.state === 'disconnected' || session.state === 'idle')) {
+            session.phone = null;
+            session.pushName = null;
+            session.error = 'WhatsApp session was not found. Please click Connect to link your device.';
+          }
+
           await updateSessionRecord(userId, session);
 
           if (shouldReconnect) {
@@ -3040,31 +3060,34 @@ app.post('/sessions/:userId/pair-code', async (req, res) => {
 });
 
 app.post('/sessions/:userId/logout', async (req, res) => {
-  const session = getSession(req.params.userId);
   const cleanUserId = String(parseInt(String(req.params.userId), 10));
   const authDir = resolve(SESSION_DIR, `user_${cleanUserId}`);
   if (authDir !== SESSION_DIR && !authDir.startsWith(SESSION_DIR + sep)) {
     res.status(400).json({ ok: false, error: 'Invalid session path.' });
     return;
   }
+  const userId = cleanUserId;
+  const session = getSession(userId);
 
-  try {
-    if (session.sock) {
-      session.sock.ev.removeAllListeners();
-      await session.sock.logout().catch(() => {});
-    }
-  } catch (error) {
-    session.error = error.message;
-  } finally {
-    destroySocket(session);
+  // Only call sock.logout() if socket is genuinely open and connected
+  if (session.sock && session.state === 'connected' && session.sock.ws?.readyState === 1) {
     try {
-      await rm(authDir, { recursive: true, force: true });
-    } catch (e) {}
+      await Promise.race([
+        session.sock.logout(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Logout timed out')), 2500))
+      ]).catch(() => {});
+    } catch (_) {}
   }
 
-  sessions.set(req.params.userId, emptySession(req.params.userId));
-  await updateSessionRecord(req.params.userId, emptySession(req.params.userId));
-  res.json({ ok: true, session: publicSession(getSession(req.params.userId)) });
+  destroySocket(session);
+  try {
+    await rm(authDir, { recursive: true, force: true });
+  } catch (_) {}
+
+  const fresh = emptySession(userId);
+  sessions.set(userId, fresh);
+  await updateSessionRecord(userId, fresh).catch(() => {});
+  res.json({ ok: true, session: publicSession(fresh) });
 });
 
 app.post('/sessions/:userId/auto-sleep', async (req, res) => {
@@ -3272,10 +3295,18 @@ async function startWorker() {
 
       // Auto-reconnect active sessions so WhatsApp Baileys sockets are restored on worker startup
       if (row.status === 'connected' && !s.sleeping) {
-        logger.info({ userId: uid }, 'Auto-reconnecting active WhatsApp session socket on worker startup');
-        startSession(uid, false, false).catch((reconnectErr) => {
-          logger.warn({ err: reconnectErr.message, userId: uid }, 'Failed to auto-reconnect session on worker startup');
-        });
+        if (hasValidSessionOnDisk(uid)) {
+          logger.info({ userId: uid }, 'Auto-reconnecting active WhatsApp session socket on worker startup');
+          startSession(uid, false, false).catch((reconnectErr) => {
+            logger.warn({ err: reconnectErr.message, userId: uid }, 'Failed to auto-reconnect session on worker startup');
+          });
+        } else {
+          logger.warn({ userId: uid }, 'Saved WhatsApp session files not found on disk; clearing stale connection state');
+          s.state = 'idle';
+          s.phone = null;
+          s.pushName = null;
+          updateSessionRecord(uid, s).catch(() => {});
+        }
       }
     }
   } catch (err) {
