@@ -126,8 +126,8 @@ if ($provider === 'gemini') {
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Authorization: Bearer ' . trim($apiKey),
-        'HTTP-Referer: https://whatsapp-api-xepo.onrender.com',
-        'X-Title: WhatsGateway AI Key Test'
+        'HTTP-Referer: ' . (app_config('app.public_url') ?: 'https://localhost'),
+        'X-Title: ' . (app_config('app.name') ?: 'WhatsGateway') . ' AI Key Test'
     ]);
 }
 

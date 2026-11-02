@@ -15,8 +15,8 @@ declare(strict_types=1);
 // ==============================================================================
 // DEFAULT CONFIGURATION
 // ==============================================================================
-$defaultApiKey = 'wa_live_72b292e05ac3c5810fb259006dae5f30e1af1f048c0fbd15';
-$defaultApiUrl = 'https://whatsapp-api-xepo.onrender.com/api/send';
+$defaultApiKey = (string) (getenv('SYSTEM_API_KEY') ?: '');
+$defaultApiUrl = getenv('APP_PUBLIC_URL') ? rtrim(getenv('APP_PUBLIC_URL'), '/') . '/api/send' : 'http://localhost/whatsapp-api/public/api/send';
 
 $responseResult = null;
 $error = null;
@@ -223,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div class="p-4 bg-slate-50 border-t border-slate-200 text-center text-xs text-slate-400">
-            Powered by <a href="https://whatsapp-api-xepo.onrender.com" target="_blank" class="font-semibold text-slate-600 hover:underline">WhatsApp API Hub</a> &bull; Baileys Engine
+            Powered by <a href="<?= htmlspecialchars($defaultApiUrl !== '' ? dirname($defaultApiUrl) : '#', ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="font-semibold text-slate-600 hover:underline">WhatsApp API Hub</a> &bull; Baileys Engine
         </div>
 
     </div>

@@ -172,8 +172,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Bottom Footer -->
         <div class="relative z-10 text-xs text-white/70 font-medium space-y-1">
-            <div>Made by <a href="https://github.com/navneetyadav-code/whatsapp-api" target="_blank" rel="noopener noreferrer" class="text-white hover:underline font-semibold">Navneet Kumar Yadav</a></div>
-            <div class="text-[11px] text-white/60">Takedown / Removal request: <a href="mailto:info.assistgroupofficial@gmail.com" class="text-white/80 hover:underline">info.assistgroupofficial@gmail.com</a></div>
+            <div>Made with open source &bull; <a href="<?= e((string) app_config('app.repo_url')) ?>" target="_blank" rel="noopener noreferrer" class="text-white hover:underline font-semibold"><?= e((string) app_config('app.author_name')) ?></a></div>
+            <div class="text-[11px] text-white/60">Support / Inquiries: <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="text-white/80 hover:underline"><?= e((string) app_config('app.support_email')) ?></a></div>
             <div class="text-[10px] text-white/40 pt-1">Independent open-source project. Not affiliated with or endorsed by Meta or WhatsApp Inc.</div>
         </div>
     </div>
@@ -205,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <h3 class="text-base font-bold text-amber-900 mb-1.5">Registration Closed</h3>
                     <p class="text-xs text-amber-800 leading-relaxed max-w-sm mx-auto mb-5">
-                        This is not allowed in current architecture. Please contact <a href="mailto:info.assistgroupofficial@gmail.com" class="font-semibold underline text-amber-950">info.assistgroupofficial@gmail.com</a>.
+                        <?= e((string) app_config('app.restricted_notice')) ?>
                     </p>
                     <a href="<?= e(base_url('index.php?page=login')) ?>" class="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-sm">
                         Back to Login &rarr;
@@ -231,7 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="fullName" class="block text-xs font-semibold text-gray-700 mb-1">Full Name</label>
                     <input type="text" id="fullName" name="name" 
                            class="w-full px-3.5 py-2 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
-                           placeholder="Navneet Yadav" 
+                           placeholder="Your Full Name" 
                            required>
                 </div>
 

@@ -375,11 +375,15 @@ export async function handleDraftEmail(args, context) {
   const cc = args.cc ? String(args.cc).trim() : null;
 
   // Resolve Boss's verified primary email fallback
-  const bossPrimaryEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'info.assistgroupofficial@gmail.com';
+  const bossPrimaryEmail = context.ownerEmail || process.env.SMTP_FROM || process.env.SMTP_USER || '';
 
   // Automatically correct recipient if user requested to send to self or if LLM hallucinated a synthetic domain email
   const lowerTo = to.toLowerCase();
-  if (!to || ['me', 'myself', 'boss', 'admin', 'self', 'ankit', 'to me', 'detach to me', 'send to me'].includes(lowerTo) || lowerTo.endsWith('@assistgroup.com') || lowerTo.endsWith('@assistgroup.gt.tc')) {
+  const selfAliases = ['me', 'myself', 'boss', 'admin', 'self', 'to me', 'detach to me', 'send to me'];
+  if (context.ownerName) selfAliases.push(String(context.ownerName).toLowerCase());
+  const senderDomain = bossPrimaryEmail.includes('@') ? bossPrimaryEmail.split('@')[1] : null;
+  const isSyntheticSelf = senderDomain && lowerTo.endsWith(`@${senderDomain}`);
+  if (!to || selfAliases.includes(lowerTo) || isSyntheticSelf) {
     to = bossPrimaryEmail;
   }
 
@@ -899,7 +903,8 @@ async function executeSharedEnvApi(executionConfig, args = {}) {
   } catch (err) {
     const isTimeout = err.name === 'TimeoutError' || (err.message && err.message.includes('timeout'));
     const isConnect = err.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' || (err.cause?.message && err.cause.message.includes('Timeout'));
-    const detail = (isTimeout || isConnect) ? 'Server connection timed out (host assistgroup.gt.tc is unreachable)' : (err.cause?.message || err.message);
+    const targetHost = (() => { try { return new URL(finalUrl).hostname; } catch (_) { return 'remote host'; } })();
+    const detail = (isTimeout || isConnect) ? `Server connection timed out (host ${targetHost} is unreachable)` : (err.cause?.message || err.message);
     return {
       success: false,
       error: `Production API request failed: ${detail}`

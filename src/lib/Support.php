@@ -301,7 +301,7 @@ function seo_meta(?string $page): array {
         'canonical' => $baseUrl . '/' . ($page === 'dashboard' ? '' : ltrim($page ?? '', '/')),
         'type' => 'website',
         'robots' => 'index, follow',
-        'author' => 'Navneet Kumar Yadav',
+        'author' => (string) (app_config('app.author_name') ?: 'Open Source Contributor'),
     ];
 
     switch ($page) {
@@ -424,7 +424,7 @@ function send_smtp_email(string $to, string $subject, string $body): bool {
     $user = trim((string) app_config('smtp.user'));
     $from = str_replace(["\r", "\n"], '', trim((string) (app_config('smtp.from') ?: '')));
     if ($from === '' || str_ends_with($from, '@localhost')) {
-        $from = ($user !== '' && filter_var($user, FILTER_VALIDATE_EMAIL)) ? $user : 'info.assistgroupofficial@gmail.com';
+        $from = ($user !== '' && filter_var($user, FILTER_VALIDATE_EMAIL)) ? $user : ((string) (app_config('app.support_email') ?: 'noreply@localhost'));
     }
     $from = str_replace(["\r", "\n"], '', $from);
     $fromName = str_replace(["\r", "\n"], '', trim((string) (app_config('smtp.from_name') ?: 'WhatsGateway')));

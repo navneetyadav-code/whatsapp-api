@@ -87,7 +87,8 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
     activeToolSlugs.add('update_memory');
     activeToolSlugs.add('draft_email');
     activeToolSlugs.add('confirm_action');
-    activeToolSlugs.add('assistgroup_crm');
+    const crmTool = allTools.find(t => t.tool_slug === 'crm' || t.tool_slug === 'assistgroup_crm' || t.category === 'crm' || t.tool_slug.includes('crm'));
+    if (crmTool) activeToolSlugs.add(crmTool.tool_slug);
     activeToolSlugs.add('web_search');
     activeToolSlugs.add('evaluate_math');
   }
@@ -127,16 +128,17 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
 
       case 'crm_read':
       case 'crm_write':
-        activeToolSlugs.add('assistgroup_crm');
+        const crmTool = allTools.find(t => t.tool_slug === 'crm' || t.tool_slug === 'assistgroup_crm' || t.category === 'crm' || t.tool_slug.includes('crm'));
+    if (crmTool) activeToolSlugs.add(crmTool.tool_slug);
         skillDirectives.push(
-          `CRM PROTOCOL:\n• Autonomously call assistgroup_crm for platform metrics, user lookups, or inquiry records.\n• Summarize numbers clearly with bold labels.`
+          `CRM PROTOCOL:\n• Autonomously call ${crmTool ? crmTool.tool_slug : 'crm'} for platform metrics, user lookups, or inquiry records.\n• Summarize numbers clearly with bold labels.`
         );
         break;
 
       case 'email_draft':
         activeToolSlugs.add('draft_email');
         skillDirectives.push(
-          `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• Call draft_email with to, subject, body. Prompt: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim email is sent until confirm_action succeeds.\n• RECIPIENT RULES:\n  - If Boss says "to me" or asks for a report, recipient MUST be: info.assistgroupofficial@gmail.com.\n  - NEVER invent synthetic domain emails (e.g. <name>@assistgroup.com).\n  - Boss is Ankit (info.assistgroupofficial@gmail.com); Ankush is a team collaborator (ankushkumary113@gmail.com).`
+          `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• Call draft_email with to, subject, body. Prompt: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim email is sent until confirm_action succeeds.\n• RECIPIENT RULES:\n  - If ${context.ownerName || 'Boss'} says "to me" or asks for a report, recipient MUST be: ${context.ownerEmail || process.env.SMTP_FROM || process.env.SMTP_USER || 'admin@example.com'}.\n  - Never invent synthetic domain emails.`
         );
         break;
 

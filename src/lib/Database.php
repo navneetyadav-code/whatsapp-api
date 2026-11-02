@@ -30,7 +30,7 @@ final class Database
             $caCandidates = array_filter([$configuredCa,
                 '/etc/ssl/certs/ca-certificates.crt',
                 dirname(__DIR__, 2) . '/prod/isrgrootx1.pem',
-                dirname(__DIR__, 2) . '/produ/isrgrootx1.pem',
+
             ]);
             $caFound = null;
             foreach ($caCandidates as $ca) {

@@ -276,7 +276,7 @@ const db = mysql.createPool({
   database: database.database,
   ssl: dbSslOptions,
   waitForConnections: true,
-  connectionLimit: 5
+  connectionLimit: Number(process.env.DB_POOL_LIMIT || 5)
 });
 
 const app = express();
@@ -2968,8 +2968,9 @@ async function startWorker() {
     logger.warn({ err: err.message }, 'Failed to pre-load sessions from database on worker startup');
   }
 
-  const server = app.listen(PORT, '127.0.0.1', () => {
-    console.info(`[worker] listener=http://127.0.0.1:${PORT} health_route=GET /health database=ready`);
+  const HOST = process.env.WORKER_HOST || '127.0.0.1';
+  const server = app.listen(PORT, HOST, () => {
+    console.info(`[worker] listener=http://${HOST}:${PORT} health_route=GET /health database=ready`);
     setInterval(processQueueOnce, QUEUE_POLL_MS);
     setInterval(processWebhookQueueOnce, QUEUE_POLL_MS);
   });

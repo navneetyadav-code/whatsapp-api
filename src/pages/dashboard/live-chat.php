@@ -219,7 +219,7 @@ declare(strict_types=1);
             </div>
             <div>
                 <label class="block text-[11px] font-bold text-slate-600 mb-1">Contact Name (optional)</label>
-                <input type="text" id="newChatName" placeholder="e.g. Navneet Yadav" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-900 focus:outline-none">
+                <input type="text" id="newChatName" placeholder="e.g. Alex Johnson" class="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-slate-900 focus:outline-none">
             </div>
             <div class="flex items-center justify-end gap-2 pt-2">
                 <button type="button" id="btnCancelNewChat" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>

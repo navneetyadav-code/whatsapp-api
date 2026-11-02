@@ -72,7 +72,7 @@ $seoTitle = 'Terms of Service | WhatsGateway';
             </span>
             <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">Terms of Service</h1>
             <p class="mt-2 text-sm text-slate-500 font-medium">
-                Effective Date: October 14, 2026 &bull; Version 2.4 &bull; Maintained by Navneet Kumar Yadav
+                Effective Date: October 14, 2026 &bull; Version 2.4 &bull; Maintained by <?= e((string) app_config('app.author_name')) ?>
             </p>
         </div>
 
@@ -110,7 +110,7 @@ $seoTitle = 'Terms of Service | WhatsGateway';
                 <ul class="list-disc pl-5 space-y-1.5 text-slate-600">
                     <li>Provide truthful, accurate, and current registration information.</li>
                     <li>Maintain the confidentiality and security of your account credentials, session secrets, and generated API key secrets.</li>
-                    <li>Immediately notify us at <a href="mailto:info.assistgroupofficial@gmail.com" class="text-brand-wa_med hover:underline font-semibold">info.assistgroupofficial@gmail.com</a> upon discovering any unauthorized access or breach of your API tokens.</li>
+                    <li>Immediately notify us at <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="text-brand-wa_med hover:underline font-semibold"><?= e((string) app_config('app.support_email')) ?></a> upon discovering any unauthorized access or breach of your API tokens.</li>
                     <li>Accept full legal and operational responsibility for all API requests, transmissions, and messages dispatched under your API keys or paired WhatsApp session.</li>
                 </ul>
             </section>
@@ -198,7 +198,7 @@ $seoTitle = 'Terms of Service | WhatsGateway';
             <section class="space-y-3">
                 <h2 class="text-xl font-bold text-slate-900 tracking-tight">10. Limitation of Liability</h2>
                 <p class="text-slate-600">
-                    IN NO EVENT SHALL THE MAINTAINERS, DEVELOPERS, OR CONTRIBUTORS (INCLUDING NAVNEET KUMAR YADAV) BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF REVENUE, PROFITS, GOODWILL, REPUTATIONAL DAMAGE, OR BUSINESS DISRUPTIONS ARISING OUT OF OR IN CONNECTION WITH THE USE OR INABILITY TO USE THE SERVICE, THIRD-PARTY ACCOUNT RESTRICTIONS, OR WHATSAPP BAN EVENTS.
+                    IN NO EVENT SHALL THE MAINTAINERS, DEVELOPERS, OR CONTRIBUTORS (INCLUDING <?= strtoupper(e((string) app_config('app.author_name'))) ?>) BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF REVENUE, PROFITS, GOODWILL, REPUTATIONAL DAMAGE, OR BUSINESS DISRUPTIONS ARISING OUT OF OR IN CONNECTION WITH THE USE OR INABILITY TO USE THE SERVICE, THIRD-PARTY ACCOUNT RESTRICTIONS, OR WHATSAPP BAN EVENTS.
                 </p>
             </section>
 
@@ -215,9 +215,9 @@ $seoTitle = 'Terms of Service | WhatsGateway';
                     For inquiries, clarification, or compliance questions regarding these Terms of Service, please contact the maintainer:
                 </p>
                 <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-1 text-slate-600 text-xs md:text-sm">
-                    <p><strong>Maintainer:</strong> Navneet Kumar Yadav</p>
-                    <p><strong>Official Inquiries:</strong> <a href="mailto:info.assistgroupofficial@gmail.com" class="text-brand-wa_med hover:underline font-semibold">info.assistgroupofficial@gmail.com</a></p>
-                    <p><strong>Source Repository:</strong> <a href="https://github.com/navneetyadav-code/whatsapp-api" target="_blank" rel="noopener noreferrer" class="text-brand-wa_med hover:underline font-semibold">github.com/navneetyadav-code/whatsapp-api</a></p>
+                    <p><strong>Maintainer:</strong> <?= e((string) app_config('app.author_name')) ?></p>
+                    <p><strong>Official Inquiries:</strong> <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="text-brand-wa_med hover:underline font-semibold"><?= e((string) app_config('app.support_email')) ?></a></p>
+                    <p><strong>Source Repository:</strong> <a href="<?= e((string) app_config('app.repo_url')) ?>" target="_blank" rel="noopener noreferrer" class="text-brand-wa_med hover:underline font-semibold"><?= e((string) app_config('app.repo_url')) ?></a></p>
                 </div>
             </section>
 
@@ -231,9 +231,9 @@ $seoTitle = 'Terms of Service | WhatsGateway';
             <a href="<?= e(base_url('docs')) ?>" class="hover:text-slate-900 transition-colors">Documentation</a>
             <a href="<?= e(base_url('privacy')) ?>" class="hover:text-slate-900 transition-colors">Privacy Policy</a>
             <a href="<?= e(base_url('terms')) ?>" class="text-slate-900 font-bold hover:underline">Terms of Service</a>
-            <a href="mailto:info.assistgroupofficial@gmail.com" class="hover:text-slate-900 transition-colors">Support Contact</a>
+            <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="hover:text-slate-900 transition-colors">Support Contact</a>
         </div>
-        <p class="text-slate-400 text-[11px]">&copy; <?= date('Y') ?> WhatsGateway &bull; Maintained by Navneet Kumar Yadav &bull; Open Source under MIT License</p>
+        <p class="text-slate-400 text-[11px]">&copy; <?= date('Y') ?> WhatsGateway &bull; Maintained by <?= e((string) app_config('app.author_name')) ?> &bull; Open Source under MIT License</p>
     </footer>
 
 </body>

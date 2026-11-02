@@ -1303,7 +1303,7 @@ func main() {
             <section id="disclaimers" class="doc-section mb-14 pt-6 border-t border-slate-200">
                 <h3 class="text-base font-bold text-slate-900 mb-2">Legal Notices & MIT License</h3>
                 <p class="text-xs text-slate-500 leading-relaxed mb-3">
-                    WhatsGateway is an independent open-source project maintained by <strong>Navneet Kumar Yadav</strong> and released under the permissive MIT License.
+                    WhatsGateway is an independent open-source project maintained by <strong><?= e((string) app_config('app.author_name')) ?></strong> and released under the permissive MIT License.
                 </p>
                 <p class="text-xs text-slate-500 leading-relaxed">
                     This project is not affiliated, endorsed, sponsored, or certified by Meta Platforms, Inc., WhatsApp Inc., or Google LLC. "WhatsApp" is a registered trademark of Meta Platforms, Inc. "Google" is a registered trademark of Google LLC.
@@ -1311,7 +1311,7 @@ func main() {
                 <div class="mt-4 flex flex-wrap gap-4 text-xs font-semibold text-slate-600">
                     <a href="<?= e(base_url('privacy')) ?>" class="hover:text-slate-900 underline">Privacy Policy</a>
                     <a href="<?= e(base_url('terms')) ?>" class="hover:text-slate-900 underline">Terms of Service</a>
-                    <a href="mailto:info.assistgroupofficial@gmail.com" class="hover:text-slate-900 underline">info.assistgroupofficial@gmail.com</a>
+                    <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="hover:text-slate-900 underline"><?= e((string) app_config('app.support_email')) ?></a>
                 </div>
             </section>
 

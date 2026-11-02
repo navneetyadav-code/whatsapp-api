@@ -153,7 +153,7 @@ $seoTitle = 'Privacy Policy | WhatsGateway';
                     <li><strong>Delete Contacts:</strong> You can delete any individual contact or flush your contact list at any moment directly from the Contacts Manager.</li>
                     <li><strong>Unlink WhatsApp:</strong> Clicking "Disconnect" or "Reset Session" immediately wipes your active WhatsApp cryptographic session files from our servers.</li>
                     <li><strong>Revoke Google Access:</strong> You can revoke WhatsGateway's access to your Google Account at any time via your Google Security Settings at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" class="text-brand-wa_med hover:underline font-semibold">Google Account Permissions</a>.</li>
-                    <li><strong>Account Deletion Requests:</strong> To permanently delete your entire account, API keys, database records, and logs, email us at <a href="mailto:info.assistgroupofficial@gmail.com" class="text-brand-wa_med hover:underline font-semibold">info.assistgroupofficial@gmail.com</a>. We will process your deletion request within 48 business hours.</li>
+                    <li><strong>Account Deletion Requests:</strong> To permanently delete your entire account, API keys, database records, and logs, email us at <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="text-brand-wa_med hover:underline font-semibold"><?= e((string) app_config('app.support_email')) ?></a>. We will process your deletion request within 48 business hours.</li>
                 </ul>
             </section>
 
@@ -170,9 +170,9 @@ $seoTitle = 'Privacy Policy | WhatsGateway';
                     If you have any questions, inquiries, concerns, or deletion requests regarding this Privacy Policy or our data handling practices, please contact our privacy compliance team:
                 </p>
                 <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-1 text-slate-600 text-xs md:text-sm">
-                    <p><strong>Primary Maintainer:</strong> Navneet Kumar Yadav</p>
-                    <p><strong>Official Email:</strong> <a href="mailto:info.assistgroupofficial@gmail.com" class="text-brand-wa_med hover:underline font-semibold">info.assistgroupofficial@gmail.com</a></p>
-                    <p><strong>Project Repository:</strong> <a href="https://github.com/navneetyadav-code/whatsapp-api" target="_blank" rel="noopener noreferrer" class="text-brand-wa_med hover:underline font-semibold">github.com/navneetyadav-code/whatsapp-api</a></p>
+                    <p><strong>Primary Maintainer:</strong> <?= e((string) app_config('app.author_name')) ?></p>
+                    <p><strong>Official Email:</strong> <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="text-brand-wa_med hover:underline font-semibold"><?= e((string) app_config('app.support_email')) ?></a></p>
+                    <p><strong>Project Repository:</strong> <a href="<?= e((string) app_config('app.repo_url')) ?>" target="_blank" rel="noopener noreferrer" class="text-brand-wa_med hover:underline font-semibold"><?= e((string) app_config('app.repo_url')) ?></a></p>
                 </div>
             </section>
         </article>
@@ -185,9 +185,9 @@ $seoTitle = 'Privacy Policy | WhatsGateway';
             <a href="<?= e(base_url('docs')) ?>" class="hover:text-slate-900 transition-colors">Documentation</a>
             <a href="<?= e(base_url('privacy')) ?>" class="text-slate-900 font-bold hover:underline">Privacy Policy</a>
             <a href="<?= e(base_url('terms')) ?>" class="hover:text-slate-900 transition-colors">Terms of Service</a>
-            <a href="mailto:info.assistgroupofficial@gmail.com" class="hover:text-slate-900 transition-colors">Support Contact</a>
+            <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="hover:text-slate-900 transition-colors">Support Contact</a>
         </div>
-        <p class="text-slate-400 text-[11px]">&copy; <?= date('Y') ?> WhatsGateway &bull; Maintained by Navneet Kumar Yadav &bull; Open Source under MIT License</p>
+        <p class="text-slate-400 text-[11px]">&copy; <?= date('Y') ?> WhatsGateway &bull; Maintained by <?= e((string) app_config('app.author_name')) ?> &bull; Open Source under MIT License</p>
     </footer>
 
 </body>

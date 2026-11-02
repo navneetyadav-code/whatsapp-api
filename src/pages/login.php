@@ -174,8 +174,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Bottom Footer -->
         <div class="relative z-10 text-xs text-white/70 font-medium space-y-1">
-            <div>Made by <a href="https://github.com/navneetyadav-code/whatsapp-api" target="_blank" rel="noopener noreferrer" class="text-white hover:underline font-semibold">Navneet Kumar Yadav</a></div>
-            <div class="text-[11px] text-white/60">Takedown / Removal request: <a href="mailto:info.assistgroupofficial@gmail.com" class="text-white/80 hover:underline">info.assistgroupofficial@gmail.com</a></div>
+            <div>Made with open source &bull; <a href="<?= e((string) app_config('app.repo_url')) ?>" target="_blank" rel="noopener noreferrer" class="text-white hover:underline font-semibold"><?= e((string) app_config('app.author_name')) ?></a></div>
+            <div class="text-[11px] text-white/60">Support / Inquiries: <a href="mailto:<?= e((string) app_config('app.support_email')) ?>" class="text-white/80 hover:underline"><?= e((string) app_config('app.support_email')) ?></a></div>
             <div class="text-[10px] text-white/40 pt-1">Independent open-source project. Not affiliated with or endorsed by Meta or WhatsApp Inc.</div>
         </div>
     </div>

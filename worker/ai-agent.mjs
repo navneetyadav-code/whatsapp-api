@@ -323,10 +323,7 @@ OPERATING DIRECTIVES:
  * Call Google Gemini API with Autonomous Multi-Turn Function Calling Support
  */
 async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
-  let modelName = model || 'gemini-3.5-flash';
-  if (modelName === 'gemini-2.5-flash' || modelName === 'gemini-1.5-flash' || modelName === 'gemini-3.8-flash') {
-    modelName = 'gemini-3.5-flash';
-  }
+  let modelName = model || process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash';
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
   // Dynamically load active custom & built-in tools for this user from ai_custom_tools
@@ -346,7 +343,8 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   let turn = 0;
 
   // Primary model with resilient fallback cascade for transient Google 503/429 spikes
-  const candidateModels = Array.from(new Set([modelName, 'gemini-3.5-flash', 'gemini-3.5-flash-lite']));
+  const fallbackList = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash,gemini-2.5-flash-lite').split(',').map(m => m.trim()).filter(Boolean);
+  const candidateModels = Array.from(new Set([modelName, ...fallbackList]));
 
   while (turn < maxTurns) {
     turn++;
@@ -444,7 +442,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
  * Call Groq API (OpenAI compatible with full Function Calling loop)
  */
 async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
-  const modelName = model || 'openai/gpt-oss-120b';
+  const modelName = model || process.env.DEFAULT_GROQ_MODEL || 'openai/gpt-oss-120b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
 
   const messages = ChatMemoryEngine.buildOpenAiMessages(systemPrompt, conversationHistory, userMessage);
@@ -545,7 +543,7 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
  * Call OpenRouter API (OpenAI compatible fallback)
  */
 async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = []) {
-  const modelName = model || 'meta-llama/llama-3.3-70b-instruct:free';
+  const modelName = model || process.env.DEFAULT_OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const messages = ChatMemoryEngine.buildOpenAiMessages(systemPrompt, conversationHistory, userMessage);
@@ -562,8 +560,8 @@ async function callOpenRouter(apiKey, model, systemPrompt, userMessage, temperat
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://whatsapp-api-xepo.onrender.com',
-      'X-Title': 'WhatsGateway AI'
+      'HTTP-Referer': process.env.APP_PUBLIC_URL || 'https://localhost',
+      'X-Title': process.env.APP_NAME || 'WhatsGateway AI'
     },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(20000)

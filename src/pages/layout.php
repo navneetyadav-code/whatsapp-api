@@ -26,7 +26,7 @@ $isPersonalMode = ($agentMode === 'personal');
     <title><?= e($seo['title']) ?></title>
     <meta name="description" content="<?= e($seo['description']) ?>">
     <meta name="keywords" content="<?= e($seo['keywords']) ?>">
-    <meta name="author" content="Navneet Kumar Yadav">
+    <meta name="author" content="<?= e((string) app_config('app.author_name')) ?>">
     <meta name="robots" content="<?= e($seo['robots']) ?>">
     <link rel="canonical" href="<?= e($seo['canonical']) ?>">
     <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
@@ -61,8 +61,8 @@ $isPersonalMode = ($agentMode === 'personal');
       },
       "author": {
         "@type": "Person",
-        "name": "Navneet Kumar Yadav",
-        "url": "https://github.com/navneetyadav-code/whatsapp-api"
+        "name": <?= json_encode((string) app_config('app.author_name')) ?>,
+        "url": <?= json_encode((string) app_config('app.repo_url')) ?>
       },
       "description": "Free open-source WhatsApp API Gateway and Dashboard powered by Baileys, PHP, Node.js, and MySQL."
     }

@@ -7,10 +7,10 @@ services:
     container_name: whatsgateway_db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root_secure_password
-      MYSQL_DATABASE: whatsapp_gateway
-      MYSQL_USER: gateway_user
-      MYSQL_PASSWORD: gateway_user_password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_secure_password}
+      MYSQL_DATABASE: ${DB_NAME:-whatsapp_api}
+      MYSQL_USER: ${DB_USER:-gateway_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-gateway_user_password}
     volumes:
       - whatsgateway_mysql_data:/var/lib/mysql
     ports:
@@ -38,11 +38,12 @@ services:
       APP_PUBLIC_URL: http://localhost:8080
       DB_HOST: db
       DB_PORT: 3306
-      DB_NAME: whatsapp_gateway
-      DB_USER: gateway_user
-      DB_PASSWORD: gateway_user_password
+      DB_NAME: ${DB_NAME:-whatsapp_api}
+      DB_USER: ${DB_USER:-gateway_user}
+      DB_PASSWORD: ${DB_PASSWORD:-gateway_user_password}
       DEFAULT_COUNTRY_CODE: in
       WORKER_PORT: 3107
+      WORKER_TOKEN: ${WORKER_TOKEN:-generate-a-strong-secret-token-32-chars-long}
     volumes:
       - whatsgateway_sessions:/var/www/html/whatsapp-api-data/sessions
 

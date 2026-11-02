@@ -105,8 +105,11 @@ return [
         'default_country_code' => config_env('DEFAULT_COUNTRY_CODE', 'in'),
         'disable_password_login' => config_bool('DISABLE_PASSWORD_LOGIN', false),
         'allow_new_devices' => config_bool('ALLOW_NEW_DEVICES', false),
-        'admin_email' => config_env('ADMIN_EMAIL', 'navneetyadav982008@gmail.com,unknownkumar1113@gmail.com'),
-        'restricted_notice' => 'This is not allowed in current architecture. Contact info.assistgroupofficial@gmail.com',
+        'admin_email' => config_env('ADMIN_EMAIL', ''),
+        'restricted_notice' => config_env('APP_RESTRICTED_NOTICE', 'This action is not permitted in the current configuration. Please contact your system administrator.'),
+        'author_name' => config_env('APP_AUTHOR_NAME', 'Open Source Contributor'),
+        'support_email' => config_env('APP_SUPPORT_EMAIL', 'support@example.com'),
+        'repo_url' => config_env('APP_REPO_URL', 'https://github.com/navneetyadav-code/whatsapp-api'),
     ],
     'security' => [
         'worker_token' => $workerToken,
