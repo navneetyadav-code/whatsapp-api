@@ -1340,11 +1340,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                     `🔒 *This chat session is now closed.*\n` +
                     `If you ever want to chat again or have any questions, simply reply with */start* or *start* to begin a new chat session! 😊`;
                   try {
-                    await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: thanksText });
+                    const sentThanks = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: thanksText });
                     await db.execute(
-                      `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                       VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
-                      [userId, preConv.id, preConv.session_uuid || null, thanksText]
+                      `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                       VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, ?, 'sent')`,
+                      [userId, preConv.id, preConv.session_uuid || null, thanksText, sentThanks?.key?.id || null]
                     );
                   } catch (replyErr) {
                     logger.warn({ replyErr: replyErr.message }, 'Failed to dispatch feedback thank-you reply');
@@ -1585,11 +1585,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                 const handoverMsg = 'I understand you need assistance from our team. I have escalated this conversation to our support representatives and paused automated replies. A team member will join you shortly. 🔔';
                 try {
-                  await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: handoverMsg });
+                  const sentHandover = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: handoverMsg });
                   await db.execute(
-                    `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, status)
-                     VALUES (?, ?, 'bot', 'Support System', 'text', ?, 'sent')`,
-                    [userId, convId, handoverMsg]
+                    `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, wa_message_id, status)
+                     VALUES (?, ?, 'bot', 'Support System', 'text', ?, ?, 'sent')`,
+                    [userId, convId, handoverMsg, sentHandover?.key?.id || null]
                   );
                 } catch (sendErr) {
                   logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch handover confirmation');
@@ -1629,11 +1629,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                 `I am your virtual assistant, ready to assist you with inquiries, services, and support.\n\n` +
                 `How can I help you today? ✨`;
             try {
-              await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
+              const sentWelcome = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
               await db.execute(
-                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                [userId, conversationId, currentSessionUuid, welcomeText]
+                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                [userId, conversationId, currentSessionUuid, welcomeText, sentWelcome?.key?.id || null]
               );
               await db.execute(
                 `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
@@ -1666,11 +1666,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                   : `🧹 *Working Context Cleared!*\nStarting a fresh topic session. How can I assist you or take a message for ${ownerName || 'the owner'}?`)
               : '🧹 *Conversation Context Cleared!*\nHow can I help you with a fresh inquiry today?';
             try {
-              await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: resetReplyText });
+              const sentReset = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: resetReplyText });
               await db.execute(
-                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                [userId, conversationId, currentSessionUuid, resetReplyText]
+                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                [userId, conversationId, currentSessionUuid, resetReplyText, sentReset?.key?.id || null]
               );
               await db.execute(
                 `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
@@ -1730,11 +1730,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               await closeSession(db, conv.id, resolutionCheck.remark, true, true);
 
                               const closureMsg = ChatResolutionEngine.getClosureMessage();
-                              await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
+                              const sentClosure = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
                               await db.execute(
-                                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                                 VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, 'sent')`,
-                                [userId, conv.id, activeSessionUuid, closureMsg]
+                                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                                 VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, ?, 'sent')`,
+                                [userId, conv.id, activeSessionUuid, closureMsg, sentClosure?.key?.id || null]
                               );
                               await db.execute(
                                 `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?`,
@@ -1752,11 +1752,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           });
                           if (greetingCheck.shouldIntercept && greetingCheck.replyText) {
                             logger.info({ userId, senderPhone }, '⚡ Intercepted repeated greeting locally - saved LLM tokens!');
-                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: greetingCheck.replyText });
+                            const sentGreet = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: greetingCheck.replyText });
                             await db.execute(
-                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                              [userId, conv.id, activeSessionUuid, greetingCheck.replyText]
+                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                              [userId, conv.id, activeSessionUuid, greetingCheck.replyText, sentGreet?.key?.id || null]
                             );
                             return;
                           }
@@ -1847,11 +1847,11 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           }
 
                           if (replyText && replyText.trim()) {
-                            await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
+                            const sentAiReply = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
                             await db.execute(
-                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
-                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, 'sent')`,
-                              [userId, conv.id, activeSessionUuid, replyText.trim()]
+                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
+                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
+                              [userId, conv.id, activeSessionUuid, replyText.trim(), sentAiReply?.key?.id || null]
                             );
                             await db.execute(
                               `UPDATE chat_conversations
