@@ -13,10 +13,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/navneetyadav-code/whatsapp-api/stargazers"><img src="https://img.shields.io/github/stars/navneetyadav-code/whatsapp-api?style=for-the-badge&logo=github&color=gold" alt="GitHub Stars"></a>
-  <a href="https://github.com/navneetyadav-code/whatsapp-api/network/members"><img src="https://img.shields.io/github/forks/navneetyadav-code/whatsapp-api?style=for-the-badge&logo=github&color=blue" alt="GitHub Forks"></a>
-  <a href="https://github.com/navneetyadav-code/whatsapp-api/issues"><img src="https://img.shields.io/github/issues/navneetyadav-code/whatsapp-api?style=for-the-badge&color=brightgreen" alt="GitHub Issues"></a>
-  <a href="https://github.com/navneetyadav-code/whatsapp-api/discussions"><img src="https://img.shields.io/badge/Discussions-Join-purple?style=for-the-badge&logo=github" alt="GitHub Discussions"></a>
+  <a href="https://github.com/navneetyadav-code/WhatsGateway/stargazers"><img src="https://img.shields.io/github/stars/navneetyadav-code/WhatsGateway?style=for-the-badge&logo=github&color=gold" alt="GitHub Stars"></a>
+  <a href="https://github.com/navneetyadav-code/WhatsGateway/network/members"><img src="https://img.shields.io/github/forks/navneetyadav-code/WhatsGateway?style=for-the-badge&logo=github&color=blue" alt="GitHub Forks"></a>
+  <a href="https://github.com/navneetyadav-code/WhatsGateway/issues"><img src="https://img.shields.io/github/issues/navneetyadav-code/WhatsGateway?style=for-the-badge&color=brightgreen" alt="GitHub Issues"></a>
+  <a href="https://github.com/navneetyadav-code/WhatsGateway/discussions"><img src="https://img.shields.io/badge/Discussions-Join-purple?style=for-the-badge&logo=github" alt="GitHub Discussions"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License: MIT"></a>
 </p>
 
@@ -37,7 +37,7 @@
   <a href="#why-whatsgateway"><b>⚖️ Why WhatsGateway</b></a> •
   <a href="#client-sdks"><b>💻 SDKs</b></a> •
   <a href="#faq"><b>❓ FAQ</b></a> •
-  <a href="https://github.com/navneetyadav-code/whatsapp-api/stargazers"><b>⭐ Star on GitHub</b></a>
+  <a href="https://github.com/navneetyadav-code/WhatsGateway/stargazers"><b>⭐ Star on GitHub</b></a>
 </p>
 
 ---
@@ -163,8 +163,8 @@ The fastest way to deploy WhatsGateway with PHP 8.2 Apache, Node.js 20, and MySQ
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/navneetyadav-code/whatsapp-api.git
-cd whatsapp-api
+git clone https://github.com/navneetyadav-code/WhatsGateway.git
+cd WhatsGateway
 
 # 2. Launch the full stack
 docker compose up -d
@@ -189,8 +189,8 @@ docker compose up -d
 
 ```bash
 # 1. Clone repository into your web root
-git clone https://github.com/navneetyadav-code/whatsapp-api.git
-cd whatsapp-api
+git clone https://github.com/navneetyadav-code/WhatsGateway.git
+cd WhatsGateway
 
 # 2. Configure environment
 cp .env.example .env
@@ -635,7 +635,7 @@ The repository includes a production [`Dockerfile`](Dockerfile) with Supervisor 
 
 ### Linux VPS Service Management (PM2)
 ```bash
-cd /var/www/whatsapp-api/worker
+cd /var/www/whatsgateway/worker
 npm install --omit=dev
 npm install -g pm2
 pm2 start server.mjs --name "whatsapp-worker"
@@ -793,7 +793,7 @@ If WhatsGateway saves you development time or helps your project avoid expensive
 Your support helps more developers discover free open-source tools and motivates continued development.
 
 <p align="center">
-  <a href="https://github.com/navneetyadav-code/whatsapp-api/stargazers">
+  <a href="https://github.com/navneetyadav-code/WhatsGateway/stargazers">
     <img src="https://img.shields.io/badge/⭐%20Star%20WhatsGateway-on%20GitHub-gold?style=for-the-badge&logo=github" alt="Star on GitHub">
   </a>
 </p>
@@ -804,8 +804,8 @@ Your support helps more developers discover free open-source tools and motivates
 
 Contributions are welcomed! Whether reporting bugs, improving documentation, or submitting pull requests:
 
-1. **Discussions:** Have a question or idea? Join [GitHub Discussions](https://github.com/navneetyadav-code/whatsapp-api/discussions).
-2. **Issue Tracker:** Found a bug? Open a [GitHub Issue](https://github.com/navneetyadav-code/whatsapp-api/issues).
+1. **Discussions:** Have a question or idea? Join [GitHub Discussions](https://github.com/navneetyadav-code/WhatsGateway/discussions).
+2. **Issue Tracker:** Found a bug? Open a [GitHub Issue](https://github.com/navneetyadav-code/WhatsGateway/issues).
 3. **Pull Requests:** Check our [Contributing Guide](CONTRIBUTING.md) and run local quality checks:
 
 ```powershell
@@ -818,13 +818,16 @@ node --check worker/server.mjs
 
 ---
 
-## ⚖️ License & Trademark Disclaimer
+## ⚖️ License & Unofficial API / Trademark Disclaimer
 
 ### License
 This project is open-source software licensed under the [MIT License](LICENSE).
 
-### Trademark Disclaimer
-WhatsGateway is an independent open-source project and is **not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with Meta Platforms, Inc. or WhatsApp LLC.** WhatsApp is a registered trademark of WhatsApp LLC.
+### Unofficial API & Trademark Disclaimer
+* **Unofficial Implementation:** WhatsGateway is an independent open-source automation gateway powered by **[@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys)**, connecting via the unofficial WhatsApp Web multi-device protocol.
+* **No Official Affiliation:** This project is **not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with Meta Platforms, Inc., WhatsApp LLC, or any of their subsidiaries or affiliates.** The official WhatsApp website is located at [https://whatsapp.com](https://whatsapp.com).
+* **Trademark Notice:** "WhatsApp" as well as related names, marks, emblems, and logos are registered trademarks of WhatsApp LLC / Meta Platforms, Inc.
+* **Usage Responsibility:** This software is intended for personal, educational, and authorized business automation in compliance with local regulations and applicable terms of service.
 
 ---
 
