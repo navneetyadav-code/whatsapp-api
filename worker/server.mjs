@@ -1790,7 +1790,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                             // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
                             const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
-                            const userFacts = isPersonalMode ? await ChatFactMemory.loadUserFacts(db, userId, senderPhone) : { factsText: '' };
+                            const userFacts = isPersonalMode ? await ChatFactMemory.loadUserFacts(db, userId, senderPhone, consolidatedText) : { factsText: '' };
                             const currentDateTime = new Date().toLocaleString('en-US', {
                               timeZone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
                               dateStyle: 'full',
