@@ -859,6 +859,152 @@ if ($page === 'custom-tool-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect_to('index.php?page=tools');
 }
 
+// Export custom tools to ZIP
+if ($page === 'custom-tools-export' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+
+    $rawIds = $_POST['tool_ids'] ?? [];
+    if (is_string($rawIds)) {
+        $rawIds = array_filter(array_map('trim', explode(',', $rawIds)));
+    }
+    $toolIds = array_values(array_filter(array_map('intval', (array) $rawIds), fn($id) => $id > 0));
+
+    try {
+        $exportResult = ToolsPackageService::exportToolsZip($userId, $toolIds);
+        $zipPath = $exportResult['path'];
+        $downloadFilename = $exportResult['filename'];
+
+        if (!file_exists($zipPath)) {
+            throw new RuntimeException('Generated export archive file was not found.');
+        }
+
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $downloadFilename . '"');
+        header('Content-Length: ' . filesize($zipPath));
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+
+        // Flush any preceding output buffers
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+
+        readfile($zipPath);
+        @unlink($zipPath);
+        exit;
+    } catch (Throwable $e) {
+        flash('error', 'Export failed: ' . $e->getMessage());
+        redirect_to('index.php?page=tools');
+    }
+}
+
+// Inspect uploaded tools ZIP package (Stage 1 AJAX)
+if ($page === 'custom-tools-import-inspect' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+
+    if (!isset($_FILES['tools_zip']) || $_FILES['tools_zip']['error'] !== UPLOAD_ERR_OK) {
+        json_response([
+            'ok' => false,
+            'error' => 'Please upload a valid ZIP package file.'
+        ], 400);
+    }
+
+    $tmpPath = (string) $_FILES['tools_zip']['tmp_name'];
+
+    try {
+        $inspection = ToolsPackageService::inspectToolsZip($tmpPath, $userId);
+        $importToken = bin2hex(random_bytes(16));
+
+        $_SESSION['tools_import_staging'] = [
+            'token' => $importToken,
+            'tools' => $inspection['tools'],
+            'created_at' => time(),
+        ];
+
+        json_response([
+            'ok' => true,
+            'import_token' => $importToken,
+            'tools' => $inspection['tools'],
+            'summary' => $inspection['summary'],
+        ]);
+    } catch (Throwable $e) {
+        json_response([
+            'ok' => false,
+            'error' => $e->getMessage(),
+        ], 400);
+    }
+}
+
+// Commit selected tools from inspected package (Stage 2 AJAX)
+if ($page === 'custom-tools-import-commit' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user = require_auth();
+    verify_csrf();
+    $userId = (int) $user['id'];
+
+    $input = request_json();
+    $importToken = trim((string) ($input['import_token'] ?? $_POST['import_token'] ?? ''));
+    $selectedSlugs = (array) ($input['selected_slugs'] ?? $_POST['selected_slugs'] ?? []);
+    $overwrite = !empty($input['overwrite_existing'] ?? $_POST['overwrite_existing'] ?? 1);
+
+    $staging = $_SESSION['tools_import_staging'] ?? null;
+    if (!$staging || !isset($staging['token']) || !hash_equals((string) $staging['token'], $importToken)) {
+        json_response([
+            'ok' => false,
+            'error' => 'Import session expired or invalid. Please upload the ZIP package again.'
+        ], 400);
+    }
+
+    if (empty($selectedSlugs)) {
+        json_response([
+            'ok' => false,
+            'error' => 'Please select at least one tool to import.'
+        ], 400);
+    }
+
+    $stagedTools = (array) ($staging['tools'] ?? []);
+    $selectedSlugMap = array_flip(array_map('strtolower', array_map('strval', $selectedSlugs)));
+
+    $toolsToImport = [];
+    foreach ($stagedTools as $st) {
+        $slug = strtolower((string) ($st['tool_slug'] ?? ''));
+        if (isset($selectedSlugMap[$slug])) {
+            $toolsToImport[] = $st;
+        }
+    }
+
+    if (empty($toolsToImport)) {
+        json_response([
+            'ok' => false,
+            'error' => 'None of the selected tools matched the verified package definitions.'
+        ], 400);
+    }
+
+    try {
+        $commitResult = ToolsPackageService::commitImportedTools($userId, $toolsToImport, $overwrite);
+        unset($_SESSION['tools_import_staging']);
+
+        flash('success', "Import complete: {$commitResult['imported_count']} tools imported ({$commitResult['new_count']} new, {$commitResult['updated_count']} updated).");
+
+        json_response([
+            'ok' => true,
+            'imported_count' => $commitResult['imported_count'],
+            'new_count' => $commitResult['new_count'],
+            'updated_count' => $commitResult['updated_count'],
+            'message' => "Successfully imported {$commitResult['imported_count']} tool(s)."
+        ]);
+    } catch (Throwable $e) {
+        json_response([
+            'ok' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
 if ($page === 'app-store-install' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();

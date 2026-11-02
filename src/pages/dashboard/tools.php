@@ -13,7 +13,15 @@
             </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" id="toolsExportToggleBtn" onclick="toggleExportMode()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer" title="Select and export tools into a ZIP package">
+                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span id="toolsExportToggleBtnText">Export ZIP</span>
+            </button>
+            <button type="button" onclick="openToolsImportModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer" title="Import tools from a ZIP package">
+                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                <span>Import ZIP</span>
+            </button>
             <button type="button" onclick="openPresetsModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
                 <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                 <span>Presets</span>
@@ -96,9 +104,9 @@
                 $method = $cat === 'rest_api' ? ($tool['execution_config']['method'] ?? 'GET') : ($cat === 'webhook' ? 'POST' : ($cat === 'shared_env_api' ? 'PROD' : 'BUILTIN'));
                 $targetUrl = $cat === 'rest_api' ? ($tool['execution_config']['url'] ?? '') : ($cat === 'webhook' ? ($tool['execution_config']['target_url'] ?? '') : ($cat === 'shared_env_api' ? ($tool['execution_config']['base_url'] ?? '') : ($tool['execution_config']['handler'] ?? $tool['tool_slug'])));
             ?>
-                <div class="tool-card bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-2xs hover:shadow-card transition-all flex flex-col justify-between group" data-category="<?= e($cat) ?>" data-tool="<?= htmlspecialchars(json_encode($tool, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
+                <div class="tool-card bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-2xs hover:shadow-card transition-all flex flex-col justify-between group relative" data-tool-id="<?= (int) $tool['id'] ?>" data-tool-slug="<?= e($tool['tool_slug']) ?>" data-category="<?= e($cat) ?>" data-tool="<?= htmlspecialchars(json_encode($tool, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>" onclick="handleCardExportSelect(this, event)">
                     <div>
-                        <!-- Header: Method Badge, Title, Toggle -->
+                        <!-- Header: Method Badge, Title, Toggle, Export Selection Indicator -->
                         <div class="flex items-start justify-between gap-2 mb-2">
                             <div class="flex items-center gap-1.5 min-w-0 flex-1">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 <?= $cat === 'rest_api' ? 'bg-sky-50 text-sky-700 border border-sky-200/80' : ($cat === 'shared_env_api' ? 'bg-purple-50 text-purple-700 border border-purple-200/80' : ($cat === 'webhook' ? 'bg-amber-50 text-amber-700 border border-amber-200/80' : 'bg-slate-100 text-slate-700 border border-slate-200')) ?>">
@@ -109,14 +117,23 @@
                                 </h3>
                             </div>
 
-                            <form method="post" action="<?= e(base_url('index.php?page=custom-tool-toggle')) ?>" class="inline shrink-0">
-                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                                <input type="hidden" name="id" value="<?= (int) $tool['id'] ?>">
-                                <button type="submit" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer <?= !empty($tool['is_active']) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200' ?>" title="<?= !empty($tool['is_active']) ? 'Disable tool' : 'Enable tool' ?>">
-                                    <span class="w-1.5 h-1.5 rounded-full <?= !empty($tool['is_active']) ? 'bg-emerald-500' : 'bg-slate-400' ?>"></span>
-                                    <span><?= !empty($tool['is_active']) ? 'Active' : 'Off' ?></span>
-                                </button>
-                            </form>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <form method="post" action="<?= e(base_url('index.php?page=custom-tool-toggle')) ?>" class="inline tool-toggle-form">
+                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
+                                    <input type="hidden" name="id" value="<?= (int) $tool['id'] ?>">
+                                    <button type="submit" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer <?= !empty($tool['is_active']) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200' ?>" title="<?= !empty($tool['is_active']) ? 'Disable tool' : 'Enable tool' ?>">
+                                        <span class="w-1.5 h-1.5 rounded-full <?= !empty($tool['is_active']) ? 'bg-emerald-500' : 'bg-slate-400' ?>"></span>
+                                        <span><?= !empty($tool['is_active']) ? 'Active' : 'Off' ?></span>
+                                    </button>
+                                </form>
+
+                                <!-- Export Selection Indicator (Radio / Checkbox style) -->
+                                <div class="export-indicator-wrap hidden" title="Select tool for export">
+                                    <div class="w-5 h-5 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs group-hover:border-indigo-400">
+                                        <svg class="w-3 h-3 text-white hidden export-check-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Slug & Target URL Line -->
@@ -147,7 +164,7 @@
                     </div>
 
                     <!-- Footer Actions: Test, Edit, Delete -->
-                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                    <div class="tool-card-footer pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 transition-opacity">
                         <button type="button" onclick="handleToolTest(this)" class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md transition-colors cursor-pointer active:scale-95">
                             <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             <span>Test</span>
@@ -177,17 +194,54 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 </div>
                 <h3 class="text-xs font-bold text-slate-900 mb-1">No Tools Configured</h3>
-                <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">Add a custom REST endpoint or install from pre-configured presets.</p>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">Add a custom REST endpoint, import a ZIP package, or install from presets.</p>
                 <div class="flex items-center justify-center gap-2">
                     <button type="button" onclick="openCustomToolDrawer()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
-                        + Add Custom Tool
+                        + Add Tool
+                    </button>
+                    <button type="button" onclick="openToolsImportModal()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/90 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
+                        Import ZIP Package
                     </button>
                     <button type="button" onclick="openPresetsModal()" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
-                        Presets
+                        Browse Presets
                     </button>
                 </div>
             </div>
         <?php endif; ?>
+    </div>
+
+    <!-- Floating Export Selection Action Bar (Docked at bottom of viewport) -->
+    <div id="exportSelectionBar" class="fixed bottom-6 inset-x-0 mx-auto max-w-2xl px-4 z-40 hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div class="bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/80 rounded-2xl shadow-2xl p-3 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                </div>
+                <div>
+                    <div class="text-xs font-bold leading-tight flex items-center gap-1.5">
+                        <span>Export Mode</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-indigo-500/30 text-indigo-300 font-mono font-bold" id="exportSelectionCountBadge">0 selected</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Click tool cards to select which ones to bundle into the ZIP package.</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <button type="button" onclick="selectAllExportTools()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer">
+                    Select All
+                </button>
+                <button type="button" onclick="deselectAllExportTools()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer">
+                    Clear
+                </button>
+                <button type="button" onclick="exitExportMode()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" id="exportSubmitBtn" onclick="submitExportPackage()" disabled class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white shadow-md transition-all active:scale-[0.98] cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span>Download ZIP (<span id="exportSubmitCount">0</span>)</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- VIEW 2: EXECUTION LOG TABLE -->
@@ -725,6 +779,107 @@
             <button type="button" onclick="closePresetsModal()" class="px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer">
                 Close
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- TOOLS IMPORT ZIP PACKAGE MODAL                            -->
+<!-- ========================================================= -->
+<div id="toolsImportModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 hidden animate-in fade-in duration-150">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200/90 max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150">
+        <!-- Modal Header -->
+        <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-600 flex items-center justify-center shadow-2xs">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 leading-tight">Import Tools Package</h3>
+                    <p class="text-[11px] text-slate-500">Restore or import custom tools from a verified ZIP archive.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeToolsImportModal()" class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer" aria-label="Close modal">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- Modal Body (Scrollable) -->
+        <div class="p-5 overflow-y-auto flex-1 custom-scrollbar space-y-4">
+            <!-- Security Guardrail Notice -->
+            <div class="bg-slate-50 rounded-xl p-3 border border-slate-200/80 flex items-start gap-2.5 text-[11px] text-slate-600">
+                <svg class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <div class="leading-relaxed">
+                    <span class="font-bold text-slate-800">Sandboxed & Security Verified:</span>
+                    <span>Archives are inspected in memory with Zip-Slip defense, anti-Zip-Bomb quotas, SSRF protocol whitelisting (http/https only), and RBAC role normalization.</span>
+                </div>
+            </div>
+
+            <!-- STAGE 1: Drag-and-drop Upload -->
+            <div id="importStageUpload" class="space-y-3">
+                <div id="importDropzone" ondragover="handleImportDragOver(event)" ondragleave="handleImportDragLeave(event)" ondrop="handleImportDrop(event)" onclick="document.getElementById('importZipInput').click()" class="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/20 rounded-2xl p-8 text-center transition-all cursor-pointer group">
+                    <input type="file" id="importZipInput" accept=".zip,application/zip,application/x-zip-compressed" onchange="handleImportFileSelect(this)" class="hidden">
+                    <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-2xs text-slate-500 group-hover:text-indigo-600 group-hover:scale-105 group-hover:border-indigo-200 flex items-center justify-center mx-auto mb-3 transition-all">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    </div>
+                    <h4 class="text-xs font-bold text-slate-800 mb-1">Click to browse or drop ZIP package here</h4>
+                    <p class="text-[11px] text-slate-400">Accepts standard <span class="font-mono text-slate-600">.zip</span> packages containing exported tools (Max 10MB)</p>
+                </div>
+
+                <!-- Inspection Loading State -->
+                <div id="importLoadingState" class="hidden py-8 text-center space-y-2">
+                    <div class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 animate-spin">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    </div>
+                    <div class="text-xs font-semibold text-slate-800">Inspecting package & validating schemas...</div>
+                    <div class="text-[11px] text-slate-400">Verifying signatures, JSON structures, and collision states</div>
+                </div>
+
+                <!-- Error Alert -->
+                <div id="importErrorAlert" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200/90 text-rose-800 text-xs flex items-start gap-2">
+                    <svg class="w-4 h-4 text-rose-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span id="importErrorMessage" class="leading-relaxed"></span>
+                </div>
+            </div>
+
+            <!-- STAGE 2: Tool Selection Grid (Select which ones to import) -->
+            <div id="importStagePreview" class="hidden space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-800" id="importSummaryBadge"></span>
+                        <span class="text-slate-300">|</span>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="selectAllImportTools()" class="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer">Select All</button>
+                            <span class="text-slate-300">•</span>
+                            <button type="button" onclick="deselectAllImportTools()" class="text-[11px] text-slate-500 hover:text-slate-700 font-medium cursor-pointer">Deselect All</button>
+                        </div>
+                    </div>
+
+                    <label class="inline-flex items-center gap-2 cursor-pointer select-none text-[11px] text-slate-600 font-medium">
+                        <input type="checkbox" id="importOverwriteCheckbox" checked class="w-3.5 h-3.5 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500">
+                        <span>Overwrite existing tools on slug conflict</span>
+                    </label>
+                </div>
+
+                <!-- Discovered Tools List -->
+                <div id="importToolsList" class="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-1"></div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-5 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+            <button type="button" id="importResetBtn" onclick="resetImportModalState()" class="hidden px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer">
+                ← Choose Another File
+            </button>
+            <div class="flex items-center gap-2 ml-auto">
+                <button type="button" onclick="closeToolsImportModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" id="importCommitBtn" onclick="commitSelectedImportTools()" disabled class="hidden inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <span>Import Selected (<span id="importCommitCount">0</span>)</span>
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -1510,9 +1665,490 @@
         form.submit();
     }
 
+    // =========================================================
+    // TOOLS ZIP EXPORT LOGIC (RADIO / CHECKBOX SELECTION MODE)
+    // =========================================================
+    const toolsCsrfToken = '<?= e(csrf_token()) ?>';
+    let isExportMode = false;
+    const selectedExportToolIds = new Set();
+
+    function toggleExportMode() {
+        if (!isExportMode) {
+            enterExportMode();
+        } else {
+            exitExportMode();
+        }
+    }
+
+    function enterExportMode() {
+        isExportMode = true;
+        const toggleBtn = document.getElementById('toolsExportToggleBtn');
+        const toggleBtnText = document.getElementById('toolsExportToggleBtnText');
+        const selectionBar = document.getElementById('exportSelectionBar');
+        const cardsGrid = document.getElementById('toolsCardsGrid');
+
+        if (toggleBtn) {
+            toggleBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 border border-indigo-300 text-indigo-700 shadow-2xs transition-all cursor-pointer';
+        }
+        if (toggleBtnText) toggleBtnText.textContent = 'Cancel Export';
+        if (selectionBar) selectionBar.classList.remove('hidden');
+
+        // Reveal selection indicators on all tool cards
+        document.querySelectorAll('.export-indicator-wrap').forEach(el => el.classList.remove('hidden'));
+        document.querySelectorAll('.tool-toggle-form').forEach(el => el.classList.add('hidden'));
+
+        // Highlight cards grid
+        if (cardsGrid) {
+            cardsGrid.classList.add('export-mode-active');
+        }
+        document.querySelectorAll('.tool-card').forEach(card => {
+            card.classList.add('cursor-pointer', 'select-none');
+            const footer = card.querySelector('.tool-card-footer');
+            if (footer) footer.style.pointerEvents = 'none';
+        });
+
+        updateExportUI();
+    }
+
+    function exitExportMode() {
+        isExportMode = false;
+        const toggleBtn = document.getElementById('toolsExportToggleBtn');
+        const toggleBtnText = document.getElementById('toolsExportToggleBtnText');
+        const selectionBar = document.getElementById('exportSelectionBar');
+        const cardsGrid = document.getElementById('toolsCardsGrid');
+
+        if (toggleBtn) {
+            toggleBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer';
+        }
+        if (toggleBtnText) toggleBtnText.textContent = 'Export ZIP';
+        if (selectionBar) selectionBar.classList.add('hidden');
+
+        // Hide indicators and restore cards
+        document.querySelectorAll('.export-indicator-wrap').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tool-toggle-form').forEach(el => el.classList.remove('hidden'));
+
+        if (cardsGrid) {
+            cardsGrid.classList.remove('export-mode-active');
+        }
+        document.querySelectorAll('.tool-card').forEach(card => {
+            card.classList.remove('cursor-pointer', 'select-none', 'ring-2', 'ring-indigo-500', 'border-indigo-400', 'bg-indigo-50/20');
+            const circle = card.querySelector('.export-radio-circle');
+            if (circle) circle.className = 'w-5 h-5 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs group-hover:border-indigo-400';
+            const check = card.querySelector('.export-check-svg');
+            if (check) check.classList.add('hidden');
+            const footer = card.querySelector('.tool-card-footer');
+            if (footer) footer.style.pointerEvents = '';
+        });
+
+        selectedExportToolIds.clear();
+        updateExportUI();
+    }
+
+    function handleCardExportSelect(cardEl, event) {
+        if (!isExportMode) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const toolId = parseInt(cardEl.dataset.toolId, 10);
+        if (!toolId) return;
+
+        if (selectedExportToolIds.has(toolId)) {
+            selectedExportToolIds.delete(toolId);
+            cardEl.classList.remove('ring-2', 'ring-indigo-500', 'border-indigo-400', 'bg-indigo-50/20');
+            const circle = cardEl.querySelector('.export-radio-circle');
+            if (circle) circle.className = 'w-5 h-5 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs group-hover:border-indigo-400';
+            const check = cardEl.querySelector('.export-check-svg');
+            if (check) check.classList.add('hidden');
+        } else {
+            selectedExportToolIds.add(toolId);
+            cardEl.classList.add('ring-2', 'ring-indigo-500', 'border-indigo-400', 'bg-indigo-50/20');
+            const circle = cardEl.querySelector('.export-radio-circle');
+            if (circle) circle.className = 'w-5 h-5 rounded-full border-2 border-indigo-600 bg-indigo-600 flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs';
+            const check = cardEl.querySelector('.export-check-svg');
+            if (check) check.classList.remove('hidden');
+        }
+
+        updateExportUI();
+    }
+
+    function selectAllExportTools() {
+        document.querySelectorAll('.tool-card').forEach(card => {
+            const toolId = parseInt(card.dataset.toolId, 10);
+            if (toolId) {
+                selectedExportToolIds.add(toolId);
+                card.classList.add('ring-2', 'ring-indigo-500', 'border-indigo-400', 'bg-indigo-50/20');
+                const circle = card.querySelector('.export-radio-circle');
+                if (circle) circle.className = 'w-5 h-5 rounded-full border-2 border-indigo-600 bg-indigo-600 flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs';
+                const check = card.querySelector('.export-check-svg');
+                if (check) check.classList.remove('hidden');
+            }
+        });
+        updateExportUI();
+    }
+
+    function deselectAllExportTools() {
+        selectedExportToolIds.clear();
+        document.querySelectorAll('.tool-card').forEach(card => {
+            card.classList.remove('ring-2', 'ring-indigo-500', 'border-indigo-400', 'bg-indigo-50/20');
+            const circle = card.querySelector('.export-radio-circle');
+            if (circle) circle.className = 'w-5 h-5 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs group-hover:border-indigo-400';
+            const check = card.querySelector('.export-check-svg');
+            if (check) check.classList.add('hidden');
+        });
+        updateExportUI();
+    }
+
+    function updateExportUI() {
+        const count = selectedExportToolIds.size;
+        const countBadge = document.getElementById('exportSelectionCountBadge');
+        const submitCount = document.getElementById('exportSubmitCount');
+        const submitBtn = document.getElementById('exportSubmitBtn');
+
+        if (countBadge) countBadge.textContent = `${count} selected`;
+        if (submitCount) submitCount.textContent = count;
+        if (submitBtn) submitBtn.disabled = (count === 0);
+    }
+
+    function submitExportPackage() {
+        if (selectedExportToolIds.size === 0) return;
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '<?= e(base_url('index.php?page=custom-tools-export')) ?>';
+
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = toolsCsrfToken;
+        form.appendChild(csrfInput);
+
+        selectedExportToolIds.forEach(id => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'tool_ids[]';
+            input.value = id;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        setTimeout(() => {
+            document.body.removeChild(form);
+            exitExportMode();
+        }, 300);
+    }
+
+    // =========================================================
+    // TOOLS ZIP IMPORT MODAL & STAGING LOGIC
+    // =========================================================
+    let importStagingToken = null;
+    let importDiscoveredTools = [];
+    let selectedImportSlugs = new Set();
+
+    function openToolsImportModal() {
+        const modal = document.getElementById('toolsImportModal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        resetImportModalState();
+    }
+
+    function closeToolsImportModal() {
+        const modal = document.getElementById('toolsImportModal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        resetImportModalState();
+    }
+
+    function resetImportModalState() {
+        importStagingToken = null;
+        importDiscoveredTools = [];
+        selectedImportSlugs.clear();
+
+        const stageUpload = document.getElementById('importStageUpload');
+        const dropzone = document.getElementById('importDropzone');
+        const loadingState = document.getElementById('importLoadingState');
+        const errorAlert = document.getElementById('importErrorAlert');
+        const stagePreview = document.getElementById('importStagePreview');
+        const resetBtn = document.getElementById('importResetBtn');
+        const commitBtn = document.getElementById('importCommitBtn');
+        const fileInput = document.getElementById('importZipInput');
+
+        if (stageUpload) stageUpload.classList.remove('hidden');
+        if (dropzone) dropzone.classList.remove('hidden');
+        if (loadingState) loadingState.classList.add('hidden');
+        if (errorAlert) errorAlert.classList.add('hidden');
+        if (stagePreview) stagePreview.classList.add('hidden');
+        if (resetBtn) resetBtn.classList.add('hidden');
+        if (commitBtn) {
+            commitBtn.classList.add('hidden');
+            commitBtn.disabled = true;
+        }
+        if (fileInput) fileInput.value = '';
+    }
+
+    function handleImportDragOver(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropzone = document.getElementById('importDropzone');
+        if (dropzone) {
+            dropzone.classList.add('border-indigo-500', 'bg-indigo-50/40');
+        }
+    }
+
+    function handleImportDragLeave(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropzone = document.getElementById('importDropzone');
+        if (dropzone) {
+            dropzone.classList.remove('border-indigo-500', 'bg-indigo-50/40');
+        }
+    }
+
+    function handleImportDrop(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropzone = document.getElementById('importDropzone');
+        if (dropzone) {
+            dropzone.classList.remove('border-indigo-500', 'bg-indigo-50/40');
+        }
+
+        const files = e.dataTransfer ? e.dataTransfer.files : null;
+        if (files && files.length > 0) {
+            inspectToolsZipFile(files[0]);
+        }
+    }
+
+    function handleImportFileSelect(input) {
+        if (input.files && input.files.length > 0) {
+            inspectToolsZipFile(input.files[0]);
+        }
+    }
+
+    async function inspectToolsZipFile(file) {
+        if (!file.name.toLowerCase().endsWith('.zip')) {
+            showImportError('Please select a valid .zip archive file.');
+            return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+            showImportError('Package file exceeds the 10MB upload limit.');
+            return;
+        }
+
+        const dropzone = document.getElementById('importDropzone');
+        const loadingState = document.getElementById('importLoadingState');
+        const errorAlert = document.getElementById('importErrorAlert');
+
+        if (dropzone) dropzone.classList.add('hidden');
+        if (errorAlert) errorAlert.classList.add('hidden');
+        if (loadingState) loadingState.classList.remove('hidden');
+
+        const formData = new FormData();
+        formData.append('tools_zip', file);
+        formData.append('csrf_token', toolsCsrfToken);
+
+        try {
+            const response = await fetch('<?= e(base_url('index.php?page=custom-tools-import-inspect')) ?>', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to inspect package file.');
+            }
+
+            importStagingToken = data.import_token;
+            importDiscoveredTools = data.tools || [];
+            selectedImportSlugs = new Set(importDiscoveredTools.map(t => t.tool_slug));
+
+            renderImportPreview(importDiscoveredTools, data.summary || {});
+        } catch (err) {
+            if (loadingState) loadingState.classList.add('hidden');
+            if (dropzone) dropzone.classList.remove('hidden');
+            showImportError(err.message || 'Inspection failed.');
+        }
+    }
+
+    function showImportError(msg) {
+        const errorAlert = document.getElementById('importErrorAlert');
+        const errorMsg = document.getElementById('importErrorMessage');
+        if (errorMsg) errorMsg.textContent = msg;
+        if (errorAlert) errorAlert.classList.remove('hidden');
+    }
+
+    function renderImportPreview(tools, summary) {
+        const stageUpload = document.getElementById('importStageUpload');
+        const stagePreview = document.getElementById('importStagePreview');
+        const resetBtn = document.getElementById('importResetBtn');
+        const commitBtn = document.getElementById('importCommitBtn');
+        const summaryBadge = document.getElementById('importSummaryBadge');
+        const toolsList = document.getElementById('importToolsList');
+
+        if (stageUpload) stageUpload.classList.add('hidden');
+        if (stagePreview) stagePreview.classList.remove('hidden');
+        if (resetBtn) resetBtn.classList.remove('hidden');
+        if (commitBtn) commitBtn.classList.remove('hidden');
+
+        const total = summary.total || tools.length;
+        const newCount = summary.new || 0;
+        const updates = summary.updates || 0;
+
+        if (summaryBadge) {
+            summaryBadge.innerHTML = `<span class="font-mono">${total}</span> tool(s) found (<span class="text-emerald-600 font-bold">${newCount} new</span>, <span class="text-amber-600 font-bold">${updates} update${updates === 1 ? '' : 's'}</span>)`;
+        }
+
+        if (toolsList) {
+            toolsList.innerHTML = tools.map(t => {
+                const isSelected = selectedImportSlugs.has(t.tool_slug);
+                const isExisting = !!t.exists;
+                const statusBadge = isExisting
+                    ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">⚠️ Overwrites Existing</span>`
+                    : `<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">✨ New Tool</span>`;
+
+                const cat = t.category || 'rest_api';
+                const method = cat === 'rest_api' ? (t.execution_config?.method || 'GET') : (cat === 'webhook' ? 'POST' : (cat === 'shared_env_api' ? 'PROD' : 'BUILTIN'));
+                const badgeClass = cat === 'rest_api' ? 'bg-sky-50 text-sky-700 border border-sky-200' : (cat === 'shared_env_api' ? 'bg-purple-50 text-purple-700 border border-purple-200' : (cat === 'webhook' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-700 border border-slate-200'));
+                const paramsCount = Object.keys(t.parameters_schema?.properties || {}).length;
+
+                return `
+                    <div class="import-tool-row p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 select-none ${isSelected ? 'border-indigo-400 bg-indigo-50/30' : 'border-slate-200 bg-white hover:border-slate-300'}" data-slug="${escapeHtml(t.tool_slug)}" onclick="toggleImportItem('${escapeHtml(t.tool_slug)}')">
+                        <div class="pt-0.5 shrink-0">
+                            <div class="import-radio-circle w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-indigo-600 bg-indigo-600 shadow-2xs' : 'border-slate-300 bg-white'}">
+                                <svg class="w-3 h-3 text-white import-check-svg ${isSelected ? '' : 'hidden'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase shrink-0 ${badgeClass}">${escapeHtml(method)}</span>
+                                    <h4 class="text-xs font-bold text-slate-900 truncate">${escapeHtml(t.display_name)}</h4>
+                                    <span class="text-[10px] font-mono text-slate-400 truncate">(${escapeHtml(t.tool_slug)})</span>
+                                </div>
+                                ${statusBadge}
+                            </div>
+                            <p class="text-[11px] text-slate-500 line-clamp-1 mb-1.5">${escapeHtml(t.description || 'No description provided.')}</p>
+                            <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                                <span>${paramsCount} parameter${paramsCount === 1 ? '' : 's'}</span>
+                                <span>•</span>
+                                <span>RBAC: ${(t.rbac_roles || ['guest', 'customer', 'admin']).join(', ')}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        updateImportCommitUI();
+    }
+
+    function toggleImportItem(slug) {
+        if (selectedImportSlugs.has(slug)) {
+            selectedImportSlugs.delete(slug);
+        } else {
+            selectedImportSlugs.add(slug);
+        }
+
+        // Update row styling
+        const row = document.querySelector(`.import-tool-row[data-slug="${slug}"]`);
+        if (row) {
+            const isSelected = selectedImportSlugs.has(slug);
+            row.className = `import-tool-row p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 select-none ${isSelected ? 'border-indigo-400 bg-indigo-50/30' : 'border-slate-200 bg-white hover:border-slate-300'}`;
+            const circle = row.querySelector('.import-radio-circle');
+            if (circle) circle.className = `import-radio-circle w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-indigo-600 bg-indigo-600 shadow-2xs' : 'border-slate-300 bg-white'}`;
+            const check = row.querySelector('.import-check-svg');
+            if (check) check.classList.toggle('hidden', !isSelected);
+        }
+
+        updateImportCommitUI();
+    }
+
+    function selectAllImportTools() {
+        importDiscoveredTools.forEach(t => selectedImportSlugs.add(t.tool_slug));
+        document.querySelectorAll('.import-tool-row').forEach(row => {
+            row.classList.add('border-indigo-400', 'bg-indigo-50/30');
+            row.classList.remove('border-slate-200', 'bg-white');
+            const circle = row.querySelector('.import-radio-circle');
+            if (circle) circle.className = 'import-radio-circle w-5 h-5 rounded-full border-2 border-indigo-600 bg-indigo-600 flex items-center justify-center transition-all shadow-2xs';
+            const check = row.querySelector('.import-check-svg');
+            if (check) check.classList.remove('hidden');
+        });
+        updateImportCommitUI();
+    }
+
+    function deselectAllImportTools() {
+        selectedImportSlugs.clear();
+        document.querySelectorAll('.import-tool-row').forEach(row => {
+            row.classList.remove('border-indigo-400', 'bg-indigo-50/30');
+            row.classList.add('border-slate-200', 'bg-white');
+            const circle = row.querySelector('.import-radio-circle');
+            if (circle) circle.className = 'import-radio-circle w-5 h-5 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center transition-all';
+            const check = row.querySelector('.import-check-svg');
+            if (check) check.classList.add('hidden');
+        });
+        updateImportCommitUI();
+    }
+
+    function updateImportCommitUI() {
+        const count = selectedImportSlugs.size;
+        const commitCount = document.getElementById('importCommitCount');
+        const commitBtn = document.getElementById('importCommitBtn');
+
+        if (commitCount) commitCount.textContent = count;
+        if (commitBtn) commitBtn.disabled = (count === 0);
+    }
+
+    async function commitSelectedImportTools() {
+        if (selectedImportSlugs.size === 0 || !importStagingToken) return;
+
+        const commitBtn = document.getElementById('importCommitBtn');
+        const originalContent = commitBtn.innerHTML;
+        commitBtn.disabled = true;
+        commitBtn.innerHTML = `
+            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <span>Importing...</span>
+        `;
+
+        const overwrite = document.getElementById('importOverwriteCheckbox')?.checked ? 1 : 0;
+
+        try {
+            const res = await fetch('<?= e(base_url('index.php?page=custom-tools-import-commit')) ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': toolsCsrfToken
+                },
+                body: JSON.stringify({
+                    import_token: importStagingToken,
+                    selected_slugs: Array.from(selectedImportSlugs),
+                    overwrite_existing: overwrite
+                }),
+                credentials: 'same-origin'
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to commit imported tools.');
+            }
+
+            closeToolsImportModal();
+            window.location.reload();
+        } catch (err) {
+            commitBtn.innerHTML = originalContent;
+            commitBtn.disabled = false;
+            alert(err.message || 'Import error.');
+        }
+    }
+
     // Close modals on ESC
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
+            if (isExportMode) exitExportMode();
+            closeToolsImportModal();
             closeInvocationDetails();
             closeToolTestModal();
             closeCustomToolDrawer();

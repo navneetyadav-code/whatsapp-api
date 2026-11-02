@@ -6,9 +6,10 @@ RUN apt-get update && apt-get install -y \
     git \
     supervisor \
     ca-certificates \
+    libzip-dev \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
-    && docker-php-ext-install pdo pdo_mysql \
+    && docker-php-ext-install pdo pdo_mysql zip \
     && a2enmod rewrite \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
