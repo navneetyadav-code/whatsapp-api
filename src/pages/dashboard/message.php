@@ -133,11 +133,11 @@
                     <!-- Attachment Upload -->
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
-                            <label class="block text-[12px] font-semibold text-slate-700">Media Attachment <span class="text-slate-400 font-normal">(Optional)</span></label>
-                            <span class="text-[11px] text-slate-400 font-mono">Max 15MB</span>
+                            <label class="block text-[12px] font-semibold text-slate-700">Media Attachments <span class="text-slate-400 font-normal">(Optional, Multiple supported)</span></label>
+                            <span class="text-[11px] text-slate-400 font-mono">Max 15MB each</span>
                         </div>
                         <div class="relative group border border-dashed border-slate-300 hover:border-emerald-500 rounded-lg px-3 py-2 bg-slate-50/50 hover:bg-emerald-50/20 transition-all cursor-pointer flex items-center gap-3">
-                            <input id="messageAttachment" name="attachment" type="file" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept=".jpg,.jpeg,.png,.webp,.mp4,.pdf,.doc,.docx,.txt,image/*,video/mp4,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                            <input id="messageAttachment" name="attachment[]" type="file" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,.mov,.3gp,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.rtf,.zip,image/*,video/*,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation">
                             <div class="w-7 h-7 rounded-md bg-white border border-slate-200 group-hover:border-emerald-300 group-hover:text-emerald-600 shadow-subtle flex items-center justify-center text-slate-400 shrink-0 transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                             </div>
@@ -146,21 +146,21 @@
                                 <span class="shrink-0 text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-500 group-hover:border-emerald-200 group-hover:text-emerald-600 shadow-subtle">Browse</span>
                             </div>
                         </div>
-                        <p class="text-[11px] text-slate-400 mt-1.5">Supported: Images, MP4, PDF, DOCX, TXT.</p>
+                        <p class="text-[11px] text-slate-400 mt-1.5">Supported: Images, MP4, PDF, DOCX, PPT, PPTX, TXT. (Select multiple files if needed)</p>
                     </div>
                 </div>
 
                 <!-- Message Body -->
                 <div class="pt-2 border-t border-slate-100">
                     <div class="flex items-center justify-between mb-2">
-                        <label class="text-[12px] font-semibold text-slate-700">Message Content</label>
+                        <label class="text-[12px] font-semibold text-slate-700">Message Content <span class="text-slate-400 font-normal">(Optional if files attached)</span></label>
                         <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono whitespace-nowrap">
                             <span>WYSIWYG</span>
                             <span class="text-slate-300" aria-hidden="true">|</span>
                             <span>Live WA Preview</span>
                         </div>
                     </div>
-                    <textarea name="message" data-presets='["{name}", "{phone}"]' rows="5" class="wa-editor block w-full px-3.5 py-3 text-[15px] sm:text-[16px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all shadow-subtle placeholder:text-slate-300 font-sans leading-relaxed" placeholder="Type your WhatsApp message here..." required></textarea>
+                    <textarea name="message" data-presets='["{name}", "{phone}"]' rows="5" class="wa-editor block w-full px-3.5 py-3 text-[15px] sm:text-[16px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white transition-all shadow-subtle placeholder:text-slate-300 font-sans leading-relaxed" placeholder="Type your WhatsApp message here..."></textarea>
                 </div>
 
                 <!-- Footer Actions -->

@@ -150,10 +150,22 @@ $navigation = [
                 'icon' => 'dashboard',
             ],
             [
+                'label' => 'New Message',
+                'page' => 'message',
+                'pages' => ['message'],
+                'icon' => 'edit',
+            ],
+            [
                 'label' => 'Connect WhatsApp',
                 'page' => 'device',
                 'pages' => ['device'],
                 'icon' => 'phone',
+            ],
+            [
+                'label' => 'API Keys',
+                'page' => 'api-keys',
+                'pages' => ['api-keys'],
+                'icon' => 'key',
             ],
             [
                 'label' => 'Contacts',
@@ -184,12 +196,6 @@ $navigation = [
                 'badge' => 'live-chat',
             ],
             [
-                'label' => 'New Message',
-                'page' => 'message',
-                'pages' => ['message'],
-                'icon' => 'edit',
-            ],
-            [
                 'label' => 'Campaigns',
                 'page' => 'campaigns',
                 'pages' => ['campaigns'],
@@ -206,6 +212,7 @@ $navigation = [
                 'page' => 'feedback',
                 'pages' => ['feedback'],
                 'icon' => 'star',
+                'mode' => 'support',
             ],
             [
                 'label' => 'Escalations',
@@ -233,6 +240,13 @@ $navigation = [
                 'page' => 'chatbot',
                 'pages' => ['chatbot', 'ai-agent'],
                 'icon' => 'bot',
+            ],
+            [
+                'label' => 'AI Providers & SMTP',
+                'page' => 'ai-credentials',
+                'pages' => ['ai-credentials', 'ai-keys'],
+                'icon' => 'plug',
+                'badge' => 'credentials',
             ],
             [
                 'label' => 'Memory & Training',
@@ -284,23 +298,10 @@ $navigation = [
         'icon' => 'integrations',
         'items' => [
             [
-                'label' => 'API Keys',
-                'page' => 'api-keys',
-                'pages' => ['api-keys'],
-                'icon' => 'key',
-            ],
-            [
                 'label' => 'Webhooks',
                 'page' => 'webhooks',
                 'pages' => ['webhooks'],
                 'icon' => 'webhook',
-            ],
-            [
-                'label' => 'AI Providers & SMTP',
-                'page' => 'ai-credentials',
-                'pages' => ['ai-credentials', 'ai-keys'],
-                'icon' => 'plug',
-                'badge' => 'credentials',
             ],
         ],
     ],

@@ -118,20 +118,42 @@ if ($page === 'message-send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $message = trim((string) ($_POST['message'] ?? ''));
     $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
     
-    if ($message === '') {
-        if ($isAjax) {
-            json_response(['ok' => false, 'error' => 'Message is required.'], 400);
+    // Normalize uploaded attachments (supports single or multiple file uploads)
+    $uploadedFiles = [];
+    if (!empty($_FILES['attachment'])) {
+        $raw = $_FILES['attachment'];
+        if (is_array($raw['name'])) {
+            $fCount = count($raw['name']);
+            for ($i = 0; $i < $fCount; $i++) {
+                if (isset($raw['error'][$i]) && $raw['error'][$i] !== UPLOAD_ERR_NO_FILE) {
+                    $uploadedFiles[] = [
+                        'name'     => $raw['name'][$i],
+                        'type'     => $raw['type'][$i] ?? '',
+                        'tmp_name' => $raw['tmp_name'][$i],
+                        'error'    => $raw['error'][$i],
+                        'size'     => $raw['size'][$i],
+                    ];
+                }
+            }
+        } elseif (($raw['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $uploadedFiles[] = $raw;
         }
-        flash('error', 'Message is required.');
+    }
+
+    if ($message === '' && empty($uploadedFiles)) {
+        if ($isAjax) {
+            json_response(['ok' => false, 'error' => 'Please provide a message or attach at least one file.'], 400);
+        }
+        flash('error', 'Please provide a message or attach at least one file.');
         redirect_to('index.php?page=message');
     }
 
-    // Secure media upload handling (validated against allowed MIME types, extension whitelisting, and temporary cleanup)
-    $payload = [];
-    if (!empty($_FILES['attachment']) && $_FILES['attachment']['error'] !== UPLOAD_ERR_NO_FILE) {
+    // Secure media upload handling (supports images, pdf, docx, ppt, pptx, mp4, etc.)
+    $savedAttachments = [];
+    foreach ($uploadedFiles as $fileItem) {
         try {
-            $saved = save_uploaded_media($_FILES['attachment']);
-            $payload['attachment'] = [
+            $saved = save_uploaded_media($fileItem);
+            $savedAttachments[] = [
                 'path' => $saved['path'],
                 'name' => $saved['name'],
                 'type' => $saved['type'],
@@ -147,18 +169,39 @@ if ($page === 'message-send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    if (!empty($_POST['humanize'])) {
-        $payload['humanize'] = true;
-    }
+    $isHumanize = !empty($_POST['humanize']);
 
     try {
         $queuedCount = 0;
+
+        $enqueueForRecipient = static function (string $recipientPhone, string $recipientMessage) use ($user, $savedAttachments, $isHumanize, &$queuedCount) {
+            if (!empty($savedAttachments)) {
+                $isFirst = true;
+                foreach ($savedAttachments as $att) {
+                    $payload = ['attachment' => $att];
+                    if ($isHumanize) {
+                        $payload['humanize'] = true;
+                    }
+                    $bodyText = $isFirst ? $recipientMessage : '';
+                    enqueue_message((int) $user['id'], null, $recipientPhone, $bodyText, $payload);
+                    $queuedCount++;
+                    $isFirst = false;
+                }
+            } else {
+                $payload = [];
+                if ($isHumanize) {
+                    $payload['humanize'] = true;
+                }
+                enqueue_message((int) $user['id'], null, $recipientPhone, $recipientMessage, $payload);
+                $queuedCount++;
+            }
+        };
+
         if ($type === 'number') {
             $phone = trim((string) ($_POST['manual_number'] ?? ''));
             if (!$phone) throw new Exception('Phone number required');
             $phone = normalize_phone($phone);
-            enqueue_message((int) $user['id'], null, $phone, $message, $payload);
-            $queuedCount = 1;
+            $enqueueForRecipient($phone, $message);
         } elseif ($type === 'contact') {
             $contactId = (int) ($_POST['contact_id'] ?? 0);
             $stmt = Database::pdo()->prepare('SELECT * FROM contacts WHERE id = ? AND user_id = ?');
@@ -167,15 +210,13 @@ if ($page === 'message-send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$contact) throw new Exception('Contact not found');
             
             $formattedMsg = apply_contact_template($message, $contact);
-            enqueue_message((int) $user['id'], null, $contact['phone'], $formattedMsg, $payload);
-            $queuedCount = 1;
+            $enqueueForRecipient($contact['phone'], $formattedMsg);
         } elseif ($type === 'campaign') {
             $campaignId = (int) ($_POST['campaign_id'] ?? 0);
             $contacts = campaign_contacts((int) $user['id'], $campaignId);
             foreach ($contacts as $contact) {
                 $formattedMsg = apply_contact_template($message, $contact);
-                enqueue_message((int) $user['id'], null, $contact['phone'], $formattedMsg, $payload);
-                $queuedCount++;
+                $enqueueForRecipient($contact['phone'], $formattedMsg);
             }
         }
         

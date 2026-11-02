@@ -10,6 +10,11 @@ $user = $user ?? require_auth();
 $userId = (int) $user['id'];
 $pdo = Database::pdo();
 
+$modeStmt = $pdo->prepare('SELECT agent_mode FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
+$modeStmt->execute([$userId]);
+$agentMode = (string) ($modeStmt->fetchColumn() ?: 'support');
+$isPersonalMode = ($agentMode === 'personal');
+
 // 1. Telemetry Aggregation
 $statsStmt = $pdo->prepare(
     'SELECT 

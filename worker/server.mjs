@@ -886,6 +886,20 @@ async function startSession(userId, force = false, waitForReady = true) {
           session.pushName = sock.user?.name || sock.user?.verifiedName || null;
           try { session.profilePicture = await sock.profilePictureUrl(sock.user.id, 'image'); } catch(e) { session.profilePicture = null; }
           await updateSessionRecord(userId, session);
+
+          // WhatsApp device detected/connected: release all waiting queued messages immediately!
+          try {
+            await db.execute(
+              `UPDATE message_queue
+               SET available_at = NOW(),
+                   error_message = NULL
+               WHERE user_id = ? AND status = 'queued'`,
+              [userId]
+            );
+            setImmediate(processQueueOnce);
+          } catch (flushErr) {
+            logger.warn({ flushErr: flushErr.message, userId }, 'Failed to release waiting queue on device connection');
+          }
         }
 
         if (connection === 'close') {
@@ -2193,31 +2207,21 @@ async function sendQueuedMessage(message) {
 
   const session = await startSession(String(message.user_id));
 
-  // If session is not connected, schedule a non-blocking retry with exponential backoff & jitter
+  // If session is not connected, do NOT burn delivery retries or fail permanently!
+  // Keep the message safely queued so that when the device is detected / connected, it will be dispatched immediately.
   if (session.state !== 'connected' || !session.sock) {
-    logger.info(`Session for user ${message.user_id} is not connected (state: ${session.state}). Scheduling background retry.`);
-    const attempts = Number(message.attempts) || 1;
-    const maxAttempts = Number(message.max_attempts) || 5;
-
-    if (attempts >= maxAttempts) {
-      await markMessageFailed(message, 'WhatsApp device is not connected or failed to wake up after maximum retry attempts.');
-      return;
-    }
-
-    // Exponential backoff with jitter (5s, 10s, 20s, 40s... capped at 120s)
-    const baseDelay = Math.min(120, 5 * Math.pow(2, Math.max(0, attempts - 1)));
-    const jitter = Math.floor(Math.random() * 5);
-    const delaySeconds = baseDelay + jitter;
-
+    logger.info(`Session for user ${message.user_id} is not connected (state: ${session.state}). Pausing message until device connects.`);
+    
     await db.execute(
       `UPDATE message_queue
        SET status = 'queued',
            locked_at = NULL,
            locked_by = NULL,
-           error_message = 'Session waking up or not yet connected; retry scheduled.',
-           available_at = DATE_ADD(NOW(), INTERVAL ? SECOND)
+           attempts = LEAST(attempts, 1),
+           error_message = 'Paused: Waiting for WhatsApp device to be connected.',
+           available_at = DATE_ADD(NOW(), INTERVAL 45 SECOND)
        WHERE id = ?`,
-      [delaySeconds, message.id]
+      [message.id]
     );
     return;
   }

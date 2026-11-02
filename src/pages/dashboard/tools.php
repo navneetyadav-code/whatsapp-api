@@ -737,7 +737,7 @@
     let currentSearchQuery = '';
 
     // Main Tab Switcher: Tools vs. Invocations
-    function switchMainTab(tab) {
+    function switchMainTab(tab, updateHistory = true) {
         const toolsSection = document.getElementById('viewToolsSection');
         const invocationsSection = document.getElementById('viewInvocationsSection');
         const filterBar = document.getElementById('toolsFilterBar');
@@ -759,7 +759,30 @@
             tabInvocationsBtn.className = 'main-view-tab px-3 py-1 text-xs font-bold rounded-md bg-white text-slate-900 shadow-2xs transition-all cursor-pointer';
             tabToolsBtn.className = 'main-view-tab px-3 py-1 text-xs font-bold rounded-md text-slate-600 hover:text-slate-900 transition-all cursor-pointer';
         }
+
+        try {
+            localStorage.setItem('tools_active_tab', tab);
+            if (updateHistory) {
+                const url = new URL(window.location);
+                url.searchParams.set('tab', tab);
+                window.history.replaceState(null, '', url);
+            }
+        } catch (_) {}
     }
+
+    // Auto-restore tab on load (checks URL parameter, hash, or localStorage)
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashTab = window.location.hash ? window.location.hash.replace('#', '').replace('tab=', '') : null;
+            const tabParam = urlParams.get('tab') || hashTab || localStorage.getItem('tools_active_tab');
+            if (tabParam === 'invocations') {
+                switchMainTab('invocations', false);
+            } else if (tabParam === 'tools') {
+                switchMainTab('tools', false);
+            }
+        } catch (_) {}
+    });
 
     // Category Filter
     function filterTools(category, buttonEl) {

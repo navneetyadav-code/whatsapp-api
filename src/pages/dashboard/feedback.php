@@ -27,6 +27,26 @@ declare(strict_types=1);
     </div>
 </div>
 
+<?php if (!empty($isPersonalMode)): ?>
+<!-- Personal Mode Notice -->
+<div class="mb-6 p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-3 shadow-xs">
+    <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+    </div>
+    <div class="flex-1">
+        <h3 class="text-xs font-bold text-amber-900">Customer Feedback Disabled in Personal Assistant Mode</h3>
+        <p class="text-[12px] text-amber-700 mt-0.5 leading-relaxed">
+            Your AI Agent is currently operating in <strong>Personal Executive Assistant mode</strong>. In this mode, post-chat satisfaction surveys are automatically disabled to prevent bothering your personal contacts with customer support ratings.
+        </p>
+        <div class="mt-2.5 flex items-center gap-3">
+            <a href="<?= e(base_url('index.php?page=chatbot')) ?>" class="text-[11px] font-bold text-amber-800 hover:text-amber-950 underline underline-offset-2">
+                Configure AI Agent Modes in Studio &rarr;
+            </a>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Telemetry Ribbon (KPI Scorecards) -->
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     

@@ -278,20 +278,29 @@ const tabPairCodeBtn = document.getElementById('tabPairCodeBtn');
 const paneQr = document.getElementById('paneQr');
 const panePairCode = document.getElementById('panePairCode');
 
-if (tabQrBtn && tabPairCodeBtn && paneQr && panePairCode) {
-    tabQrBtn.addEventListener('click', () => {
-        tabQrBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all shadow-sm bg-white text-slate-900 flex items-center justify-center gap-1.5';
-        tabPairCodeBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
-        paneQr.classList.remove('hidden');
-        panePairCode.classList.add('hidden');
-    });
-
-    tabPairCodeBtn.addEventListener('click', () => {
+function switchPairingTab(mode) {
+    if (!tabQrBtn || !tabPairCodeBtn || !paneQr || !panePairCode) return;
+    if (mode === 'code') {
         tabPairCodeBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all shadow-sm bg-white text-slate-900 flex items-center justify-center gap-1.5';
         tabQrBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
         panePairCode.classList.remove('hidden');
         paneQr.classList.add('hidden');
-    });
+    } else {
+        tabQrBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all shadow-sm bg-white text-slate-900 flex items-center justify-center gap-1.5';
+        tabPairCodeBtn.className = 'flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5';
+        paneQr.classList.remove('hidden');
+        panePairCode.classList.add('hidden');
+    }
+    try { localStorage.setItem('wa_pairing_tab', mode); } catch (_) {}
+}
+
+if (tabQrBtn && tabPairCodeBtn && paneQr && panePairCode) {
+    tabQrBtn.addEventListener('click', () => switchPairingTab('qr'));
+    tabPairCodeBtn.addEventListener('click', () => switchPairingTab('code'));
+    try {
+        const savedPairTab = localStorage.getItem('wa_pairing_tab');
+        if (savedPairTab === 'code') switchPairingTab('code');
+    } catch (_) {}
 }
 
 // Phone Number Pairing Form Submission
@@ -687,6 +696,14 @@ if (composeForm) {
             }
         }
 
+        const msgVal = composeForm.querySelector('[name="message"]')?.value?.trim();
+        const fileInput = composeForm.querySelector('#messageAttachment');
+        const hasFiles = fileInput && fileInput.files && fileInput.files.length > 0;
+        if (!msgVal && !hasFiles) {
+            window.showToast("Please enter a message or attach at least one file.", "error");
+            return;
+        }
+
         e.preventDefault();
         
         const submitBtn = composeForm.querySelector('button[type="submit"]');
@@ -732,7 +749,12 @@ const initAttachmentUI = () => {
     if (input && status) {
         input.addEventListener('change', function() {
             if (this.files && this.files.length > 0) {
-                status.textContent = this.files[0].name;
+                if (this.files.length === 1) {
+                    status.textContent = this.files[0].name;
+                } else {
+                    const names = Array.from(this.files).map(f => f.name).slice(0, 2).join(', ');
+                    status.textContent = `${this.files.length} files: ${names}` + (this.files.length > 2 ? '…' : '');
+                }
             } else {
                 status.textContent = 'No file selected';
             }

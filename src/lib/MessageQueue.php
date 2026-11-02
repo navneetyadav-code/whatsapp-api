@@ -549,14 +549,15 @@ function get_dashboard_analytics_stats(int $userId, string $period = '24h'): arr
         $intervalSql = 'INTERVAL 24 HOUR';
     }
 
-    // 1. Time Series (Sent vs Received from chat_messages)
+    // 1. Time Series (Bot sent, Contacts received, Delivery status from chat_messages)
     $tsStmt = $pdo->prepare("
         SELECT
             DATE_FORMAT(created_at, '$groupBy') AS time_slot,
+            SUM(CASE WHEN sender_type = 'bot' THEN 1 ELSE 0 END) AS bot_count,
             SUM(CASE WHEN sender_type IN ('bot', 'agent') THEN 1 ELSE 0 END) AS sent_count,
             SUM(CASE WHEN sender_type = 'contact' THEN 1 ELSE 0 END) AS received_count,
             SUM(CASE WHEN sender_type IN ('bot', 'agent') AND status IN ('delivered', 'read') THEN 1 ELSE 0 END) AS delivered_count,
-            SUM(CASE WHEN sender_type IN ('bot', 'agent') AND status = 'failed' THEN 1 ELSE 0 END) AS failed_count
+            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_count
         FROM chat_messages
         WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), $intervalSql)
         GROUP BY time_slot
@@ -566,11 +567,52 @@ function get_dashboard_analytics_stats(int $userId, string $period = '24h'): arr
     $indexed = [];
     foreach ($tsStmt->fetchAll(PDO::FETCH_ASSOC) as $pt) {
         $indexed[$pt['time_slot']] = [
+            'bot' => (int) $pt['bot_count'],
             'sent' => (int) $pt['sent_count'],
             'received' => (int) $pt['received_count'],
             'delivered' => (int) $pt['delivered_count'],
             'failed' => (int) $pt['failed_count'],
         ];
+    }
+
+    // 1b. API Request Logs Time Series
+    $apiIndexed = [];
+    try {
+        $apiStmt = $pdo->prepare("
+            SELECT
+                DATE_FORMAT(created_at, '$groupBy') AS time_slot,
+                COUNT(*) AS api_call_count
+            FROM api_request_logs
+            WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), $intervalSql)
+            GROUP BY time_slot
+        ");
+        $apiStmt->execute([$userId]);
+        foreach ($apiStmt->fetchAll(PDO::FETCH_ASSOC) as $ar) {
+            $apiIndexed[$ar['time_slot']] = (int) $ar['api_call_count'];
+        }
+    } catch (\Throwable $e) {
+    }
+
+    // 1c. Queue Status Time Series (Queued and Queue Failures)
+    $queueIndexed = [];
+    try {
+        $qStmt = $pdo->prepare("
+            SELECT
+                DATE_FORMAT(created_at, '$groupBy') AS time_slot,
+                SUM(CASE WHEN status IN ('queued', 'processing') THEN 1 ELSE 0 END) AS queued_count,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed_count
+            FROM message_queue
+            WHERE user_id = ? AND created_at >= DATE_SUB(NOW(), $intervalSql)
+            GROUP BY time_slot
+        ");
+        $qStmt->execute([$userId]);
+        foreach ($qStmt->fetchAll(PDO::FETCH_ASSOC) as $qr) {
+            $queueIndexed[$qr['time_slot']] = [
+                'queued' => (int) $qr['queued_count'],
+                'failed' => (int) $qr['failed_count'],
+            ];
+        }
+    } catch (\Throwable $e) {
     }
 
     $timeSeries = [];
@@ -579,13 +621,18 @@ function get_dashboard_analytics_stats(int $userId, string $period = '24h'): arr
             $t = $baseTime - ($i * 3600);
             $slotKey = date('Y-m-d H:00', $t);
             $label = date('H:i', $t);
+            $chatFailed = $indexed[$slotKey]['failed'] ?? 0;
+            $queueFailed = $queueIndexed[$slotKey]['failed'] ?? 0;
             $timeSeries[] = [
                 'timestamp' => $slotKey,
                 'label' => $label,
+                'api_calls' => $apiIndexed[$slotKey] ?? 0,
+                'bot_sent' => $indexed[$slotKey]['bot'] ?? 0,
                 'sent' => $indexed[$slotKey]['sent'] ?? 0,
                 'received' => $indexed[$slotKey]['received'] ?? 0,
                 'delivered' => $indexed[$slotKey]['delivered'] ?? 0,
-                'failed' => $indexed[$slotKey]['failed'] ?? 0,
+                'failed' => $chatFailed + $queueFailed,
+                'queued' => $queueIndexed[$slotKey]['queued'] ?? 0,
             ];
         }
     } else {
@@ -594,13 +641,18 @@ function get_dashboard_analytics_stats(int $userId, string $period = '24h'): arr
             $t = $baseTime - ($i * 86400);
             $slotKey = date('Y-m-d', $t);
             $label = date('M j', $t);
+            $chatFailed = $indexed[$slotKey]['failed'] ?? 0;
+            $queueFailed = $queueIndexed[$slotKey]['failed'] ?? 0;
             $timeSeries[] = [
                 'timestamp' => $slotKey,
                 'label' => $label,
+                'api_calls' => $apiIndexed[$slotKey] ?? 0,
+                'bot_sent' => $indexed[$slotKey]['bot'] ?? 0,
                 'sent' => $indexed[$slotKey]['sent'] ?? 0,
                 'received' => $indexed[$slotKey]['received'] ?? 0,
                 'delivered' => $indexed[$slotKey]['delivered'] ?? 0,
-                'failed' => $indexed[$slotKey]['failed'] ?? 0,
+                'failed' => $chatFailed + $queueFailed,
+                'queued' => $queueIndexed[$slotKey]['queued'] ?? 0,
             ];
         }
     }
@@ -655,10 +707,13 @@ function get_dashboard_analytics_stats(int $userId, string $period = '24h'): arr
         'byType' => $byType,
         'topChats' => $topChats,
         'totals' => [
+            'api_calls' => array_sum(array_column($timeSeries, 'api_calls')),
+            'bot_sent' => array_sum(array_column($timeSeries, 'bot_sent')),
             'sent' => array_sum(array_column($timeSeries, 'sent')),
             'received' => array_sum(array_column($timeSeries, 'received')),
             'delivered' => array_sum(array_column($timeSeries, 'delivered')),
             'failed' => array_sum(array_column($timeSeries, 'failed')),
+            'queued' => array_sum(array_column($timeSeries, 'queued')),
             'total' => array_sum($byType),
         ],
     ];

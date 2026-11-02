@@ -212,20 +212,24 @@
                     </div>
                     <div class="flex flex-wrap items-center justify-start lg:justify-end gap-2 text-[11px] font-medium shrink-0 pt-1 lg:pt-0">
                         <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/60">
+                            <span class="w-2 h-2 rounded-full bg-purple-500 shadow-xs"></span>
+                            <span class="text-slate-600 font-medium">API Calls: <b id="chartApiCallsTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['api_calls'] ?? 0) ?></b></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/60">
                             <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-xs"></span>
-                            <span class="text-slate-600 font-medium">Sent: <b id="chartSentTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['sent'] ?? 0) ?></b></span>
+                            <span class="text-slate-600 font-medium">Bot Sent: <b id="chartBotTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['bot_sent'] ?? 0) ?></b></span>
                         </div>
                         <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/60">
-                            <span class="w-2 h-2 rounded-full bg-blue-500 shadow-xs"></span>
-                            <span class="text-slate-600 font-medium">Received: <b id="chartRecvTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['received'] ?? 0) ?></b></span>
-                        </div>
-                        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/60">
-                            <span class="w-2 h-2 rounded-full bg-cyan-500 shadow-xs"></span>
-                            <span class="text-slate-600 font-medium">Delivered: <b id="chartDeliveredTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['delivered'] ?? 0) ?></b></span>
+                            <span class="w-2 h-2 rounded-full bg-amber-500 shadow-xs"></span>
+                            <span class="text-slate-600 font-medium">Queued: <b id="chartQueuedTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['queued'] ?? 0) ?></b></span>
                         </div>
                         <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/60">
                             <span class="w-2 h-2 rounded-full bg-rose-500 shadow-xs"></span>
                             <span class="text-slate-600 font-medium">Failed: <b id="chartFailedTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['failed'] ?? 0) ?></b></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200/60">
+                            <span class="w-2 h-2 rounded-full bg-blue-500 shadow-xs"></span>
+                            <span class="text-slate-600 font-medium">Received: <b id="chartRecvTotal" class="font-mono text-slate-900 tabular-nums font-bold"><?= (int) ($chartStats['totals']['received'] ?? 0) ?></b></span>
                         </div>
                         <div class="flex items-center gap-1.5 pl-1">
                             <span id="analyticsStatus" class="text-[10px] text-emerald-600 font-semibold" aria-live="polite">Live data</span>
@@ -493,14 +497,15 @@
             const canvas = document.getElementById('chartTimeSeries');
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
-            const gSent = createAreaGradient(ctx, '34, 197, 94');
-            const gRecv = createAreaGradient(ctx, '59, 130, 246');
+            const gBot = createAreaGradient(ctx, '16, 185, 129');
+            const gApi = createAreaGradient(ctx, '139, 92, 246');
 
             const labels = (data.timeSeries || []).map(p => p.label);
-            const sentValues = (data.timeSeries || []).map(p => p.sent);
-            const recvValues = (data.timeSeries || []).map(p => p.received);
-            const deliveredValues = (data.timeSeries || []).map(p => p.delivered);
-            const failedValues = (data.timeSeries || []).map(p => p.failed);
+            const apiValues = (data.timeSeries || []).map(p => p.api_calls ?? 0);
+            const botValues = (data.timeSeries || []).map(p => p.bot_sent ?? p.sent ?? 0);
+            const queuedValues = (data.timeSeries || []).map(p => p.queued ?? 0);
+            const failedValues = (data.timeSeries || []).map(p => p.failed ?? 0);
+            const recvValues = (data.timeSeries || []).map(p => p.received ?? 0);
 
             chartTimeSeries = new Chart(ctx, {
                 type: 'line',
@@ -508,40 +513,41 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: 'Sent (Bot / Agent)',
-                            data: sentValues,
-                            borderColor: '#22c55e',
-                            backgroundColor: gSent,
+                            label: 'API Calls',
+                            data: apiValues,
+                            borderColor: '#8b5cf6',
+                            backgroundColor: gApi,
                             fill: true,
                             tension: 0.35,
                             borderWidth: 2,
                             pointRadius: 2.5,
                             pointHoverRadius: 5,
-                            pointBackgroundColor: '#22c55e'
+                            pointBackgroundColor: '#8b5cf6'
                         },
                         {
-                            label: 'Received (Contact)',
-                            data: recvValues,
-                            borderColor: '#3b82f6',
-                            backgroundColor: gRecv,
+                            label: 'Bot Sent',
+                            data: botValues,
+                            borderColor: '#10b981',
+                            backgroundColor: gBot,
                             fill: true,
                             tension: 0.35,
                             borderWidth: 2,
                             pointRadius: 2.5,
                             pointHoverRadius: 5,
-                            pointBackgroundColor: '#3b82f6'
+                            pointBackgroundColor: '#10b981'
                         },
                         {
-                            label: 'Delivered',
-                            data: deliveredValues,
-                            borderColor: '#06b6d4',
+                            label: 'Queued',
+                            data: queuedValues,
+                            borderColor: '#f59e0b',
                             backgroundColor: 'transparent',
                             fill: false,
                             tension: 0.35,
                             borderWidth: 2,
+                            borderDash: [4, 4],
                             pointRadius: 2.5,
                             pointHoverRadius: 5,
-                            pointBackgroundColor: '#06b6d4'
+                            pointBackgroundColor: '#f59e0b'
                         },
                         {
                             label: 'Failed',
@@ -555,6 +561,18 @@
                             pointRadius: 2.5,
                             pointHoverRadius: 5,
                             pointBackgroundColor: '#f43f5e'
+                        },
+                        {
+                            label: 'Received',
+                            data: recvValues,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'transparent',
+                            fill: false,
+                            tension: 0.35,
+                            borderWidth: 1.5,
+                            pointRadius: 2,
+                            pointHoverRadius: 4,
+                            pointBackgroundColor: '#3b82f6'
                         }
                     ]
                 },
@@ -741,18 +759,20 @@
 
         function updateCharts(data) {
             // Update Totals & Labels
-            const sentTotalEl = document.getElementById('chartSentTotal');
-            const recvTotalEl = document.getElementById('chartRecvTotal');
-            const deliveredTotalEl = document.getElementById('chartDeliveredTotal');
+            const apiTotalEl = document.getElementById('chartApiCallsTotal');
+            const botTotalEl = document.getElementById('chartBotTotal');
+            const queuedTotalEl = document.getElementById('chartQueuedTotal');
             const failedTotalEl = document.getElementById('chartFailedTotal');
+            const recvTotalEl = document.getElementById('chartRecvTotal');
             const typeTotalEl = document.getElementById('chartTypeTotal');
             const topChatsBadge = document.getElementById('topChatsCountBadge');
             const periodLabel = document.getElementById('timeSeriesPeriodLabel');
 
-            if (sentTotalEl) sentTotalEl.textContent = data.totals ? data.totals.sent : 0;
-            if (recvTotalEl) recvTotalEl.textContent = data.totals ? data.totals.received : 0;
-            if (deliveredTotalEl) deliveredTotalEl.textContent = data.totals ? data.totals.delivered : 0;
-            if (failedTotalEl) failedTotalEl.textContent = data.totals ? data.totals.failed : 0;
+            if (apiTotalEl) apiTotalEl.textContent = data.totals ? (data.totals.api_calls ?? 0) : 0;
+            if (botTotalEl) botTotalEl.textContent = data.totals ? (data.totals.bot_sent ?? data.totals.sent ?? 0) : 0;
+            if (queuedTotalEl) queuedTotalEl.textContent = data.totals ? (data.totals.queued ?? 0) : 0;
+            if (failedTotalEl) failedTotalEl.textContent = data.totals ? (data.totals.failed ?? 0) : 0;
+            if (recvTotalEl) recvTotalEl.textContent = data.totals ? (data.totals.received ?? 0) : 0;
             if (typeTotalEl) typeTotalEl.textContent = (data.totals ? data.totals.total : 0) + ' msgs';
             if (topChatsBadge) topChatsBadge.textContent = (data.topChats ? data.topChats.length : 0) + ' chats';
 
@@ -765,20 +785,22 @@
             // 1. Time Series
             if (chartTimeSeries) {
                 const labels = (data.timeSeries || []).map(p => p.label);
-                const sentValues = (data.timeSeries || []).map(p => p.sent);
-                const recvValues = (data.timeSeries || []).map(p => p.received);
-                const deliveredValues = (data.timeSeries || []).map(p => p.delivered);
-                const failedValues = (data.timeSeries || []).map(p => p.failed);
+                const apiValues = (data.timeSeries || []).map(p => p.api_calls ?? 0);
+                const botValues = (data.timeSeries || []).map(p => p.bot_sent ?? p.sent ?? 0);
+                const queuedValues = (data.timeSeries || []).map(p => p.queued ?? 0);
+                const failedValues = (data.timeSeries || []).map(p => p.failed ?? 0);
+                const recvValues = (data.timeSeries || []).map(p => p.received ?? 0);
 
                 chartTimeSeries.data.labels = labels;
-                chartTimeSeries.data.datasets[0].data = sentValues;
-                chartTimeSeries.data.datasets[1].data = recvValues;
-                chartTimeSeries.data.datasets[2].data = deliveredValues;
+                chartTimeSeries.data.datasets[0].data = apiValues;
+                chartTimeSeries.data.datasets[1].data = botValues;
+                chartTimeSeries.data.datasets[2].data = queuedValues;
                 chartTimeSeries.data.datasets[3].data = failedValues;
+                chartTimeSeries.data.datasets[4].data = recvValues;
                 chartTimeSeries.update();
 
                 const emptyState = document.getElementById('timeSeriesEmpty');
-                const hasTraffic = sentValues.some(v => v > 0) || recvValues.some(v => v > 0);
+                const hasTraffic = apiValues.some(v => v > 0) || botValues.some(v => v > 0) || queuedValues.some(v => v > 0) || failedValues.some(v => v > 0) || recvValues.some(v => v > 0);
                 if (emptyState) {
                     emptyState.classList.toggle('hidden', hasTraffic);
                 }

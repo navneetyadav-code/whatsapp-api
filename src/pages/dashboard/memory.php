@@ -517,7 +517,7 @@ declare(strict_types=1);
 </div>
 
 <script>
-    function switchPageTab(tab) {
+    function switchPageTab(tab, updateHistory = true) {
         document.getElementById('panelMemory').classList.toggle('hidden', tab !== 'memory');
         document.getElementById('panelTraining').classList.toggle('hidden', tab !== 'training');
         document.getElementById('panelBudget').classList.toggle('hidden', tab !== 'budget');
@@ -537,7 +537,28 @@ declare(strict_types=1);
         btnBudget.className = (tab === 'budget')
             ? 'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all bg-white text-slate-900 shadow-2xs border border-slate-200/80 cursor-pointer'
             : 'flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all cursor-pointer';
+
+        try {
+            localStorage.setItem('memory_active_tab', tab);
+            if (updateHistory) {
+                const url = new URL(window.location);
+                url.searchParams.set('tab', tab);
+                window.history.replaceState(null, '', url);
+            }
+        } catch (_) {}
     }
+
+    // Auto-restore tab on load
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hashTab = window.location.hash ? window.location.hash.replace('#', '').replace('tab=', '') : null;
+            const tabParam = urlParams.get('tab') || hashTab || localStorage.getItem('memory_active_tab');
+            if (tabParam && ['memory', 'training', 'budget'].includes(tabParam)) {
+                switchPageTab(tabParam, false);
+            }
+        } catch (_) {}
+    });
 
     function filterMemories(filterType) {
         document.querySelectorAll('.mem-filter-btn').forEach(btn => {

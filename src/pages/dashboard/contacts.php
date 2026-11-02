@@ -251,7 +251,7 @@
 
     <!-- Client-side Directory Script -->
     <script>
-    function switchContactTab(tab) {
+    function switchContactTab(tab, updateHistory = true) {
         const paneManual = document.getElementById('paneManual');
         const paneCsv = document.getElementById('paneCsv');
         const tabManualBtn = document.getElementById('tabManualBtn');
@@ -267,6 +267,16 @@
             if (paneCsv) paneCsv.classList.remove('hidden');
             if (tabCsvBtn) tabCsvBtn.className = 'px-2.5 py-1 rounded-md text-slate-800 bg-white shadow-xs font-semibold flex items-center gap-1.5 transition-all';
             if (tabManualBtn) tabManualBtn.className = 'px-2.5 py-1 rounded-md text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-all';
+        }
+
+        try {
+            localStorage.setItem('contacts_active_tab', tab);
+        } catch (e) {}
+
+        if (updateHistory && window.history && window.history.replaceState) {
+            const url = new URL(window.location);
+            url.searchParams.set('tab', tab);
+            window.history.replaceState({}, '', url);
         }
     }
 
@@ -338,5 +348,16 @@
                 applyFilter();
             });
         });
+        // Restore active tab from URL query param or localStorage
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get('tab');
+            const cachedTab = localStorage.getItem('contacts_active_tab');
+            if (tabParam === 'manual' || tabParam === 'csv') {
+                switchContactTab(tabParam, false);
+            } else if (cachedTab === 'manual' || cachedTab === 'csv') {
+                switchContactTab(cachedTab, false);
+            }
+        } catch (e) {}
     });
     </script>
