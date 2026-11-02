@@ -275,12 +275,18 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
     : '• NONE (You have NO connected function tools)';
 
   const hasEmailTool = activeTools.some(t => t.tool_slug === 'draft_email' || t.tool_slug === 'send_email');
+  const hasMemoryTool = activeTools.some(t => t.tool_slug === 'update_memory');
+
+  const memoryInstruction = hasMemoryTool
+    ? `4. MEMORY PERSISTENCE: When asked to remember, note, or save personal facts, contact numbers, or preferences, use the 'update_memory' tool to store them permanently into the database notebook.`
+    : `4. MEMORY PERSISTENCE: You do NOT have a persistent memory tool connected. Never claim you have permanently saved facts into a database notebook.`;
 
   const toolGrounding = `\n\n--- ACTIVE CONNECTED TOOLS ---\n${toolListText}\n
 STRICT TOOL & CAPABILITY BOUNDARIES (ZERO TOLERANCE FOR HALLUCINATION):
 1. You have ONLY the tools listed above. If asked what tools or capabilities you have, you MUST ONLY list these specific tools.
 2. If asked about ANY capability not listed above (e.g. sending emails, email drafting, Google Calendar, scheduling appointments, calendar management, Google Meet link generation, document editing, flights, payments), you MUST explicitly state that you DO NOT have that tool or capability.
-3. NEVER SIMULATE OR ROLEPLAY ACTIONS: Do NOT generate fake emails claiming they were sent ("I have initiated the dispatch of your email", etc.), fake calendar entries, fake booking tables, or pretend to create calendar events or Google Meet links. If you cannot execute a real tool call for it, state directly that you cannot perform it.`;
+3. NEVER SIMULATE OR ROLEPLAY ACTIONS: Do NOT generate fake emails claiming they were sent ("I have initiated the dispatch of your email", etc.), fake calendar entries, fake booking tables, or pretend to create calendar events or Google Meet links. If you cannot execute a real tool call for it, state directly that you cannot perform it.
+${memoryInstruction}`;
 
   // 2. Real-Time Temporal Anchor
   const temporalAnchor = options.currentDateTime

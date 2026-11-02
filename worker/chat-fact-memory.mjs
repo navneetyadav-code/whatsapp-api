@@ -10,21 +10,33 @@ export class ChatFactMemory {
    * Load and format all active persistent facts for a user
    * @param {Object} db - MySQL connection pool
    * @param {number|string} userId
+   * @param {string} [contactPhone='']
    * @returns {Promise<{ factsText: string, factsCount: number, factsMap: Record<string, string> }>}
    */
-  static async loadUserFacts(db, userId) {
+  static async loadUserFacts(db, userId, contactPhone = '') {
     if (!db || !userId) {
       return { factsText: '', factsCount: 0, factsMap: {} };
     }
 
     try {
-      const [rows] = await db.execute(
-        `SELECT memory_type, memory_key, memory_value
-         FROM ai_user_memory
-         WHERE user_id = ?
-         ORDER BY memory_type ASC, id ASC`,
-        [userId]
-      );
+      const cleanPhone = String(contactPhone || '').replace(/[^\d]/g, '');
+      const params = [userId];
+      let query = `
+        SELECT memory_type, memory_key, memory_value, contact_phone
+        FROM ai_user_memory
+        WHERE user_id = ?
+      `;
+
+      if (cleanPhone) {
+        query += ` AND (contact_phone = '' OR contact_phone IS NULL OR contact_phone = ?)`;
+        params.push(cleanPhone);
+      } else {
+        query += ` AND (contact_phone = '' OR contact_phone IS NULL)`;
+      }
+
+      query += ` ORDER BY memory_type ASC, id ASC`;
+
+      const [rows] = await db.execute(query, params);
 
       if (!rows || rows.length === 0) {
         return { factsText: '', factsCount: 0, factsMap: {} };
@@ -38,7 +50,8 @@ export class ChatFactMemory {
         const formattedKey = r.memory_key
           .replace(/_/g, ' ')
           .replace(/\b\w/g, c => c.toUpperCase());
-        bulletLines.push(`• ${formattedKey}: ${r.memory_value}`);
+        const scopeTag = r.contact_phone ? ' [Contact Note]' : '';
+        bulletLines.push(`• ${formattedKey}${scopeTag}: ${r.memory_value}`);
       }
 
       const factsText = `[PERSISTENT FACT NOTEBOOK]\n${bulletLines.join('\n')}`;
@@ -63,9 +76,10 @@ export class ChatFactMemory {
    * @param {string} [type='fact']
    * @param {string} [source=null]
    * @param {number|string} [conversationId=null]
+   * @param {string} [contactPhone='']
    * @returns {Promise<{ success: boolean, key: string, value: string, error?: string }>}
    */
-  static async upsertUserFact(db, userId, key, value, type = 'fact', source = null, conversationId = null) {
+  static async upsertUserFact(db, userId, key, value, type = 'fact', source = null, conversationId = null, contactPhone = '') {
     if (!db || !userId) {
       return { success: false, error: 'Database or user context missing.' };
     }
@@ -77,6 +91,7 @@ export class ChatFactMemory {
       .slice(0, 64);
 
     const cleanVal = String(value || '').trim().slice(0, 1000);
+    const cleanPhone = String(contactPhone || '').replace(/[^\d]/g, '');
 
     const validTypes = ['profile', 'fact', 'preference', 'entity', 'rule'];
     const cleanType = validTypes.includes(type) ? type : 'fact';
@@ -88,14 +103,14 @@ export class ChatFactMemory {
     try {
       await db.execute(
         `INSERT INTO ai_user_memory
-         (user_id, conversation_id, memory_type, memory_key, memory_value, source_context)
-         VALUES (?, ?, ?, ?, ?, ?)
+         (user_id, conversation_id, contact_phone, memory_type, memory_key, memory_value, source_context)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            memory_value = VALUES(memory_value),
            memory_type = VALUES(memory_type),
            source_context = VALUES(source_context),
            updated_at = NOW()`,
-        [userId, conversationId || null, cleanType, cleanKey, cleanVal, source ? String(source).slice(0, 255) : null]
+        [userId, conversationId || null, cleanPhone, cleanType, cleanKey, cleanVal, source ? String(source).slice(0, 255) : null]
       );
 
       return {

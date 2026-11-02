@@ -551,7 +551,7 @@ export async function handleConfirmAction(args, context) {
  * Autonomous Memory Handler: Remembers durable facts in ai_user_memory
  */
 export async function handleUpdateMemory(args, context) {
-  const { db, userId, conversationId } = context;
+  const { db, userId, conversationId, callerPhone, isAdminCaller } = context;
   const key = args.key;
   const value = args.value;
   const memoryType = args.memory_type || 'fact';
@@ -560,6 +560,9 @@ export async function handleUpdateMemory(args, context) {
     return { error: 'Memory key and value are required.' };
   }
 
+  // If caller is Admin/Owner, save as global owner fact (contact_phone = ''); if external contact, scope to their phone
+  const contactPhone = (isAdminCaller === false && callerPhone) ? String(callerPhone).replace(/[^\d]/g, '') : '';
+
   const res = await ChatFactMemory.upsertUserFact(
     db,
     userId,
@@ -567,20 +570,22 @@ export async function handleUpdateMemory(args, context) {
     value,
     memoryType,
     'whatsapp_chat',
-    conversationId
+    conversationId,
+    contactPhone
   );
 
   if (!res.success) {
     return { error: `Failed to save memory: ${res.error}` };
   }
 
+  const scopeLabel = contactPhone ? 'contact profile' : 'global notebook';
   return {
     success: true,
     remembered: true,
     key: res.key,
     value: res.value,
     type: res.type,
-    message: `Stored fact permanently in notebook: "${res.key}" = "${res.value}"`
+    message: `Stored fact permanently in ${scopeLabel}: "${res.key}" = "${res.value}"`
   };
 }
 
@@ -972,7 +977,7 @@ export class UniversalToolsRegistry {
         [userId]
       );
 
-      return rows.map(r => ({
+      const loaded = rows.map(r => ({
         tool_slug: r.tool_slug,
         display_name: r.display_name,
         category: r.category,
@@ -982,6 +987,40 @@ export class UniversalToolsRegistry {
         rbac_roles: typeof r.rbac_roles === 'string' ? JSON.parse(r.rbac_roles) : (r.rbac_roles || ['admin']),
         is_active: Boolean(r.is_active)
       }));
+
+      // Universal System Core: Ensure update_memory is always available for ALL users
+      if (!loaded.some(t => t.tool_slug === 'update_memory')) {
+        loaded.push({
+          tool_slug: 'update_memory',
+          display_name: '🧠 Remember Persistent Fact',
+          category: 'builtin',
+          description: 'Permanently saves or updates a durable fact, profile attribute, key entity (e.g. contact email, phone, role, preference), or note into the Persistent Fact Notebook.',
+          parameters_schema: {
+            type: 'OBJECT',
+            required: ['key', 'value'],
+            properties: {
+              key: {
+                type: 'STRING',
+                description: 'Short identifier for the fact (e.g. "close_friend_navneet", "ankush_email", "office_hours", "preferred_tone")'
+              },
+              value: {
+                type: 'STRING',
+                description: 'The exact factual information to remember permanently.'
+              },
+              memory_type: {
+                type: 'STRING',
+                enum: ['fact', 'preference', 'entity', 'rule', 'profile'],
+                description: 'Category of memory (default: "fact")'
+              }
+            }
+          },
+          execution_config: { handler: 'update_memory' },
+          rbac_roles: ['admin', 'guest', 'customer'],
+          is_active: true
+        });
+      }
+
+      return loaded;
     } catch (err) {
       console.error('[UniversalToolsRegistry] Failed to load tools from database:', err.message);
       return [];

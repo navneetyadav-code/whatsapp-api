@@ -41,7 +41,7 @@ $execConfig = json_encode([
     'description' => 'Autonomous persistent fact memory store'
 ], JSON_UNESCAPED_SLASHES);
 
-$rbacRoles = json_encode(['admin'], JSON_UNESCAPED_SLASHES);
+$rbacRoles = json_encode(['admin', 'guest', 'customer'], JSON_UNESCAPED_SLASHES);
 
 foreach ($users as $u) {
     $userId = (int)$u['id'];
@@ -68,23 +68,9 @@ foreach ($users as $u) {
         echo "Inserted tool '$toolSlug' for user ID $userId.\n";
     }
 
-    // Seed initial facts for user in ai_user_memory
-    $initFacts = [
-        ['fact', 'boss_name', 'Ankit', 'Initial Profile'],
-        ['fact', 'organization', 'Assist Group', 'Initial Profile'],
-        ['fact', 'primary_email', 'info.assistgroupofficial@gmail.com', 'Initial Profile'],
-        ['entity', 'ankush_email', 'ankushkumary113@gmail.com (Developer / Collaborator)', 'Initial Profile']
-    ];
-
-    foreach ($initFacts as [$type, $key, $val, $src]) {
-        $factStmt = $pdo->prepare("
-            INSERT INTO ai_user_memory (user_id, memory_type, memory_key, memory_value, source_context)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE memory_value = VALUES(memory_value), source_context = VALUES(source_context), updated_at = NOW()
-        ");
-        $factStmt->execute([$userId, $type, $key, $val, $src]);
-    }
-    echo "Seeded initial facts in ai_user_memory for user ID $userId.\n";
 }
 
-echo "Done seeding update_memory tool and facts.\n";
+// Clean up any old hardcoded dummy facts
+$pdo->exec("DELETE FROM ai_user_memory WHERE source_context = 'Initial Profile'");
+echo "Cleaned up hardcoded initial profile dummy facts.\n";
+echo "Done ensuring update_memory tool for all users.\n";
