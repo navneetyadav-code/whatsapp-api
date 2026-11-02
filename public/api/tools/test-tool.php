@@ -24,9 +24,20 @@ if (!$user) {
 }
 
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
+$toolSlug = trim((string) ($input['tool_slug'] ?? ''));
 $category = trim((string) ($input['category'] ?? 'rest_api'));
 $executionConfig = is_array($input['execution_config'] ?? null) ? $input['execution_config'] : [];
 $args = is_array($input['args'] ?? null) ? $input['args'] : [];
+
+if (empty($executionConfig) && $toolSlug !== '') {
+    $stmt = Database::pdo()->prepare('SELECT * FROM ai_custom_tools WHERE user_id = ? AND tool_slug = ? LIMIT 1');
+    $stmt->execute([(int) $user['id'], $toolSlug]);
+    $toolRow = $stmt->fetch();
+    if ($toolRow) {
+        $category = (string) $toolRow['category'];
+        $executionConfig = json_decode((string) $toolRow['execution_config'], true) ?: [];
+    }
+}
 
 $startTime = microtime(true);
 
@@ -50,15 +61,27 @@ if ($category === 'rest_api') {
     $method = strtoupper((string) ($executionConfig['method'] ?? 'GET'));
     $headers = is_array($executionConfig['headers'] ?? null) ? $executionConfig['headers'] : [];
     $formattedHeaders = [
-        'User-Agent: WhatsGateway-Tester/3.0',
+        'User-Agent: ' . AntiBotBypass::BROWSER_USER_AGENT,
         'Accept: application/json'
     ];
+    $hasExplicitCookie = false;
     foreach ($headers as $hk => $hv) {
+        if (strcasecmp($hk, 'Cookie') === 0) {
+            $hasExplicitCookie = true;
+        }
         $formattedHeaders[] = "{$hk}: {$hv}";
+    }
+
+    if (!$hasExplicitCookie) {
+        $cachedCookie = AntiBotBypass::getCachedCookie($finalUrl);
+        if ($cachedCookie) {
+            $formattedHeaders[] = "Cookie: __test={$cachedCookie}";
+        }
     }
 
     $ch = curl_init($finalUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 12);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $formattedHeaders);
 
@@ -95,17 +118,87 @@ if ($category === 'rest_api') {
             }
         }
 
-        if (!isset($headers['Content-Type']) && !isset($headers['content-type'])) {
-            $formattedHeaders[] = 'Content-Type: application/json';
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $formattedHeaders);
+        $isForm = false;
+        foreach ($headers as $hk => $hv) {
+            if (strcasecmp($hk, 'Content-Type') === 0 && str_contains(strtolower($hv), 'application/x-www-form-urlencoded')) {
+                $isForm = true;
+                break;
+            }
         }
-        curl_setopt($ch, CURLOPT_POSTFIELDS, is_array($bodyData) ? json_encode($bodyData) : (string) $bodyData);
+
+        if ($isForm && is_array($bodyData)) {
+            $formattedParams = [];
+            foreach ($bodyData as $bk => $bv) {
+                if (is_bool($bv)) {
+                    $formattedParams[$bk] = $bv ? '1' : '0';
+                } else {
+                    $formattedParams[$bk] = $bv;
+                }
+            }
+            $postPayload = http_build_query($formattedParams);
+        } else {
+            if (!isset($headers['Content-Type']) && !isset($headers['content-type'])) {
+                $formattedHeaders[] = 'Content-Type: application/json';
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $formattedHeaders);
+            }
+            $postPayload = is_array($bodyData) ? json_encode($bodyData) : (string) $bodyData;
+        }
+
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postPayload);
     }
 
     $responseBody = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $curlError = curl_error($ch);
     curl_close($ch);
+
+    // Auto-detect and bypass anti-bot / aes.js challenges (InfinityFree, ByetHost, etc.)
+    if (AntiBotBypass::isChallenge((string) $responseBody)) {
+        $solvedCookie = AntiBotBypass::solveChallenge((string) $responseBody);
+        if ($solvedCookie) {
+            AntiBotBypass::setCachedCookie($finalUrl, $solvedCookie);
+            AntiBotBypass::activateCookie($finalUrl, $solvedCookie);
+
+            $retryHeaders = [];
+            $hasCookie = false;
+            foreach ($formattedHeaders as $h) {
+                if (stripos($h, 'Cookie:') === 0) {
+                    $retryHeaders[] = $h . "; __test={$solvedCookie}";
+                    $hasCookie = true;
+                } elseif (stripos($h, 'User-Agent:') === 0) {
+                    $retryHeaders[] = 'User-Agent: ' . AntiBotBypass::BROWSER_USER_AGENT;
+                } else {
+                    $retryHeaders[] = $h;
+                }
+            }
+            if (!$hasCookie) {
+                $retryHeaders[] = "Cookie: __test={$solvedCookie}";
+            }
+
+            $chRetry = curl_init($finalUrl);
+            curl_setopt($chRetry, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($chRetry, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($chRetry, CURLOPT_TIMEOUT, 12);
+            curl_setopt($chRetry, CURLOPT_HTTPHEADER, $retryHeaders);
+            if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+                curl_setopt($chRetry, CURLOPT_CUSTOMREQUEST, $method);
+                if (isset($postPayload)) {
+                    curl_setopt($chRetry, CURLOPT_POSTFIELDS, $postPayload);
+                }
+            }
+
+            $retryBody = curl_exec($chRetry);
+            $retryCode = curl_getinfo($chRetry, CURLINFO_HTTP_CODE);
+            $retryErr = curl_error($chRetry);
+            curl_close($chRetry);
+
+            if (!$retryErr && $retryBody) {
+                $responseBody = $retryBody;
+                $httpCode = $retryCode;
+                $curlError = '';
+            }
+        }
+    }
 
     $latencyMs = round((microtime(true) - $startTime) * 1000);
 
@@ -185,20 +278,49 @@ if ($category === 'rest_api') {
     $targetUrl = $baseUrl . '/' . ltrim($action, '/');
     $headers = [
         'Accept: application/json',
-        'User-Agent: WhatsGateway-Tester/3.0'
+        'User-Agent: ' . AntiBotBypass::BROWSER_USER_AGENT
     ];
     if ($token !== '') {
         $headers[] = "Authorization: Bearer {$token}";
     }
 
+    $cachedCookie = AntiBotBypass::getCachedCookie($targetUrl);
+    if ($cachedCookie) {
+        $headers[] = "Cookie: __test={$cachedCookie}";
+    }
+
     $ch = curl_init($targetUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 12);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $responseBody = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
+    if (AntiBotBypass::isChallenge((string) $responseBody)) {
+        $solvedCookie = AntiBotBypass::solveChallenge((string) $responseBody);
+        if ($solvedCookie) {
+            AntiBotBypass::setCachedCookie($targetUrl, $solvedCookie);
+            AntiBotBypass::activateCookie($targetUrl, $solvedCookie);
+
+            $headers[] = "Cookie: __test={$solvedCookie}";
+            $chRetry = curl_init($targetUrl);
+            curl_setopt($chRetry, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($chRetry, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($chRetry, CURLOPT_TIMEOUT, 12);
+            curl_setopt($chRetry, CURLOPT_HTTPHEADER, $headers);
+            $retryBody = curl_exec($chRetry);
+            $retryCode = curl_getinfo($chRetry, CURLINFO_HTTP_CODE);
+            curl_close($chRetry);
+
+            if ($retryBody) {
+                $responseBody = $retryBody;
+                $httpCode = $retryCode;
+            }
+        }
+    }
 
     $latencyMs = round((microtime(true) - $startTime) * 1000);
 

@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$conversationId, $userId]);
         } else {
             // Acknowledge all active for this user
-            $stmt = $pdo->prepare('UPDATE chat_escalations SET status = "acknowledged", acknowledged_at = NOW() WHERE user_id = ? AND status = "active"');
+            $stmt = $pdo->prepare("UPDATE chat_escalations SET status = 'acknowledged', acknowledged_at = NOW() WHERE user_id = ? AND status = 'active'");
             $stmt->execute([$userId]);
         }
 
@@ -74,12 +74,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($conversationId > 0) {
             // Mark conversation as open, clear escalation, keep bot_paused = 1 for human takeover
-            $pdo->prepare('UPDATE chat_conversations SET status = "open", escalation_reason = NULL, escalated_at = NULL, bot_paused = 1 WHERE id = ? AND user_id = ?')->execute([$conversationId, $userId]);
-            $pdo->prepare('UPDATE chat_escalations SET status = "resolved", resolved_at = NOW(), resolved_by = ? WHERE conversation_id = ? AND user_id = ? AND status != "resolved"')->execute([$user['name'] ?? 'Agent', $conversationId, $userId]);
+            $pdo->prepare("UPDATE chat_conversations SET status = 'open', escalation_reason = NULL, escalated_at = NULL, bot_paused = 1 WHERE id = ? AND user_id = ?")->execute([$conversationId, $userId]);
+            $pdo->prepare("UPDATE chat_escalations SET status = 'resolved', resolved_at = NOW(), resolved_by = ? WHERE conversation_id = ? AND user_id = ? AND status != 'resolved'")->execute([$user['name'] ?? 'Agent', $conversationId, $userId]);
         } else {
             // Global resolve for active user escalations
-            $pdo->prepare('UPDATE chat_conversations SET status = "open", escalation_reason = NULL, escalated_at = NULL, bot_paused = 1 WHERE user_id = ? AND status = "escalated"')->execute([$userId]);
-            $pdo->prepare('UPDATE chat_escalations SET status = "resolved", resolved_at = NOW(), resolved_by = ? WHERE user_id = ? AND status != "resolved"')->execute([$user['name'] ?? 'Agent', $userId]);
+            $pdo->prepare("UPDATE chat_conversations SET status = 'open', escalation_reason = NULL, escalated_at = NULL, bot_paused = 1 WHERE user_id = ? AND status = 'escalated'")->execute([$userId]);
+            $pdo->prepare("UPDATE chat_escalations SET status = 'resolved', resolved_at = NOW(), resolved_by = ? WHERE user_id = ? AND status != 'resolved'")->execute([$user['name'] ?? 'Agent', $userId]);
         }
 
         json_response([

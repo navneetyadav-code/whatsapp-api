@@ -22,6 +22,7 @@ final class Database
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
         ];
         $isSsl = !empty(self::$config['ssl']) || str_contains((string) (self::$config['dsn'] ?? ''), 'tidbcloud.com');
         if ($isSsl) {
@@ -45,13 +46,50 @@ final class Database
             $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
         }
 
-        self::$pdo = new PDO(
-            self::$config['dsn'],
-            self::$config['user'],
-            self::$config['password'],
-            $options
-        );
+        try {
+            self::$pdo = new PDO(
+                self::$config['dsn'],
+                self::$config['user'],
+                self::$config['password'],
+                $options
+            );
+            return self::$pdo;
+        } catch (PDOException $e) {
+            $code = (int) ($e->errorInfo[1] ?? 0);
+            if ($code !== 1049) {
+                throw $e;
+            }
 
-        return self::$pdo;
+            // Database was unknown (error 1049).
+            $requestedDb = '';
+            if (preg_match('/dbname=([^;]+)/i', (string) (self::$config['dsn'] ?? ''), $matches)) {
+                $requestedDb = trim($matches[1]);
+            }
+
+            if ($requestedDb === '') {
+                throw $e;
+            }
+
+            // Attempt to auto-create the exact requested database dynamically loaded from env
+            $strippedDsn = preg_replace('/dbname=[^;]+;?/i', '', (string) self::$config['dsn']);
+            try {
+                $probePdo = new PDO(
+                    $strippedDsn,
+                    self::$config['user'],
+                    self::$config['password'],
+                    $options
+                );
+                $probePdo->exec("CREATE DATABASE IF NOT EXISTS `{$requestedDb}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                self::$pdo = new PDO(
+                    self::$config['dsn'],
+                    self::$config['user'],
+                    self::$config['password'],
+                    $options
+                );
+                return self::$pdo;
+            } catch (Throwable) {
+                throw $e;
+            }
+        }
     }
 }

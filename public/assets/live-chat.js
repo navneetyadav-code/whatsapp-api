@@ -102,17 +102,19 @@
         return div.innerHTML;
     }
 
-    // Helper: Canonical phone normalizer (defaults 10-digit numbers to '91')
+    // Helper: Canonical phone normalizer (defaults 10-digit numbers to default country dial code)
+    const DEFAULT_DIAL = (window.AppConfig && window.AppConfig.defaultDialCode) ? String(window.AppConfig.defaultDialCode).replace(/\D/g, '') : '91';
+
     function normalizePhone(raw) {
         let digits = String(raw || '').replace(/\D/g, '');
         if (digits.startsWith('00')) {
             digits = digits.slice(2);
         }
         if (digits.length === 11 && digits.startsWith('0')) {
-            digits = '91' + digits.slice(1);
+            digits = DEFAULT_DIAL + digits.slice(1);
         }
         if (digits.length === 10) {
-            digits = '91' + digits;
+            digits = DEFAULT_DIAL + digits;
         }
         return digits;
     }
@@ -120,8 +122,10 @@
     // Helper: Pretty formats a canonical phone number
     function formatPhone(phone) {
         const clean = String(phone || '').replace(/\D/g, '');
-        if (clean.length === 12 && clean.startsWith('91')) {
-            return `+91 ${clean.slice(2, 7)} ${clean.slice(7)}`;
+        if (clean.length === (DEFAULT_DIAL.length + 10) && clean.startsWith(DEFAULT_DIAL)) {
+            const local = clean.slice(DEFAULT_DIAL.length);
+            const mid = Math.floor(local.length / 2);
+            return `+${DEFAULT_DIAL} ${local.slice(0, mid)} ${local.slice(mid)}`;
         }
         return clean ? `+${clean}` : '';
     }
@@ -1035,7 +1039,7 @@
     dom.btnNewChat.addEventListener('click', () => {
         dom.newChatModal.classList.remove('hidden');
         if (!dom.newChatPhone.value || dom.newChatPhone.value.trim() === '') {
-            dom.newChatPhone.value = '91';
+            dom.newChatPhone.value = DEFAULT_DIAL;
         }
         dom.newChatPhone.focus();
         const len = dom.newChatPhone.value.length;
@@ -1044,7 +1048,7 @@
 
     function closeNewChatModal() {
         dom.newChatModal.classList.add('hidden');
-        dom.newChatPhone.value = '91';
+        dom.newChatPhone.value = DEFAULT_DIAL;
         dom.newChatName.value = '';
     }
 

@@ -28,12 +28,11 @@ $geminiKey = trim((string) ($settings['gemini_api_key'] ?? ''));
 $groqKey = trim((string) ($settings['groq_api_key'] ?? ''));
 $openrouterKey = trim((string) ($settings['openrouter_api_key'] ?? ''));
 
-$geminiModel = trim((string) ($settings['gemini_model'] ?? 'gemini-1.5-flash')) ?: 'gemini-1.5-flash';
-$groqModel = trim((string) ($settings['groq_model'] ?? 'openai/gpt-oss-120b')) ?: 'openai/gpt-oss-120b';
-if (str_contains($groqModel, 'llama-3.3-70b-versatile')) {
-    $groqModel = 'openai/gpt-oss-120b';
-}
-$openrouterModel = trim((string) ($settings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free')) ?: 'meta-llama/llama-3.3-70b-instruct:free';
+$geminiModel = preg_replace('/^models\//', '', trim((string) ($settings['gemini_model'] ?? '')));
+$groqModel = trim((string) ($settings['groq_model'] ?? ''));
+
+
+$openrouterModel = trim((string) ($settings['openrouter_model'] ?? ''));
 
 $priority = $settings['provider_priority'] ?? 'gemini';
 

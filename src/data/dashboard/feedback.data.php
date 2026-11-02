@@ -90,9 +90,12 @@ $feedbackRows = $dataStmt->fetchAll();
 if (!function_exists('format_feedback_phone')) {
     function format_feedback_phone(string $phone): string
     {
+        $dial = function_exists('default_country_dial_code') ? default_country_dial_code() : '91';
         $clean = preg_replace('/\D/', '', $phone) ?? '';
-        if (strlen($clean) === 12 && str_starts_with($clean, '91')) {
-            return '+91 ' . substr($clean, 2, 5) . ' ' . substr($clean, 7);
+        if (strlen($clean) === (strlen($dial) + 10) && str_starts_with($clean, $dial)) {
+            $local = substr($clean, strlen($dial));
+            $mid = (int) floor(strlen($local) / 2);
+            return '+' . $dial . ' ' . substr($local, 0, $mid) . ' ' . substr($local, $mid);
         }
         return $clean !== '' ? '+' . $clean : $phone;
     }

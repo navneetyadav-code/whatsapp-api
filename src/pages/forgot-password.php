@@ -36,10 +36,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $pdo = Database::pdo();
+
+        // 1. Rate Limit: 60-second cooldown between consecutive OTP requests for the same email
+        $stmtCooldown = $pdo->prepare(
+            "SELECT TIMESTAMPDIFF(SECOND, NOW(), expires_at) AS rem_sec 
+             FROM password_resets 
+             WHERE email = ? AND expires_at > DATE_ADD(NOW(), INTERVAL 14 MINUTE) 
+             LIMIT 1"
+        );
+        $stmtCooldown->execute([$email]);
+        $activeCooldown = $stmtCooldown->fetch();
+        if ($activeCooldown) {
+            $waitLeft = max(1, (int) $activeCooldown['rem_sec'] - (14 * 60));
+            json_response([
+                'ok' => false, 
+                'error' => "Please wait {$waitLeft} seconds before requesting a new OTP.",
+                'cooldown' => $waitLeft
+            ], 429);
+        }
+
+        // 2. Rate Limit: Max 5 OTP requests per 15 minutes per email account
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM password_resets WHERE email = ? AND expires_at > NOW() - INTERVAL 15 MINUTE");
         $stmt->execute([$email]);
-        if ($stmt->fetchColumn() >= 3) {
-            json_response(['ok' => false, 'error' => 'Too many requests. Please try again later.'], 429);
+        if ((int) $stmt->fetchColumn() >= 5) {
+            json_response(['ok' => false, 'error' => 'Too many reset requests for this account. Please wait 15 minutes.'], 429);
+        }
+
+        // 3. Rate Limit: Max 15 requests per 15 minutes per IP address (defense against IP spraying)
+        $clientIp = client_ip();
+        if ($clientIp !== '') {
+            $stmtIp = $pdo->prepare("SELECT COUNT(*) FROM login_attempts WHERE ip_address = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+            $stmtIp->execute([$clientIp]);
+            if ((int) $stmtIp->fetchColumn() >= 15) {
+                json_response(['ok' => false, 'error' => 'Too many requests from your network. Please wait a few minutes before trying again.'], 429);
+            }
         }
 
         $stmt = $pdo->prepare("SELECT id, phone FROM users WHERE email = ? LIMIT 1");
@@ -121,18 +151,50 @@ It expires in 15 minutes.";
             }
         }
 
-        json_response(['ok' => true, 'sent_via' => $sentVia]);
+        if (empty($sentVia)) {
+            $err = $viaEmail 
+                ? 'Unable to send OTP. Email delivery failed, and no WhatsApp session is currently connected.'
+                : ($phone === '' 
+                    ? 'No phone number is registered on this account. Please update your account phone number to receive OTP via WhatsApp.' 
+                    : 'Unable to send OTP: No active WhatsApp session is currently connected. Please connect a WhatsApp session in the dashboard.');
+            json_response([
+                'ok' => false,
+                'error' => $err
+            ], 500);
+        }
+
+        $maskedPhone = '';
+        if ($phone !== '') {
+            $cleanPhone = preg_replace('/[^\d+]/', '', $phone);
+            $len = strlen($cleanPhone);
+            $maskedPhone = $len > 4 ? substr($cleanPhone, 0, 3) . str_repeat('*', max(2, $len - 5)) . substr($cleanPhone, -2) : $cleanPhone;
+        }
+
+        json_response([
+            'ok' => true, 
+            'sent_via' => $sentVia, 
+            'phone' => $maskedPhone,
+            'cooldown' => 60
+        ]);
     } elseif ($action === 'verify_otp') {
         $email = mb_strtolower(trim((string) ($data['email'] ?? '')));
         $otp = trim((string) ($data['otp'] ?? ''));
         $newPassword = (string) ($data['new_password'] ?? '');
 
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            json_response(['ok' => false, 'error' => 'Invalid email address.'], 400);
+        }
+
         if (login_lockout_seconds($email) > 0) {
             json_response(['ok' => false, 'error' => 'Too many failed attempts. Account is temporarily locked. Please try again later.'], 429);
         }
 
+        if (!preg_match('/^[0-9]{6}$/', $otp)) {
+            json_response(['ok' => false, 'error' => 'OTP must be a 6-digit number.'], 400);
+        }
+
         if (strlen($newPassword) < 8) {
-            json_response(['ok' => false, 'error' => 'Password must be at least 8 characters.'], 400);
+            json_response(['ok' => false, 'error' => 'Password must be at least 8 characters long.'], 400);
         }
 
         $pdo = Database::pdo();
@@ -160,6 +222,9 @@ It expires in 15 minutes.";
 
         $stmt = $pdo->prepare("DELETE FROM password_resets WHERE email = ?");
         $stmt->execute([$email]);
+
+        // Ensure security flag is set
+        $pdo->prepare("INSERT INTO user_security (user_id, password_set) SELECT id, 1 FROM users WHERE email = ? ON DUPLICATE KEY UPDATE password_set = 1")->execute([$email]);
 
         clear_failed_logins($email);
         session_regenerate_id(true);
@@ -250,7 +315,7 @@ It expires in 15 minutes.";
 
         <!-- Top Logo -->
         <div class="relative z-10 flex items-center gap-2.5">
-            <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/20">
+            <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-contain shadow-sm border border-white/20">
             <span class="font-semibold text-white tracking-wide text-sm">WhatsGateway</span>
         </div>
 
@@ -302,7 +367,7 @@ It expires in 15 minutes.";
             
             <!-- Logo inside form (mobile branding) -->
             <div class="flex items-center gap-2 mb-6 lg:hidden">
-                <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-cover shadow-sm border border-gray-100">
+                <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-contain shadow-sm border border-gray-100">
                 <span class="font-bold text-gray-900 tracking-tight text-base">WhatsGateway</span>
             </div>
 
@@ -315,7 +380,7 @@ It expires in 15 minutes.";
                 </a>
                 
                 <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Forgot Password</h2>
-                <p class="text-sm text-gray-500 mt-1.5 font-medium leading-relaxed">Enter the email address associated with your account, and we'll send you a link to reset your password.</p>
+                <p class="text-sm text-gray-500 mt-1.5 font-medium leading-relaxed">Enter your registered email address, and we'll send a 6-digit OTP to your linked phone via WhatsApp.</p>
             </div>
 
             <!-- Forgot Password Form -->
@@ -324,7 +389,7 @@ It expires in 15 minutes.";
                 
                 <!-- Email Field -->
                 <div>
-                    <label for="email" class="block text-sm font-semibold text-gray-700 mb-1.5">Work Email</label>
+                    <label for="email" class="block text-sm font-semibold text-gray-700 mb-1.5">Registered Email</label>
                     <input type="email" id="email" 
                            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200" 
                            placeholder="name@company.com" 
@@ -333,7 +398,7 @@ It expires in 15 minutes.";
                 
                 <!-- Submit Button -->
                 <button type="submit" id="submitBtn" class="w-full bg-brand-wa_light hover:bg-[#1DA851] text-white font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 shadow-sm shadow-brand-wa_light/20 active:scale-[0.98] flex justify-center items-center gap-2 mt-2">
-                    Send Reset Link
+                    Send Reset OTP
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                 </button>
             </form>
@@ -343,14 +408,15 @@ It expires in 15 minutes.";
                 <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-4">
                     <svg class="w-6 h-6 text-brand-wa_light" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                 </div>
-                <h3 id="successHeading" class="text-lg font-bold text-gray-900 mb-2">Check your inbox</h3>
-                <p class="text-sm text-gray-500 mb-6">We've sent a 6-digit OTP to <span id="displayEmail" class="font-medium text-gray-700"></span>.</p>
+                <h3 id="successHeading" class="text-lg font-bold text-gray-900 mb-1.5">Check your WhatsApp</h3>
+                <p id="successSubtext" class="text-sm text-gray-500 mb-6">We've sent a 6-digit OTP to: <span id="displayPhone" class="font-bold text-gray-800"></span></p>
+                <span id="displayEmail" class="hidden"></span>
                 
                 <form id="otpForm" onsubmit="handleVerifyOTP(event)" class="space-y-4 text-left">
                     <div id="otpErrorAlert" class="hidden p-3 text-sm rounded-xl bg-red-50 text-red-700"></div>
                     <div>
-                        <label for="otp" class="block text-sm font-semibold text-gray-700 mb-1.5">Enter OTP</label>
-                        <input type="text" id="otp" pattern="[0-9]{6}" title="6-digit OTP" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 text-center tracking-widest text-lg font-bold" placeholder="------" required>
+                        <label for="otp" class="block text-sm font-semibold text-gray-700 mb-1.5">Enter 6-Digit OTP</label>
+                        <input type="text" id="otp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" title="6-digit OTP" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50 focus:bg-white placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-brand-wa_light/10 focus:border-brand-wa_light transition-all duration-200 text-center tracking-widest text-lg font-bold" placeholder="------" required autocomplete="one-time-code">
                     </div>
                     <div>
                         <label for="new_password" class="block text-sm font-semibold text-gray-700 mb-1.5">New Password</label>
@@ -361,9 +427,10 @@ It expires in 15 minutes.";
                     </button>
                 </form>
 
-                <p class="mt-6 text-sm text-gray-500">
-                    Didn't receive it? <button onclick="handleReset(event, true)" id="resendBtn" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Click to resend</button>
-                </p>
+                <div class="mt-6 text-sm text-gray-500">
+                    Didn't receive it? <button type="button" onclick="handleReset(event, true)" id="resendBtn" class="font-semibold text-brand-wa_med hover:text-brand-wa_dark transition-colors">Click to resend</button>
+                    <span id="cooldownNotice" class="block text-xs text-gray-400 mt-1"></span>
+                </div>
             </div>
 
             <!-- Footer (Contact Support option if needed) -->
@@ -388,20 +455,51 @@ It expires in 15 minutes.";
     </div>
 
     <script>
-        
+        let resendTimer = null;
+
+        function startCooldown(seconds) {
+            const resendBtn = document.getElementById('resendBtn');
+            const cooldownNotice = document.getElementById('cooldownNotice');
+            if (!resendBtn) return;
+            
+            if (resendTimer) clearInterval(resendTimer);
+            resendBtn.disabled = true;
+            resendBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            let left = seconds;
+            const updateLabel = () => {
+                if (left <= 0) {
+                    clearInterval(resendTimer);
+                    resendBtn.disabled = false;
+                    resendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    resendBtn.textContent = 'Click to resend';
+                    if (cooldownNotice) cooldownNotice.textContent = '';
+                } else {
+                    resendBtn.textContent = `Resend in ${left}s`;
+                    if (cooldownNotice) cooldownNotice.textContent = `Wait ${left}s before requesting another OTP`;
+                    left--;
+                }
+            };
+            updateLabel();
+            resendTimer = setInterval(updateLabel, 1000);
+        }
+
         function handleReset(e, isResend = false) {
             if(e) e.preventDefault();
             
-            const emailInput = document.getElementById('email').value;
+            const emailInput = document.getElementById('email').value.trim();
             const btn = isResend ? document.getElementById('resendBtn') : document.getElementById('submitBtn');
             const form = document.getElementById('forgotPasswordForm');
             const successDiv = document.getElementById('successMessage');
             const displayEmail = document.getElementById('displayEmail');
+            const displayPhone = document.getElementById('displayPhone');
             const errorAlert = document.getElementById('errorAlert');
             const otpErrorAlert = document.getElementById('otpErrorAlert');
             
+            if (errorAlert) errorAlert.classList.add('hidden');
+            if (otpErrorAlert) otpErrorAlert.classList.add('hidden');
+
             const originalText = btn.innerHTML;
-            
             btn.innerHTML = `<svg class="animate-spin inline h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Sending...`;
             btn.disabled = true;
             btn.classList.add('opacity-90', 'cursor-wait');
@@ -421,45 +519,59 @@ It expires in 15 minutes.";
                 btn.classList.remove('opacity-90', 'cursor-wait');
 
                 if (!data.ok) {
-                    if (isResend) {
+                    if (isResend && otpErrorAlert) {
                         otpErrorAlert.textContent = data.error;
                         otpErrorAlert.classList.remove('hidden');
-                    } else {
+                    } else if (errorAlert) {
                         errorAlert.textContent = data.error;
                         errorAlert.classList.remove('hidden');
                     }
+                    if (data.cooldown) {
+                        startCooldown(data.cooldown);
+                    }
                 } else {
-                    displayEmail.textContent = emailInput;
+                    if (displayEmail) displayEmail.textContent = emailInput;
+                    if (displayPhone) displayPhone.textContent = data.phone || 'your phone';
                     
                     if (data.sent_via && data.sent_via.length > 0) {
                         const methods = data.sent_via.join(' and ');
-                        document.getElementById('successHeading').textContent = 'Check your ' + methods;
+                        const heading = document.getElementById('successHeading');
+                        if (heading) heading.textContent = 'Check your ' + methods;
                     }
                     
-                    form.classList.add('hidden');
-                    successDiv.classList.remove('hidden');
-                    if (isResend) {
-                        otpErrorAlert.classList.add('hidden');
-                        btn.innerHTML = "Sent!";
-                        setTimeout(() => { btn.innerHTML = originalText; }, 2000);
-                    }
+                    if (form) form.classList.add('hidden');
+                    if (successDiv) successDiv.classList.remove('hidden');
+                    
+                    startCooldown(data.cooldown || 60);
+
+                    setTimeout(() => {
+                        const otpInput = document.getElementById('otp');
+                        if (otpInput) otpInput.focus();
+                    }, 100);
                 }
             })
             .catch(err => {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
                 btn.classList.remove('opacity-90', 'cursor-wait');
+                const targetAlert = isResend ? otpErrorAlert : errorAlert;
+                if (targetAlert) {
+                    targetAlert.textContent = 'Network error or request timeout. Please try again.';
+                    targetAlert.classList.remove('hidden');
+                }
             });
         }
 
         function handleVerifyOTP(e) {
             e.preventDefault();
-            const emailInput = document.getElementById('email').value;
-            const otpInput = document.getElementById('otp').value;
+            const emailInput = document.getElementById('email').value.trim();
+            const otpInput = document.getElementById('otp').value.trim();
             const newPasswordInput = document.getElementById('new_password').value;
             const btn = document.getElementById('verifyBtn');
             const otpErrorAlert = document.getElementById('otpErrorAlert');
             
+            if (otpErrorAlert) otpErrorAlert.classList.add('hidden');
+
             const originalText = btn.innerHTML;
             btn.innerHTML = "Verifying...";
             btn.disabled = true;
@@ -477,18 +589,28 @@ It expires in 15 minutes.";
                 btn.innerHTML = originalText;
                 btn.disabled = false;
                 if (!data.ok) {
-                    otpErrorAlert.textContent = data.error;
-                    otpErrorAlert.classList.remove('hidden');
+                    if (otpErrorAlert) {
+                        otpErrorAlert.textContent = data.error;
+                        otpErrorAlert.classList.remove('hidden');
+                    }
                 } else {
-                    window.location.href = '<?= e(base_url("index.php?page=login")) ?>';
+                    btn.innerHTML = "Password Reset! Redirecting...";
+                    btn.classList.add('bg-emerald-600');
+                    setTimeout(() => {
+                        window.location.href = '<?= e(base_url("index.php?page=login&reset=success")) ?>';
+                    }, 500);
                 }
             })
             .catch(err => {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
+                if (otpErrorAlert) {
+                    otpErrorAlert.textContent = 'Verification request failed. Please check your connection.';
+                    otpErrorAlert.classList.remove('hidden');
+                }
             });
         }
-</script>
+    </script>
 </body>
 </html>
 <?php exit; ?>

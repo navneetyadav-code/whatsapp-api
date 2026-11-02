@@ -6,7 +6,6 @@
 -- outbound webhooks, and native built-in utility tools.
 -- ============================================================================
 
-USE `whatsapp_api`;
 
 CREATE TABLE IF NOT EXISTS `ai_custom_tools` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -1,11 +1,10 @@
 -- Migration 007: Enterprise AI Agent, Zero-Cloud RAG Knowledge Base & Human Escalation
 -- Extends conversations with escalation status and adds AI Agent configuration, knowledge chunks, and escalation logs.
 
-ALTER TABLE `chat_conversations`
-  MODIFY COLUMN `status` enum('open', 'escalated', 'closed') NOT NULL DEFAULT 'open',
-  ADD COLUMN `escalated_at` timestamp NULL DEFAULT NULL AFTER `status`,
-  ADD COLUMN `escalation_reason` varchar(191) DEFAULT NULL AFTER `escalated_at`,
-  ADD COLUMN `consecutive_bot_replies` int(10) unsigned NOT NULL DEFAULT 0 AFTER `escalation_reason`;
+ALTER TABLE `chat_conversations` MODIFY COLUMN `status` enum('open', 'escalated', 'closed') NOT NULL DEFAULT 'open';
+ALTER TABLE `chat_conversations` ADD COLUMN `escalated_at` timestamp NULL DEFAULT NULL;
+ALTER TABLE `chat_conversations` ADD COLUMN `escalation_reason` varchar(191) DEFAULT NULL;
+ALTER TABLE `chat_conversations` ADD COLUMN `consecutive_bot_replies` int(10) unsigned NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS `ai_agent_settings` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,

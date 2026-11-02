@@ -12,10 +12,13 @@ if (!app_config('app.enable_registration')) {
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    $name = trim((string) ($_POST['name'] ?? ''));
-    $email = trim((string) ($_POST['email'] ?? ''));
-    $phone = trim((string) ($_POST['phone'] ?? ''));
-    $password = (string) ($_POST['password'] ?? '');
+    if (!$allowRegistration) {
+        $error = $restrictedNotice;
+    } else {
+        $name = trim((string) ($_POST['name'] ?? ''));
+        $email = trim((string) ($_POST['email'] ?? ''));
+        $phone = trim((string) ($_POST['phone'] ?? ''));
+        $password = (string) ($_POST['password'] ?? '');
 
     // Normalize phone number
     $cleanPhone = preg_replace('/[^\d+]/', '', $phone);
@@ -44,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $exception) {
             $error = 'That email or phone is already registered.';
         }
+    }
     }
 }
 ?>
@@ -132,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- Top Logo -->
         <div class="relative z-10 flex items-center gap-2.5">
-            <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/20">
+            <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-8 h-8 rounded-lg object-contain shadow-sm border border-white/20">
             <span class="font-semibold text-white tracking-wide text-sm">WhatsGateway</span>
         </div>
 
@@ -184,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <!-- Logo inside form (mobile branding) -->
             <div class="flex items-center gap-2 mb-4 lg:hidden">
-                <img src="<?= e(base_url('assets/logo.jpg')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-cover shadow-sm border border-gray-100">
+                <img src="<?= e(base_url('assets/logo_white.png')) ?>" alt="WhatsGateway Logo" class="w-7 h-7 rounded-lg object-contain shadow-sm border border-gray-100">
                 <span class="font-bold text-gray-900 tracking-tight text-base">WhatsGateway</span>
             </div>
 
@@ -194,6 +198,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="text-xs text-gray-500 mt-0.5 font-medium">Start building your WhatsApp API integration.</p>
             </div>
 
+            <?php if (!$allowRegistration): ?>
+                <div class="p-6 rounded-2xl bg-amber-50 border border-amber-200/90 text-center my-4 shadow-sm">
+                    <div class="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3 border border-amber-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <h3 class="text-base font-bold text-amber-900 mb-1.5">Registration Closed</h3>
+                    <p class="text-xs text-amber-800 leading-relaxed max-w-sm mx-auto mb-5">
+                        This is not allowed in current architecture. Please contact <a href="mailto:info.assistgroupofficial@gmail.com" class="font-semibold underline text-amber-950">info.assistgroupofficial@gmail.com</a>.
+                    </p>
+                    <a href="<?= e(base_url('index.php?page=login')) ?>" class="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-sm">
+                        Back to Login &rarr;
+                    </a>
+                </div>
+            <?php else: ?>
             <!-- Register Form -->
             <form method="post" onsubmit="handleRegister(event)" class="space-y-2.5">
                 <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
@@ -307,6 +325,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </svg>
                 Sign up with Google
             </a>
+            <?php endif; ?>
 
             <!-- Footer -->
             <p class="mt-3 text-center text-xs font-medium text-gray-500">

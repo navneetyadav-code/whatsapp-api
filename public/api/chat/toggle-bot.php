@@ -39,9 +39,9 @@ if ($conv) {
     
     // If resuming bot (bot_paused = 0), reset escalated status back to open and acknowledge escalations
     if ($newStatus === 0) {
-        $updateStmt = $pdo->prepare('UPDATE chat_conversations SET bot_paused = 0, status = "open", escalation_reason = NULL, escalated_at = NULL WHERE id = ?');
+        $updateStmt = $pdo->prepare("UPDATE chat_conversations SET bot_paused = 0, status = 'open', escalation_reason = NULL, escalated_at = NULL WHERE id = ?");
         $updateStmt->execute([$conv['id']]);
-        $pdo->prepare('UPDATE chat_escalations SET status = "resolved", resolved_at = NOW(), resolved_by = ? WHERE conversation_id = ? AND user_id = ? AND status != "resolved"')->execute([$user['name'] ?? 'Agent', $conv['id'], $userId]);
+        $pdo->prepare("UPDATE chat_escalations SET status = 'resolved', resolved_at = NOW(), resolved_by = ? WHERE conversation_id = ? AND user_id = ? AND status != 'resolved'")->execute([$user['name'] ?? 'Agent', $conv['id'], $userId]);
     } else {
         $updateStmt = $pdo->prepare('UPDATE chat_conversations SET bot_paused = 1 WHERE id = ?');
         $updateStmt->execute([$conv['id']]);

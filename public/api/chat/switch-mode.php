@@ -41,7 +41,8 @@ $personalPromptPreset = "You are the dedicated, highly capable Personal AI Execu
    • Creative brainstorming, strategy, analysis, and executive summaries.
 4. Autonomous Function Calling: Proactively trigger the relevant tools whenever real-time facts, calculations, weather, or web lookups are needed. Never guess or hallucinate when tools can confirm.
 5. NO Feedback Surveys: You are a personal assistant, NOT a customer service line. NEVER request customer ratings, 1-5 star reviews, or feedback surveys.
-6. WhatsApp Style: Keep messages structured, bold key phrases (*bold*), use clean bullet points, and add natural emojis. Match your Boss's preferred language (English, Hindi, or Hinglish).";
+6. ZERO HUMAN ESCALATION: You are Boss's 24/7 dedicated Personal Executive Assistant. There is NO customer support desk, external agent, or ticket queue. NEVER offer to transfer, connect, or escalate the conversation to a human agent, manager, or representative. NEVER call any escalation tool. If Boss asks for an agent or asks to escalate, inform Boss directly and politely that you are their private personal AI assistant and handle all tasks directly for them without human escalation.
+7. WhatsApp Style: Keep messages structured, bold key phrases (*bold*), use clean bullet points, and add natural emojis. Match your Boss's preferred language (English, Hindi, or Hinglish).";
 
 $supportPromptPreset = "You are the friendly, professional, and knowledgeable AI Support Assistant for our business on WhatsApp.
 
@@ -65,14 +66,14 @@ if ($existing) {
     if ($applyPrompt) {
         $updateStmt = $pdo->prepare(
             'UPDATE ai_agent_settings
-             SET agent_mode = ?, feedback_enabled = ?, is_always_on = ?, owner_name = ?, system_prompt = ?
+             SET enabled = 1, auto_reply_enabled = 1, agent_mode = ?, feedback_enabled = ?, is_always_on = ?, owner_name = ?, system_prompt = ?
              WHERE user_id = ?'
         );
         $updateStmt->execute([$targetMode, $feedbackEnabled, $isAlwaysOn, $ownerName, $chosenPrompt, $userId]);
     } else {
         $updateStmt = $pdo->prepare(
             'UPDATE ai_agent_settings
-             SET agent_mode = ?, feedback_enabled = ?, is_always_on = ?, owner_name = ?
+             SET enabled = 1, auto_reply_enabled = 1, agent_mode = ?, feedback_enabled = ?, is_always_on = ?, owner_name = ?
              WHERE user_id = ?'
         );
         $updateStmt->execute([$targetMode, $feedbackEnabled, $isAlwaysOn, $ownerName, $userId]);
@@ -81,7 +82,7 @@ if ($existing) {
 } else {
     $insertStmt = $pdo->prepare(
         'INSERT INTO ai_agent_settings (user_id, enabled, provider_priority, gemini_model, system_prompt, auto_reply_enabled, agent_mode, feedback_enabled, is_always_on, owner_name)
-         VALUES (?, 1, \'gemini\', \'gemini-3.5-flash-lite\', ?, 1, ?, ?, ?, ?)'
+         VALUES (?, 1, \'gemini\', \'gemini-3.5-flash\', ?, 1, ?, ?, ?, ?)'
     );
     $insertStmt->execute([$userId, $chosenPrompt, $targetMode, $feedbackEnabled, $isAlwaysOn, $ownerName]);
 }
@@ -94,8 +95,19 @@ $userConvs = $convStmt->fetchAll();
 
 foreach ($userConvs as $c) {
     $freshUuid = $newSessionPrefix . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
-    $pdo->prepare('UPDATE chat_conversations SET session_uuid = ?, consecutive_bot_replies = 0, awaiting_feedback = 0 WHERE id = ?')
-        ->execute([$freshUuid, (int)$c['id']]);
+    if ($targetMode === 'personal') {
+        $pdo->prepare('UPDATE chat_conversations SET session_uuid = ?, consecutive_bot_replies = 0, awaiting_feedback = 0, status = "open", bot_paused = 0, escalation_reason = NULL WHERE id = ?')
+            ->execute([$freshUuid, (int)$c['id']]);
+    } else {
+        $pdo->prepare('UPDATE chat_conversations SET session_uuid = ?, consecutive_bot_replies = 0, awaiting_feedback = 0 WHERE id = ?')
+            ->execute([$freshUuid, (int)$c['id']]);
+    }
+}
+
+if ($targetMode === 'personal') {
+    // Auto-resolve any active escalations in chat_escalations
+    $pdo->prepare("UPDATE chat_escalations SET status = 'resolved', resolved_at = NOW(), resolved_by = 'System (Mode Switch)' WHERE user_id = ? AND status = 'active'")
+        ->execute([$userId]);
 }
 
 json_response([

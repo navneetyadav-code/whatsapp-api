@@ -27,9 +27,10 @@ $userId = (int) $user['id'];
 $pdo = Database::pdo();
 
 // Read JSON input
-$input = json_decode(file_get_contents('php://input'), true) ?? [];
+$input = json_decode(file_get_contents('php://input'), true) ?: ($_POST ?? []);
 $rawContent = trim((string) ($input['raw_content'] ?? ''));
-$inputType = trim((string) ($input['input_type'] ?? 'auto')); // auto | curl | prompt | docs
+$inputType = trim((string) ($input['input_type'] ?? 'auto')); // auto | curl | prompt | docs | shared | shared_hosting
+$isSharedHosting = in_array($inputType, ['shared', 'shared_hosting'], true);
 
 if ($rawContent === '') {
     json_response([
@@ -45,37 +46,79 @@ $parsedCurl = CurlImporter::parse($rawContent);
 $isCurl = ($parsedCurl !== null);
 
 // -----------------------------------------------------------------------------
-// STEP 2: AI COPILOT SYNTHESIS (GEMINI / GROQ / OPENROUTER)
+// STEP 2: AI COPILOT SYNTHESIS (GEMINI -> GROQ -> OPENROUTER CASCADE)
 // -----------------------------------------------------------------------------
-// Fetch active user AI credentials
+// 1. Fetch active user AI credentials from dedicated table (from /ai-credentials)
+$keysStmt = $pdo->prepare(
+    'SELECT id, provider, label, api_key, model, priority, is_active
+     FROM ai_provider_keys
+     WHERE user_id = ? AND is_active = 1
+     ORDER BY priority ASC, id ASC'
+);
+$keysStmt->execute([$userId]);
+$dbKeys = $keysStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$keysByProvider = [
+    'gemini' => [],
+    'groq' => [],
+    'openrouter' => []
+];
+foreach ($dbKeys as $k) {
+    $prov = strtolower(trim((string) $k['provider']));
+    if (isset($keysByProvider[$prov])) {
+        $keysByProvider[$prov][] = $k;
+    }
+}
+
+// 2. Fetch AI agent settings (for legacy single-key fallback & priority)
 $settingsStmt = $pdo->prepare('SELECT * FROM ai_agent_settings WHERE user_id = ? LIMIT 1');
 $settingsStmt->execute([$userId]);
-$aiSettings = $settingsStmt->fetch() ?: [];
+$aiSettings = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$geminiKey = trim((string) ($aiSettings['gemini_api_key'] ?? ''));
-$groqKey = trim((string) ($aiSettings['groq_api_key'] ?? ''));
-$openrouterKey = trim((string) ($aiSettings['openrouter_api_key'] ?? ''));
-
-$geminiModel = trim((string) ($aiSettings['gemini_model'] ?? 'gemini-1.5-flash')) ?: 'gemini-1.5-flash';
-if (str_contains($geminiModel, 'gemini-3.5') || str_contains($geminiModel, 'gemini-2.5')) {
-    $geminiModel = 'gemini-1.5-flash';
+if (empty($keysByProvider['gemini']) && !empty($aiSettings['gemini_api_key'])) {
+    $keysByProvider['gemini'][] = [
+        'api_key' => $aiSettings['gemini_api_key'],
+        'model' => $aiSettings['gemini_model'] ?? 'gemini-3.5-flash',
+        'label' => 'Legacy Gemini Key'
+    ];
 }
-$groqModel = trim((string) ($aiSettings['groq_model'] ?? 'openai/gpt-oss-120b')) ?: 'openai/gpt-oss-120b';
-if (str_contains($groqModel, 'llama-3.3-70b-versatile')) {
-    $groqModel = 'openai/gpt-oss-120b';
+if (empty($keysByProvider['groq']) && !empty($aiSettings['groq_api_key'])) {
+    $keysByProvider['groq'][] = [
+        'api_key' => $aiSettings['groq_api_key'],
+        'model' => $aiSettings['groq_model'] ?? 'openai/gpt-oss-120b',
+        'label' => 'Legacy Groq Key'
+    ];
 }
-$openrouterModel = trim((string) ($aiSettings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free')) ?: 'meta-llama/llama-3.3-70b-instruct:free';
-$priority = $aiSettings['provider_priority'] ?? 'gemini';
+if (empty($keysByProvider['openrouter']) && !empty($aiSettings['openrouter_api_key'])) {
+    $keysByProvider['openrouter'][] = [
+        'api_key' => $aiSettings['openrouter_api_key'],
+        'model' => $aiSettings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free',
+        'label' => 'Legacy OpenRouter Key'
+    ];
+}
 
-$hasAiKeys = !empty($geminiKey) || !empty($groqKey) || !empty($openrouterKey);
+$priority = strtolower(trim((string) ($aiSettings['provider_priority'] ?? 'gemini')));
+$providerOrder = match ($priority) {
+    'groq' => ['groq', 'gemini', 'openrouter'],
+    'openrouter' => ['openrouter', 'gemini', 'groq'],
+    default => ['gemini', 'groq', 'openrouter']
+};
+
+$hasAiKeys = !empty($keysByProvider['gemini']) || !empty($keysByProvider['groq']) || !empty($keysByProvider['openrouter']);
 
 $aiResult = null;
 $usedProvider = null;
 
 if ($hasAiKeys) {
-    $contextHint = $isCurl 
-        ? "The user has provided a raw cURL command:\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT)
-        : "The user has provided the following requirement, prompt, or API documentation:\n\"{$rawContent}\"";
+    if ($isSharedHosting) {
+        $contextHint = $isCurl 
+            ? "The user has provided a Shared Hosting API cURL (e.g. cPanel / ByetHost / InfinityFree / Apache virtual host / AssistGroup):\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT) . "\nEnsure the tool is fully configured for shared hosting execution without aes errors, preserving Accept: application/json and all query/route parameters."
+            : "The user has provided the following Shared Hosting requirement or API documentation:\n\"{$rawContent}\"";
+    } else {
+        $contextHint = $isCurl 
+            ? "The user has provided a raw cURL command:\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT)
+            : "The user has provided the following requirement, prompt, or API documentation:\n\"{$rawContent}\"";
+    }
 
     $systemInstruction = <<<PROMPT
 You are a Principal Integration Architect & API Engineer.
@@ -91,50 +134,47 @@ CRITICAL REQUIREMENTS:
    - If the API or cURL expects "to" and "body", the tool parameters MUST be named "to" and "body" - NEVER rename them to "phone_number", "message_content", "recipient", etc.!
    - If the API expects "order_id", use "order_id", not "tracking_no".
 6. REQUEST BODY & "body_template" FOR WRITE OPERATIONS (POST, PUT, PATCH):
-   - "execution_config.body_template" is MANDATORY whenever the endpoint receives a JSON payload.
-   - PRESERVE the exact nested JSON object/array hierarchy of the target API.
-   - Only dynamic values should be replaced with {param_name} placeholders matching your "parameters" list.
-   - Retain ALL static constants, headers, and protocol flags (e.g. "messaging_product": "whatsapp", "type": "text", "recipient_type": "individual", "preview_url": false) EXACTLY as defined in the cURL or documentation. DO NOT turn static constants into dynamic parameters!
-7. "execution_config":
-   - "method": "GET" | "POST" | "PUT" | "DELETE"
-   - "url": Target URL. ANY dynamic parameter in the URL MUST be wrapped in curly braces like {order_id} or {city}.
-   - "headers": Object containing needed headers (e.g. {"Content-Type": "application/json", "Authorization": "Bearer ...", "Accept": "application/json"}).
-   - "body_template": Object/Array representing the structured JSON payload with {param_name} placeholders (for POST/PUT/PATCH), or omit/null for GET.
-   - "response_path": Optional sub-property in response JSON (e.g. "data" or "results" or leave empty "").
-8. "parameters": Array of objects:
-   - "name": EXACT parameter identifier matching the {placeholder} in the URL or body_template.
-   - "type": "STRING" | "NUMBER" | "INTEGER" | "BOOLEAN"
-   - "description": Clear explanation of what this input is for the AI.
-   - "required": true | false
-9. "rbac_roles": Default to ["guest", "customer", "admin"]. If the tool handles private internal operations (like deleting data or viewing employee records), set to ["admin"].
+   - You MUST formulate "body_template" as an object matching the exact JSON payload expected by the target API.
+   - Use dynamic string templates for customer arguments: e.g. "to": "{to}", "body": "{body}", "order_id": "{order_id}".
+   - Keep static platform/API flags as raw values: e.g. "type": "text", "messaging_product": "whatsapp", "preview_url": false.
+7. PARAMETERS SCHEMA ("parameters"):
+   - For every placeholder `{param}` in the URL or body_template, provide a parameter entry:
+   - "name": Exact parameter name without braces (must match placeholder).
+   - "type": "STRING", "NUMBER", "INTEGER", or "BOOLEAN".
+   - "description": High-context explanation of what value this parameter takes (e.g. "Customer 10-digit mobile number with country code", "Customer AWB tracking number").
+   - "required": true for mandatory fields; false for optional fields.
+8. EXECUTION CONFIG:
+   - "method": HTTP verb (GET, POST, PUT, DELETE, PATCH).
+   - "url": Full target endpoint URL with `{param}` placeholders if query/path arguments exist.
+   - "headers": Include all required headers from cURL or specs (e.g. "Content-Type": "application/json", "Authorization": "Bearer ...", "Accept": "application/json").
+   - "response_path": (Optional) dot-separated path to extract from response JSON (e.g. "data" or "result"). Leave empty "" if returning full response.
+9. RBAC ROLES ("rbac_roles"):
+   - Default to ["guest", "customer", "admin"]. If tool performs destructive actions or refunds, restrict to ["admin"].
 
-STRICT OUTPUT FORMAT:
-Output ONLY a valid JSON object matching this schema. Do NOT enclose in markdown backticks. Do NOT write conversational filler.
+RETURN ONLY A VALID, PARSABLE JSON OBJECT. DO NOT WRAP IN MARKDOWN BACKTICKS OR ADD EXPLANATORY TEXT.
 
-Example 1 (POST with nested body_template):
+Example 1 (POST with JSON body):
 {
   "tool_slug": "send_whatsapp",
-  "display_name": "📱 WhatsApp Cloud Message",
+  "display_name": "📱 WhatsApp Dispatcher",
   "category": "rest_api",
-  "description": "Sends an outbound WhatsApp text message to a specific phone number using the Meta Cloud API format.",
+  "description": "Sends an instant WhatsApp text message to a recipient phone number.",
   "execution_config": {
     "method": "POST",
     "url": "https://api.example.com/v1/messages",
     "headers": {
       "Content-Type": "application/json",
-      "Authorization": "Bearer wa_live_token"
+      "Authorization": "Bearer sample_token"
     },
     "body_template": {
       "messaging_product": "whatsapp",
-      "recipient_type": "individual",
       "to": "{to}",
       "type": "text",
       "text": {
-        "preview_url": false,
         "body": "{body}"
       }
     },
-    "response_path": ""
+    "response_path": "messages.0"
   },
   "parameters": [
     {
@@ -181,127 +221,137 @@ PROMPT;
 
     $promptPayload = $systemInstruction . "\n\nINPUT DATA:\n" . $contextHint;
 
-    $providers = match ($priority) {
-        'groq' => ['groq', 'gemini', 'openrouter'],
-        'openrouter' => ['openrouter', 'gemini', 'groq'],
-        default => ['gemini', 'groq', 'openrouter']
-    };
-
-    foreach ($providers as $prov) {
+    // Execute Multi-Provider & Multi-Key Auto-Failover Cascade
+    foreach ($providerOrder as $prov) {
         if ($aiResult !== null) break;
+        $keys = $keysByProvider[$prov] ?? [];
+        if (empty($keys)) continue;
 
-        // Try Groq
-        if ($prov === 'groq' && !empty($groqKey)) {
-            try {
-                $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 20,
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/json',
-                        "Authorization: Bearer {$groqKey}"
-                    ],
-                    CURLOPT_POSTFIELDS => json_encode([
-                        'model' => $groqModel,
-                        'messages' => [
-                            ['role' => 'user', 'content' => $promptPayload]
-                        ],
-                        'temperature' => 0.2,
-                        'max_tokens' => 1500,
-                        'response_format' => ['type' => 'json_object']
-                    ])
-                ]);
-                $resp = curl_exec($ch);
-                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
+        foreach ($keys as $kRecord) {
+            $apiKey = trim((string) ($kRecord['api_key'] ?? ''));
+            if ($apiKey === '') continue;
 
-                if ($code === 200 && $resp) {
-                    $json = json_decode($resp, true);
-                    $content = $json['choices'][0]['message']['content'] ?? '';
-                    $parsed = json_decode(trim($content), true);
-                    if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
-                        $aiResult = $parsed;
-                        $usedProvider = "Groq ({$groqModel})";
-                    }
+            if ($prov === 'gemini') {
+                $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['gemini_model'] ?? 'gemini-3.5-flash'))) ?: 'gemini-3.5-flash';
+                $candidates = array_unique([$baseModel, 'gemini-2.5-flash', 'gemini-flash-latest']);
+                foreach ($candidates as $candModel) {
+                    try {
+                        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$candModel}:generateContent?key={$apiKey}";
+                        $ch = curl_init($url);
+                        curl_setopt_array($ch, [
+                            CURLOPT_POST => true,
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_TIMEOUT => 20,
+                            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                            CURLOPT_POSTFIELDS => json_encode([
+                                'contents' => [
+                                    ['parts' => [['text' => $promptPayload]]]
+                                ],
+                                'generationConfig' => [
+                                    'temperature' => 0.2,
+                                    'maxOutputTokens' => 1500,
+                                    'responseMimeType' => 'application/json'
+                                ]
+                            ])
+                        ]);
+                        $resp = curl_exec($ch);
+                        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        curl_close($ch);
+
+                        if ($code === 200 && $resp) {
+                            $json = json_decode($resp, true);
+                            $content = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
+                            $parsed = json_decode(trim($content), true);
+                            if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
+                                $aiResult = $parsed;
+                                $usedProvider = "Google Gemini ({$candModel})";
+                                break 2;
+                            }
+                        }
+                    } catch (\Throwable $e) {}
                 }
-            } catch (\Throwable $e) {}
-        }
+            } elseif ($prov === 'groq') {
+                $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['groq_model'] ?? 'openai/gpt-oss-120b'))) ?: 'openai/gpt-oss-120b';
+                $candidates = array_unique([$baseModel, 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile']);
+                foreach ($candidates as $candModel) {
+                    try {
+                        $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
+                        curl_setopt_array($ch, [
+                            CURLOPT_POST => true,
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_TIMEOUT => 20,
+                            CURLOPT_HTTPHEADER => [
+                                'Content-Type: application/json',
+                                "Authorization: Bearer {$apiKey}"
+                            ],
+                            CURLOPT_POSTFIELDS => json_encode([
+                                'model' => $candModel,
+                                'messages' => [
+                                    ['role' => 'user', 'content' => $promptPayload]
+                                ],
+                                'temperature' => 0.2,
+                                'max_tokens' => 1500,
+                                'response_format' => ['type' => 'json_object']
+                            ])
+                        ]);
+                        $resp = curl_exec($ch);
+                        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        curl_close($ch);
 
-        // Try Gemini
-        if ($prov === 'gemini' && !empty($geminiKey)) {
-            try {
-                $url = "https://generativelanguage.googleapis.com/v1beta/models/{$geminiModel}:generateContent?key={$geminiKey}";
-                $ch = curl_init($url);
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 20,
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                    CURLOPT_POSTFIELDS => json_encode([
-                        'contents' => [
-                            ['parts' => [['text' => $promptPayload]]]
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.2,
-                            'maxOutputTokens' => 1500,
-                            'responseMimeType' => 'application/json'
-                        ]
-                    ])
-                ]);
-                $resp = curl_exec($ch);
-                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                if ($code === 200 && $resp) {
-                    $json = json_decode($resp, true);
-                    $content = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
-                    $parsed = json_decode(trim($content), true);
-                    if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
-                        $aiResult = $parsed;
-                        $usedProvider = "Google Gemini ({$geminiModel})";
-                    }
+                        if ($code === 200 && $resp) {
+                            $json = json_decode($resp, true);
+                            $content = $json['choices'][0]['message']['content'] ?? '';
+                            $parsed = json_decode(trim($content), true);
+                            if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
+                                $aiResult = $parsed;
+                                $usedProvider = "Groq ({$candModel})";
+                                break 2;
+                            }
+                        }
+                    } catch (\Throwable $e) {}
                 }
-            } catch (\Throwable $e) {}
-        }
+            } elseif ($prov === 'openrouter') {
+                $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free'))) ?: 'meta-llama/llama-3.3-70b-instruct:free';
+                $candidates = array_unique([$baseModel, 'meta-llama/llama-3.3-70b-instruct:free', 'meta-llama/llama-3.3-70b-instruct']);
+                foreach ($candidates as $candModel) {
+                    try {
+                        $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
+                        curl_setopt_array($ch, [
+                            CURLOPT_POST => true,
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_TIMEOUT => 20,
+                            CURLOPT_HTTPHEADER => [
+                                'Content-Type: application/json',
+                                "Authorization: Bearer {$apiKey}"
+                            ],
+                            CURLOPT_POSTFIELDS => json_encode([
+                                'model' => $candModel,
+                                'messages' => [
+                                    ['role' => 'user', 'content' => $promptPayload]
+                                ],
+                                'temperature' => 0.2,
+                                'max_tokens' => 1500
+                            ])
+                        ]);
+                        $resp = curl_exec($ch);
+                        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        curl_close($ch);
 
-        // Try OpenRouter
-        if ($prov === 'openrouter' && !empty($openrouterKey)) {
-            try {
-                $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
-                curl_setopt_array($ch, [
-                    CURLOPT_POST => true,
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 20,
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/json',
-                        "Authorization: Bearer {$openrouterKey}"
-                    ],
-                    CURLOPT_POSTFIELDS => json_encode([
-                        'model' => $openrouterModel,
-                        'messages' => [
-                            ['role' => 'user', 'content' => $promptPayload]
-                        ],
-                        'temperature' => 0.2,
-                        'max_tokens' => 1500
-                    ])
-                ]);
-                $resp = curl_exec($ch);
-                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                if ($code === 200 && $resp) {
-                    $json = json_decode($resp, true);
-                    $content = $json['choices'][0]['message']['content'] ?? '';
-                    $content = preg_replace('/^```(?:json)?\s*/i', '', trim($content));
-                    $content = preg_replace('/\s*```$/', '', $content);
-                    $parsed = json_decode(trim($content), true);
-                    if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
-                        $aiResult = $parsed;
-                        $usedProvider = "OpenRouter ({$openrouterModel})";
-                    }
+                        if ($code === 200 && $resp) {
+                            $json = json_decode($resp, true);
+                            $content = $json['choices'][0]['message']['content'] ?? '';
+                            $content = preg_replace('/^```(?:json)?\s*/i', '', trim($content));
+                            $content = preg_replace('/\s*```$/', '', $content);
+                            $parsed = json_decode(trim($content), true);
+                            if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
+                                $aiResult = $parsed;
+                                $usedProvider = "OpenRouter ({$candModel})";
+                                break 2;
+                            }
+                        }
+                    } catch (\Throwable $e) {}
                 }
-            } catch (\Throwable $e) {}
+            }
         }
     }
 }
@@ -338,7 +388,12 @@ if ($aiResult !== null) {
 } elseif ($parsedCurl !== null) {
     // Use high-precision deterministic cURL parser
     $finalTool = $parsedCurl;
-    $sourceType = 'cURL Engine Fast Parser';
+    if ($isSharedHosting) {
+        if (!isset($finalTool['execution_config']['headers']['Accept']) && !isset($finalTool['execution_config']['headers']['accept'])) {
+            $finalTool['execution_config']['headers']['Accept'] = 'application/json';
+        }
+    }
+    $sourceType = $isSharedHosting ? 'Shared Hosting Engine Copilot' : 'cURL Engine Fast Parser';
 } else {
     // If not a cURL and no AI response was available, formulate a clean generic template
     $slug = strtolower((string) preg_replace('/[^a-z0-9_]/', '_', substr($rawContent, 0, 24)));

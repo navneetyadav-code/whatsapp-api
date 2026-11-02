@@ -149,8 +149,8 @@
                 body: body,
                 tag: tag || 'whatsgateway-alert',
                 requireInteraction: true, // Keep visible on screen until user interacts!
-                icon: `${baseUrl}/assets/logo.jpg`,
-                badge: `${baseUrl}/assets/logo.jpg`
+                icon: `${baseUrl}/assets/logo_white.png`,
+                badge: `${baseUrl}/assets/logo_white.png`
             });
 
             notif.onclick = function () {
@@ -392,6 +392,14 @@
 
             const conversations = data.conversations || [];
             const activeEscCount = Number(data.active_escalations_count || 0);
+
+            // In Personal Assistant mode, escalation alarms and buzzer alerts are silenced
+            const isPersonal = (window.AppConfig && window.AppConfig.agentMode === 'personal') ||
+                               (document.body && document.body.getAttribute('data-agent-mode') === 'personal');
+            if (isPersonal) {
+                if (isBuzzerRunning) stopBuzzer();
+                return;
+            }
 
             // 1. Check Escalations
             // BUZZER TRIGGER: Strictly trigger buzzer loop ONLY when activeEscCount > 0 AND not silenced

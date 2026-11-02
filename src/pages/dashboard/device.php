@@ -21,6 +21,36 @@
         </div>
     </div>
 
+    <!-- Timelock Alert Banner (Anti-Ban Protection) -->
+    <?php 
+    $timelockActive = !empty($session['reachout_timelock_active']);
+    $timelockEndsAt = !empty($session['reachout_timelock_ends_at']) ? strtotime($session['reachout_timelock_ends_at']) : 0;
+    if ($timelockActive && $timelockEndsAt > 0 && $timelockEndsAt < time()) {
+        $timelockActive = false;
+    }
+    ?>
+    <?php if ($timelockActive): ?>
+    <div class="mb-6 p-4 rounded-xl border border-rose-200 bg-rose-50/80 shadow-subtle flex items-start gap-3.5">
+        <div class="w-9 h-9 rounded-lg bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-700 shrink-0 mt-0.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        </div>
+        <div class="flex-1">
+            <div class="flex items-center gap-2">
+                <h3 class="text-[14px] font-bold text-rose-900 tracking-tight">WhatsApp Reachout Restriction Active (Anti-Ban Protection Engaged)</h3>
+                <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-200 text-rose-800 uppercase tracking-wide">Timelock</span>
+            </div>
+            <p class="text-[12px] text-rose-700 mt-1 leading-relaxed">
+                WhatsApp has placed a temporary <strong>Reachout Timelock</strong> on this phone number. You are restricted from messaging new contacts until 
+                <strong><?= $timelockEndsAt ? date('M d, Y h:i A', $timelockEndsAt) : 'further notice' ?></strong>.
+            </p>
+            <div class="mt-2 text-[11px] font-medium text-rose-600 bg-white/60 px-3 py-1.5 rounded-lg border border-rose-200/60 inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                Cold outreach & campaign broadcasts are automatically paused to prevent a permanent ban. Existing customer replies remain active.
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Integrated Telemetry Ribbon -->
     <div class="bg-white rounded-xl border border-slate-200/80 shadow-subtle mb-6 overflow-hidden">
         <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
@@ -165,19 +195,77 @@
                 <h2 class="text-[15px] font-bold text-slate-900">Device Linking Restricted</h2>
                 <p class="text-[12px] text-amber-800 mt-1 max-w-[280px] leading-relaxed font-medium"><?= e($restrictedNotice) ?></p>
                 <?php else: ?>
-                <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-2.5 border border-emerald-100">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                <!-- Pairing Method Toggle Tabs -->
+                <div class="flex items-center bg-slate-100 p-1 rounded-xl mb-4 w-full max-w-[280px] border border-slate-200/80">
+                    <button type="button" id="tabQrBtn" class="flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all shadow-sm bg-white text-slate-900 flex items-center justify-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                        <span>QR Code</span>
+                    </button>
+                    <button type="button" id="tabPairCodeBtn" class="flex-1 py-1.5 px-3 text-[12px] font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+                        <span>Phone Code</span>
+                    </button>
                 </div>
-                <h2 class="text-[15px] font-bold text-slate-900">Pair Device</h2>
-                <p class="text-[12px] text-slate-500 mt-0.5 mb-3.5 max-w-[260px]">Open WhatsApp &gt; <strong>Linked devices</strong> &gt; scan this QR code to connect.</p>
-                
-                <style>#qrPlaceholder.hidden, #qrPlaceholder[hidden] { display: none !important; }</style>
-                <div class="relative w-[210px] h-[210px] bg-white border border-slate-200/90 rounded-xl shadow-subtle p-3 flex items-center justify-center mx-auto" id="qrBox">
-                    <div id="qrPlaceholder" class="w-full h-full bg-slate-50/80 rounded-lg border-2 border-dashed border-slate-200 p-3 text-center flex flex-col items-center justify-center">
-                        <svg class="w-8 h-8 mb-2 text-slate-400 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                        <span class="text-[11px] font-medium text-slate-500 max-w-[160px] leading-relaxed">Click Connect to generate QR code</span>
+
+                <!-- Tab Pane 1: QR Code -->
+                <div id="paneQr" class="w-full flex flex-col items-center">
+                    <h2 class="text-[15px] font-bold text-slate-900">Pair via QR Code</h2>
+                    <p class="text-[12px] text-slate-500 mt-0.5 mb-3.5 max-w-[260px]">Open WhatsApp &gt; <strong>Linked devices</strong> &gt; scan this QR code to connect.</p>
+                    
+                    <style>#qrPlaceholder.hidden, #qrPlaceholder[hidden] { display: none !important; }</style>
+                    <div class="relative w-[210px] h-[210px] bg-white border border-slate-200/90 rounded-xl shadow-subtle p-3 flex items-center justify-center mx-auto" id="qrBox">
+                        <div id="qrPlaceholder" class="w-full h-full bg-slate-50/80 rounded-lg border-2 border-dashed border-slate-200 p-3 text-center flex flex-col items-center justify-center">
+                            <svg class="w-8 h-8 mb-2 text-slate-400 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                            <span class="text-[11px] font-medium text-slate-500 max-w-[160px] leading-relaxed">Click Connect to generate QR code</span>
+                        </div>
+                        <img id="qrImage" alt="WhatsApp QR code" class="w-full h-full rounded-lg object-contain block mx-auto hidden shadow-subtle" style="aspect-ratio: 1/1;">
                     </div>
-                    <img id="qrImage" alt="WhatsApp QR code" class="w-full h-full rounded-lg object-contain block mx-auto hidden shadow-subtle" style="aspect-ratio: 1/1;">
+                </div>
+
+                <!-- Tab Pane 2: Phone Pairing Code -->
+                <div id="panePairCode" class="w-full flex flex-col items-center hidden">
+                    <h2 class="text-[15px] font-bold text-slate-900">Pair via Phone Number</h2>
+                    <p class="text-[12px] text-slate-500 mt-0.5 mb-3.5 max-w-[280px]">Enter your WhatsApp number to receive an 8-character pairing code without scanning.</p>
+
+                    <form id="pairCodeForm" class="w-full max-w-[300px] space-y-3">
+                        <div class="space-y-1 text-left">
+                            <label for="pairPhoneInput" class="block text-[11px] font-semibold text-slate-700">Phone Number (with Country Code)</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-mono text-xs">+</span>
+                                <input type="tel" id="pairPhoneInput" placeholder="15551234567" required class="w-full pl-7 pr-3 py-2 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white shadow-subtle font-mono tabular-nums text-slate-900" autocomplete="tel">
+                            </div>
+                            <p class="text-[10px] text-slate-400">Include country code without '+' or spaces (e.g. 1 for US, 44 for UK, 91 for IN).</p>
+                        </div>
+                        
+                        <button type="submit" id="requestPairCodeBtn" class="w-full py-2 px-4 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-subtle transition-all flex items-center justify-center gap-2 btn-tactile active:scale-[0.98]">
+                            <svg id="pairCodeBtnSpinner" class="animate-spin h-3.5 w-3.5 text-white hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            <span id="pairCodeBtnText">Get 8-Digit Code</span>
+                        </button>
+                    </form>
+
+                    <!-- Pairing Code Result Display Box -->
+                    <div id="pairCodeDisplay" class="hidden mt-4 p-4 bg-slate-50 border border-indigo-100 rounded-xl w-full max-w-[320px]">
+                        <div class="text-[11px] font-semibold text-indigo-700 mb-1">Your WhatsApp Pairing Code:</div>
+                        <div class="flex items-center justify-center gap-2 my-2">
+                            <div id="pairCodeValue" class="text-xl sm:text-2xl font-mono font-bold tracking-widest text-slate-900 select-all px-3.5 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                --------
+                            </div>
+                            <button type="button" id="copyPairCodeBtn" title="Copy code" class="p-2 text-slate-600 hover:text-indigo-600 hover:bg-white rounded-lg border border-slate-200 transition-all bg-white shadow-subtle active:scale-95">
+                                <svg id="copyIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                <svg id="copiedIcon" class="w-4 h-4 text-emerald-600 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </button>
+                        </div>
+                        <div class="text-left text-[11px] text-slate-600 mt-2.5 pt-2.5 border-t border-slate-200/80 space-y-1">
+                            <div class="font-semibold text-slate-700">How to enter on phone:</div>
+                            <ol class="list-decimal list-inside space-y-0.5 text-[11px] text-slate-500">
+                                <li>Open <strong>WhatsApp</strong> on your phone</li>
+                                <li>Tap <strong>Settings / More options</strong> &gt; <strong>Linked Devices</strong></li>
+                                <li>Tap <strong>Link a Device</strong></li>
+                                <li>Tap <strong>Link with phone number instead</strong></li>
+                                <li>Enter the 8-character code above</li>
+                            </ol>
+                        </div>
+                    </div>
                 </div>
                 <?php endif; ?>
             </div>

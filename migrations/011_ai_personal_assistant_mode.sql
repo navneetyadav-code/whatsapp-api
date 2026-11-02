@@ -5,8 +5,7 @@
 -- Business Support Bot and Personal Executive Assistant.
 -- ============================================================
 
-ALTER TABLE `ai_agent_settings`
-  ADD COLUMN `agent_mode` ENUM('support', 'personal') NOT NULL DEFAULT 'support' AFTER `auto_reply_enabled`,
-  ADD COLUMN `feedback_enabled` TINYINT(1) NOT NULL DEFAULT 1 AFTER `agent_mode`,
-  ADD COLUMN `is_always_on` TINYINT(1) NOT NULL DEFAULT 1 AFTER `feedback_enabled`,
-  ADD COLUMN `owner_name` VARCHAR(100) NOT NULL DEFAULT 'Boss' AFTER `is_always_on`;
+ALTER TABLE `ai_agent_settings` ADD COLUMN `agent_mode` ENUM('support', 'personal') NOT NULL DEFAULT 'support';
+ALTER TABLE `ai_agent_settings` ADD COLUMN `feedback_enabled` TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE `ai_agent_settings` ADD COLUMN `is_always_on` TINYINT(1) NOT NULL DEFAULT 1;
+ALTER TABLE `ai_agent_settings` ADD COLUMN `owner_name` VARCHAR(100) NOT NULL DEFAULT 'Boss';
