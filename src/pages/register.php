@@ -4,10 +4,8 @@ if (current_user()) {
     redirect_to('index.php?page=dashboard');
 }
 
-if (!app_config('app.enable_registration')) {
-    flash('error', 'New registrations are disabled on this private instance.');
-    redirect_to('index.php?page=login');
-}
+$allowRegistration = (bool) app_config('app.enable_registration');
+$restrictedNotice = (string) (app_config('app.restricted_notice') ?: 'This is not allowed in current architecture.');
 
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

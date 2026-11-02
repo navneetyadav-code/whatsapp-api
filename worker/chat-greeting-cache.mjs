@@ -70,16 +70,18 @@ export class GreetingCache {
     }
 
     const isPersonal = options.isPersonalMode === true;
-    const owner = options.ownerName || 'Boss';
+    const isAdmin = options.isAdminCaller !== false;
+    const owner = (options.ownerName || '').trim();
 
     // If within cooldown (e.g. 5 minutes) and user is spamming greetings
     if (timeSinceLast < this.cooldownMs) {
+      const salute = (isPersonal && isAdmin && owner) ? `, ${owner}` : '';
       let canned = isPersonal
-        ? `I'm right here, ${owner}! 👋 How can I assist you right now? Let me know what you need.`
+        ? `I'm right here${salute}! 👋 How can I assist you right now? Let me know what you need.`
         : "I'm right here! 👋 How can I help you today? Feel free to ask any questions you have.";
       if (record.greetingCount >= 3) {
         canned = isPersonal
-          ? `I'm right here on standby, ${owner}! 😊 Just let me know what you need.`
+          ? `I'm right here on standby${salute}! 😊 Just let me know what you need.`
           : "I'm still here and listening! 😊 Please let me know what you need assistance with.";
       }
       return { shouldIntercept: true, replyText: canned };

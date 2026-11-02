@@ -286,25 +286,6 @@ $activeMode = $aiSettings['agent_mode'] ?? 'support';
 </div>
 
 <script>
-    const personalPromptTemplate = `You are the dedicated, highly capable Personal AI Executive Assistant & Chief of Staff to your Boss.
-
-DIRECTIVES:
-1. Executive Role: You work directly and exclusively for your Boss. Address them respectfully as "Boss" or "Sir". Be proactive, loyal, dependable, and efficient.
-2. 24/7 Availability: You are active 24/7 around the clock. No closed periods.
-3. Capabilities: Assist with daily tasks, schedules, reminders, math, coding, search, research, and WhatsApp communication.
-4. Function Calling: Proactively trigger tools when real-time facts or calculations are needed.
-5. NO Surveys: NEVER request customer ratings or feedback surveys.
-6. NO Escalation: You handle all tasks directly. Never offer to transfer to another agent or human.
-7. Style: Structured, bold key points (*bold*), clean bullets, and concise messages.`;
-
-    const supportPromptTemplate = `You are the friendly, professional, and knowledgeable AI Support Assistant for our business on WhatsApp.
-
-DIRECTIVES:
-1. Customer Service: Warmly answer customer questions about our services, products, pricing, working hours, and policies.
-2. Verified Information: Ground all factual answers in our official knowledge base.
-3. Escalation: If specific information is unavailable, politely offer to connect them with our human support team.
-4. Style: Courteous, helpful, structured bullets, bold highlights (*bold*), and concise formatting.`;
-
     function updatePromptStats() {
         const textarea = document.getElementById('systemPromptTextarea');
         const stats = document.getElementById('promptStats');
@@ -322,10 +303,27 @@ DIRECTIVES:
 
     function loadPromptTemplate(mode) {
         const textarea = document.getElementById('systemPromptTextarea');
+        const ownerInput = document.getElementById('ownerNameInput');
+        const ownerSalute = (ownerInput ? ownerInput.value.trim() : '');
+
         if (mode === 'personal') {
-            textarea.value = personalPromptTemplate;
+            const addressLine = ownerSalute ? `Address and refer to them as "${ownerSalute}".` : 'Address them respectfully.';
+            const targetRef = ownerSalute ? ownerSalute : 'the owner';
+            textarea.value = `You are the dedicated Personal AI Assistant to ${targetRef}.
+
+DIRECTIVES:
+1. Role: You work directly and exclusively for ${targetRef}. ${addressLine} Be proactive, dependable, and efficient.
+2. Focus: Assist strictly with tasks and instructions requested by ${targetRef}. Never hallucinate or assume unmentioned duties.
+3. Boundaries: You are a private personal assistant, not a public customer service line. Never ask for customer reviews, surveys, or ratings.
+4. WhatsApp Formatting: Structured, clear, use *bold* highlights, and clean bullet points.`;
         } else {
-            textarea.value = supportPromptTemplate;
+            textarea.value = `You are the friendly, professional AI Customer Support Assistant for our business on WhatsApp.
+
+DIRECTIVES:
+1. Customer Service: Help customers with inquiries based strictly on our official business information.
+2. Grounded Answers: Answer accurately based only on verified facts. Never invent policies, prices, or details.
+3. Escalation: If information is unavailable, politely offer to connect with our human support team.
+4. WhatsApp Formatting: Structured, courteous, use *bold* highlights, and clean bullet points.`;
         }
         updatePromptStats();
     }
@@ -349,7 +347,13 @@ DIRECTIVES:
         btn.innerHTML = `<svg class="w-3 h-3 animate-spin text-emerald-600 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> <span>Rewriting...</span>`;
 
         statusBox.classList.remove('hidden');
+        statusBox.className = 'p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between';
         statusText.innerText = 'AI is optimizing your system prompt...';
+
+        const modeInput = document.querySelector('input[name="agent_mode"]:checked');
+        const agentMode = modeInput ? modeInput.value : 'support';
+        const ownerNameInput = document.getElementById('ownerNameInput');
+        const ownerName = ownerNameInput ? ownerNameInput.value.trim() : 'Boss';
 
         try {
             const res = await fetch('<?= e(base_url('api/chat/enhance-prompt.php')) ?>', {
@@ -357,19 +361,27 @@ DIRECTIVES:
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     raw_text: rawText,
-                    tone: toneSelect ? toneSelect.value : 'professional_warm'
+                    tone: toneSelect ? toneSelect.value : 'professional_warm',
+                    agent_mode: agentMode,
+                    owner_name: ownerName
                 })
             });
             const data = await res.json();
             if (data.ok && data.enhanced_prompt) {
                 textarea.value = data.enhanced_prompt;
                 updatePromptStats();
-                statusText.innerText = 'Prompt rewritten successfully via ' + (data.provider || 'AI Engine') + '.';
-                setTimeout(() => { statusBox.classList.add('hidden'); }, 4000);
+                statusBox.className = 'p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between';
+                statusText.innerHTML = '<strong>Prompt rewritten successfully</strong> via ' + (data.provider || 'AI Engine') + '.';
+                setTimeout(() => { statusBox.classList.add('hidden'); }, 5000);
+            } else if (data.needs_credentials) {
+                statusBox.className = 'p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between';
+                statusText.innerHTML = `<span>${data.error}</span> <a href="<?= e(base_url('index.php?page=ai-credentials')) ?>" class="underline font-bold text-emerald-800 hover:text-emerald-900 ml-1.5 inline-flex items-center gap-0.5">Go to AI Credentials →</a>`;
             } else {
+                statusBox.className = 'p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between';
                 statusText.innerText = 'Rewrite note: ' + (data.error || 'Failed to rewrite prompt.');
             }
         } catch (e) {
+            statusBox.className = 'p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between';
             statusText.innerText = 'Network error: ' + e.message;
         } finally {
             btn.disabled = false;
@@ -483,7 +495,7 @@ DIRECTIVES:
     }
 
     async function triggerModeSwitch(targetMode) {
-        const ownerName = document.getElementById('ownerNameInput').value || 'Boss';
+        const ownerName = (document.getElementById('ownerNameInput')?.value || '').trim();
         const pill = document.getElementById('modeStatusPill');
         const text = document.getElementById('modeStatusText');
 

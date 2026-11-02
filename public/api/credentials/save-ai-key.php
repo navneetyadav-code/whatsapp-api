@@ -80,6 +80,17 @@ try {
         $keyId = (int) $pdo->lastInsertId();
     }
 
+    // Keep ai_agent_settings populated if currently blank
+    $activeKey = $finalKey ?? $apiKey;
+    $activeModel = $finalModel ?? ($model ?: null);
+    if ($provider === 'gemini') {
+        $pdo->prepare('UPDATE ai_agent_settings SET gemini_api_key = ?, gemini_model = COALESCE(?, gemini_model) WHERE user_id = ? AND (gemini_api_key IS NULL OR gemini_api_key = "")')->execute([$activeKey, $activeModel, $userId]);
+    } elseif ($provider === 'groq') {
+        $pdo->prepare('UPDATE ai_agent_settings SET groq_api_key = ?, groq_model = COALESCE(?, groq_model) WHERE user_id = ? AND (groq_api_key IS NULL OR groq_api_key = "")')->execute([$activeKey, $activeModel, $userId]);
+    } elseif ($provider === 'openrouter') {
+        $pdo->prepare('UPDATE ai_agent_settings SET openrouter_api_key = ?, openrouter_model = COALESCE(?, openrouter_model) WHERE user_id = ? AND (openrouter_api_key IS NULL OR openrouter_api_key = "")')->execute([$activeKey, $activeModel, $userId]);
+    }
+
     json_response([
         'ok' => true,
         'message' => 'AI API key saved successfully.',

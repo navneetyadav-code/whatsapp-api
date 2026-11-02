@@ -25,3 +25,15 @@ __pycache__/
 /scratch/
 /test.php
 /public/test.php
+
+# AI Training Datasets & Exports
+training/output/
+training/data/
+training/datasets/
+training/*.jsonl
+training/*.json
+training/*.csv
+!training/
+!training/*.php
+!training/*.sh
+!training/README.md

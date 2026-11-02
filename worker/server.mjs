@@ -1497,6 +1497,31 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             [userId]
           );
           const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
+          if (aiSettings) {
+            try {
+              const [pKeys] = await db.execute(
+                'SELECT provider, api_key, model FROM ai_provider_keys WHERE user_id = ? AND is_active = 1 ORDER BY priority ASC, id ASC',
+                [userId]
+              );
+              if (pKeys && pKeys.length > 0) {
+                for (const pk of pKeys) {
+                  const prov = (pk.provider || '').toLowerCase();
+                  if (prov === 'gemini' && !aiSettings.gemini_api_key && pk.api_key) {
+                    aiSettings.gemini_api_key = pk.api_key;
+                    if (pk.model) aiSettings.gemini_model = pk.model;
+                  } else if (prov === 'groq' && !aiSettings.groq_api_key && pk.api_key) {
+                    aiSettings.groq_api_key = pk.api_key;
+                    if (pk.model) aiSettings.groq_model = pk.model;
+                  } else if (prov === 'openrouter' && !aiSettings.openrouter_api_key && pk.api_key) {
+                    aiSettings.openrouter_api_key = pk.api_key;
+                    if (pk.model) aiSettings.openrouter_model = pk.model;
+                  }
+                }
+              }
+            } catch (kErr) {
+              logger.warn({ err: kErr.message }, '[Worker] Failed to query ai_provider_keys fallback');
+            }
+          }
           const isPersonalMode = aiSettings?.agent_mode === 'personal';
           const ownerName = aiSettings?.owner_name || 'Boss';
 
@@ -1509,10 +1534,21 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             } catch (e) {}
           }
           const adminPhones = Array.isArray(toolsConfig?.admin_phones) && toolsConfig.admin_phones.length > 0
-            ? toolsConfig.admin_phones
-            : (process.env.ADMIN_WHITELIST_PHONES ? process.env.ADMIN_WHITELIST_PHONES.split(',').map(s => s.trim()) : []);
+            ? toolsConfig.admin_phones.map(s => String(s).replace(/[^\d]/g, ''))
+            : (process.env.ADMIN_WHITELIST_PHONES ? process.env.ADMIN_WHITELIST_PHONES.split(',').map(s => s.trim().replace(/[^\d]/g, '')) : []);
+
+          try {
+            const [uRows] = await db.execute('SELECT phone FROM users WHERE id = ?', [userId]);
+            if (uRows && uRows[0]?.phone) {
+              const uPhone = String(uRows[0].phone).replace(/[^\d]/g, '');
+              if (uPhone && !adminPhones.includes(uPhone)) {
+                adminPhones.push(uPhone);
+              }
+            }
+          } catch (_) {}
+
           const cleanPhone = (senderPhone || '').replace(/[^\d]/g, '');
-          const isAdminCaller = isPersonalMode || adminPhones.some(p => cleanPhone.includes(p.replace(/[^\d]/g, '')));
+          const isAdminCaller = adminPhones.length > 0 && adminPhones.some(p => p && (cleanPhone.endsWith(p) || p.endsWith(cleanPhone)));
 
           // 6. Escalation & Frustration check
           // STRICT RESTRICTION: In Personal Assistant mode OR when communicating with the Admin/Boss,
@@ -1581,10 +1617,14 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             isBotPaused = 0;
             convStatus = 'open';
 
+            const contactName = (conv && conv.contact_name) ? conv.contact_name : (msg.pushName || 'there');
+            const callerSalute = isAdminCaller ? ownerName : contactName;
             const welcomeText = isPersonalMode
-              ? `Hello ${ownerName}! 👋 I am your 24/7 Personal AI Executive Assistant.\n\n` +
-                `I am ready to assist you with tasks, live web searches, weather updates, math calculations, drafting messages, and daily planning.\n\n` +
-                `How can I help you right now? ⚡`
+              ? (isAdminCaller
+                  ? `Hello ${ownerName}! 👋 I am your 24/7 Personal AI Executive Assistant.\n\n` +
+                    `How can I assist you right now? ⚡`
+                  : `Hello ${callerSalute}! 👋 I am the Personal AI Executive Assistant to ${ownerName || 'the owner'}.\n\n` +
+                    `How can I help you today, or would you like to leave a message for ${ownerName || 'the owner'}? ⚡`)
               : `Hello! 👋 Welcome to our support desk.\n\n` +
                 `I am your virtual assistant, ready to assist you with inquiries, services, and support.\n\n` +
                 `How can I help you today? ✨`;
@@ -1617,8 +1657,13 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             isBotPaused = 0;
             convStatus = 'open';
 
+            const resetSalute = isAdminCaller
+              ? (ownerName ? `, ${ownerName}` : '')
+              : ((conv && conv.contact_name) || msg.pushName ? `, ${(conv && conv.contact_name) || msg.pushName}` : '');
             const resetReplyText = isPersonalMode
-              ? `🧹 *Working Context Cleared!*\nStarting a fresh topic session. How can I assist you now, ${ownerName}?`
+              ? (isAdminCaller
+                  ? `🧹 *Working Context Cleared!*\nStarting a fresh topic session. How can I assist you now${resetSalute}?`
+                  : `🧹 *Working Context Cleared!*\nStarting a fresh topic session. How can I assist you or take a message for ${ownerName || 'the owner'}?`)
               : '🧹 *Conversation Context Cleared!*\nHow can I help you with a fresh inquiry today?';
             try {
               await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: resetReplyText });
@@ -1702,7 +1747,8 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           // Step D: Token Burn Optimizer - Intercept repeated greetings
                           const greetingCheck = globalGreetingCache.evaluate(userId, senderPhone, consolidatedText, activeSessionUuid, {
                             isPersonalMode,
-                            ownerName
+                            ownerName,
+                            isAdminCaller
                           });
                           if (greetingCheck.shouldIntercept && greetingCheck.replyText) {
                             logger.info({ userId, senderPhone }, '⚡ Intercepted repeated greeting locally - saved LLM tokens!');
@@ -1745,15 +1791,27 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                             // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
                             const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
                             const userFacts = isPersonalMode ? await ChatFactMemory.loadUserFacts(db, userId) : { factsText: '' };
+                            const currentDateTime = new Date().toLocaleString('en-US', {
+                              timeZone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
+                              dateStyle: 'full',
+                              timeStyle: 'short'
+                            });
+                            const contactName = conv.contact_name || msg.pushName || 'User';
+
                             const { systemPrompt, userMessage } = buildPromptWithRag(
                               aiSettings.system_prompt,
                               relevantChunks,
                               consolidatedText,
                               {
                                 agentMode: aiSettings.agent_mode || 'support',
-                                ownerName: aiSettings.owner_name || 'Boss',
+                                ownerName: aiSettings.owner_name || '',
                                 skillDirectives,
-                                factsText: userFacts.factsText
+                                factsText: userFacts.factsText,
+                                availableTools: filteredTools,
+                                currentDateTime,
+                                callerPhone: senderPhone,
+                                callerName: contactName,
+                                isAdminCaller
                               }
                             );
 

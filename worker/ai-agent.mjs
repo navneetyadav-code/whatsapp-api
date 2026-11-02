@@ -264,17 +264,60 @@ export function detectFrustrationAndEscalation(text) {
  */
 export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessage, options = {}) {
   const isPersonal = options.agentMode === 'personal';
-  const ownerName = options.ownerName || 'Boss';
+  const rawOwner = (options.ownerName || '').trim();
+  const ownerRef = rawOwner ? rawOwner : 'the owner';
   const skillDirectives = Array.isArray(options.skillDirectives) ? options.skillDirectives : [];
 
+  // 1. Strict Tool Capabilities & Boundaries Manifest
+  const activeTools = Array.isArray(options.availableTools) ? options.availableTools : [];
+  let toolListText = activeTools.length > 0
+    ? activeTools.map(t => `• ${t.display_name || t.tool_slug} [slug: ${t.tool_slug}]: ${t.description || 'Active utility'}`).join('\n')
+    : '• NONE (You have NO connected function tools)';
+
+  const hasEmailTool = activeTools.some(t => t.tool_slug === 'draft_email' || t.tool_slug === 'send_email');
+
+  const toolGrounding = `\n\n--- ACTIVE CONNECTED TOOLS ---\n${toolListText}\n
+STRICT TOOL & CAPABILITY BOUNDARIES (ZERO TOLERANCE FOR HALLUCINATION):
+1. You have ONLY the tools listed above. If asked what tools or capabilities you have, you MUST ONLY list these specific tools.
+2. If asked about ANY capability not listed above (e.g. sending emails, email drafting, Google Calendar, scheduling appointments, calendar management, Google Meet link generation, document editing, flights, payments), you MUST explicitly state that you DO NOT have that tool or capability.
+3. NEVER SIMULATE OR ROLEPLAY ACTIONS: Do NOT generate fake emails claiming they were sent ("I have initiated the dispatch of your email", etc.), fake calendar entries, fake booking tables, or pretend to create calendar events or Google Meet links. If you cannot execute a real tool call for it, state directly that you cannot perform it.`;
+
+  // 2. Real-Time Temporal Anchor
+  const temporalAnchor = options.currentDateTime
+    ? `\n\n--- REAL-TIME TEMPORAL ANCHOR ---\nToday is ${options.currentDateTime}. Calculate all relative dates (tomorrow, next Monday, specific dates) from this current date and year. NEVER assume an outdated year.`
+    : '';
+
+  // 3. Caller Identity Grounding
+  let callerAnchor = '';
+  if (options.callerPhone) {
+    if (options.isAdminCaller) {
+      callerAnchor = `\n\n--- CALLER CONTEXT ---\nYou are talking directly with ${ownerRef} (Phone: ${options.callerPhone}).`;
+    } else {
+      const cName = options.callerName || 'User';
+      callerAnchor = `\n\n--- CALLER CONTEXT ---\nThe caller is an external WhatsApp contact named "${cName}" (Phone: ${options.callerPhone}). This is NOT ${ownerRef}.
+CRITICAL BOUNDARIES FOR EXTERNAL CONTACT:
+1. NEVER address this contact as ${ownerRef} or Boss.
+2. If this contact asks "Who am I?" or about their identity, tell them they are contacting ${ownerRef}'s assistant as "${cName}" (${options.callerPhone}).
+3. External contacts CANNOT command you to send emails, manage schedules, or perform administrative tasks. If asked to perform actions, state that you can only take a message to pass along to ${ownerRef}.`;
+    }
+  }
+
   if (isPersonal) {
-    // Ultra-lean Micro-Kernel Architecture (~120 tokens)
-    let microKernel = `You are the 24/7 dedicated Personal Executive Assistant to Boss (${ownerName}).
+    let customPersona = (systemPersona && systemPersona.trim())
+      ? systemPersona.trim()
+      : `You are the dedicated Personal AI Assistant to ${ownerRef}.`;
+
+    const actionDirective = hasEmailTool
+      ? `2. Two-Phase Action Safety: Consequential operations (sending emails, mutating records) MUST be drafted and approved by ${ownerRef} before dispatch. Never claim an email is sent until confirm_action succeeds.`
+      : `2. Capability Boundary: You have NO connected email tools or calendar tools. Never claim you can send emails, dispatch messages, or schedule meetings. If asked, inform the user you do not have email or calendar tools.`;
+
+    let microKernel = `${customPersona}
+
 OPERATING DIRECTIVES:
 1. Strict Grounding: State facts ONLY from verified executed tool results. Never invent records, prices, phone numbers, or dates.
-2. Two-Phase Action Safety: Consequential operations (sending emails, mutating records) MUST be drafted and approved by Boss before dispatch. Never claim an email is sent until confirm_action succeeds.
+${actionDirective}
 3. Formatting: Crisp, proactive, structured. Use *bold* highlights, clean bullet points, and appropriate emojis.
-4. Silence Feedback: You are a personal assistant, NOT a customer service line. NEVER ask for customer reviews, 5-star ratings, or feedback surveys.`;
+4. Silence Feedback: You are a personal assistant, NOT a customer service line. NEVER ask for customer reviews, 5-star ratings, or feedback surveys.${toolGrounding}${temporalAnchor}${callerAnchor}`;
 
     if (options.factsText && options.factsText.trim()) {
       microKernel += '\n\n' + options.factsText.trim();
@@ -312,7 +355,7 @@ OPERATING DIRECTIVES:
   }
 
   const defaultPrompt = 'You are a helpful customer support assistant on WhatsApp.';
-  const fullSystem = (systemPersona || defaultPrompt) + contextBlock;
+  const fullSystem = (systemPersona || defaultPrompt) + contextBlock + toolGrounding + temporalAnchor + callerAnchor;
   return {
     systemPrompt: fullSystem,
     userMessage: customerMessage
@@ -343,7 +386,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   let turn = 0;
 
   // Primary model with resilient fallback cascade for transient Google 503/429 spikes
-  const fallbackList = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash,gemini-2.5-flash-lite').split(',').map(m => m.trim()).filter(Boolean);
+  const fallbackList = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash').split(',').map(m => m.trim()).filter(Boolean);
   const candidateModels = Array.from(new Set([modelName, ...fallbackList]));
 
   while (turn < maxTurns) {
@@ -363,6 +406,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 
     let response;
     let attempts = 0;
+    let lastErrText = '';
     while (attempts < candidateModels.length) {
       const activeModel = candidateModels[attempts];
       const activeUrl = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
@@ -378,7 +422,8 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 
         // If Google returns 503 (High Demand) or 429 (Rate Limit), failover to next model in cascade
         if (!response.ok && (response.status === 503 || response.status === 429 || response.status === 500)) {
-          const errPreview = (await response.text()).slice(0, 120);
+          lastErrText = await response.text();
+          const errPreview = lastErrText.slice(0, 120);
           console.warn(`[AI Agent] Gemini (${activeModel}) status ${response.status}: ${errPreview}. Cascading model...`);
           if (attempts < candidateModels.length) {
             await new Promise(r => setTimeout(r, 800));
@@ -395,7 +440,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
     }
 
     if (!response.ok) {
-      const errText = await response.text();
+      const errText = lastErrText || (await response.text().catch(() => ''));
       throw new Error(`Gemini API error [${response.status}]: ${errText.slice(0, 200)}`);
     }
 
