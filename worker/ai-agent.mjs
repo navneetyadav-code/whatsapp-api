@@ -274,21 +274,11 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
     ? activeTools.map(t => `• ${t.display_name || t.tool_slug} [slug: ${t.tool_slug}]: ${t.description || 'Active utility'}`).join('\n')
     : '• NONE (You have NO connected function tools)';
 
-  const directEmailTool = activeTools.find(t => (t.tool_slug.includes('email') || t.tool_slug.includes('mail') || t.tool_slug.includes('brevo')) && t.tool_slug !== 'draft_email');
-  const hasDraftEmailTool = activeTools.some(t => t.tool_slug === 'draft_email');
-  const hasEmailTool = Boolean(directEmailTool || hasDraftEmailTool);
-  const hasMemoryTool = activeTools.some(t => t.tool_slug === 'update_memory');
-
-  const memoryInstruction = hasMemoryTool
-    ? `4. MEMORY PERSISTENCE: When asked to remember, note, or save personal facts, contact numbers, or preferences, use the 'update_memory' tool to store them permanently into the database notebook.`
-    : `4. MEMORY PERSISTENCE: You do NOT have a persistent memory tool connected. Never claim you have permanently saved facts into a database notebook.`;
-
   const toolGrounding = `\n\n--- ACTIVE CONNECTED TOOLS ---\n${toolListText}\n
 STRICT TOOL & CAPABILITY BOUNDARIES (ZERO TOLERANCE FOR HALLUCINATION):
-1. You have ONLY the tools listed above. If asked what tools or capabilities you have, you MUST ONLY list these specific tools.
-2. If asked about ANY capability not listed above (e.g. sending emails, email drafting, Google Calendar, scheduling appointments, calendar management, Google Meet link generation, document editing, flights, payments), you MUST explicitly state that you DO NOT have that tool or capability.
-3. NEVER SIMULATE OR ROLEPLAY ACTIONS: Do NOT generate fake emails claiming they were sent ("I have initiated the dispatch of your email", etc.), fake calendar entries, fake booking tables, or pretend to create calendar events or Google Meet links. If you cannot execute a real tool call for it, state directly that you cannot perform it.
-${memoryInstruction}`;
+1. You have ONLY the active connected tools listed above. If asked what tools or capabilities you have, you MUST ONLY list these specific tools.
+2. If asked about ANY capability or external action not supported by the tools listed above, you MUST explicitly state that you DO NOT have that tool or capability.
+3. NEVER SIMULATE OR ROLEPLAY ACTIONS: Do NOT pretend to execute actions, send messages, dispatch emails, or mutate records without executing the real tool call. If you cannot execute a real tool call for it, state directly that you cannot perform it.`;
 
   // 2. Real-Time Temporal Anchor
   const temporalAnchor = options.currentDateTime
@@ -315,14 +305,9 @@ CRITICAL BOUNDARIES FOR EXTERNAL CONTACT:
       ? systemPersona.trim()
       : `You are the dedicated Personal AI Assistant to ${ownerRef}.`;
 
-    let actionDirective = '';
-    if (directEmailTool && !hasDraftEmailTool) {
-      actionDirective = `2. Direct Email Dispatch: You have a connected email tool '${directEmailTool.tool_slug}'. When ${ownerRef} instructs you to send an email, call '${directEmailTool.tool_slug}' directly with recipient email, name, subject, and content. Never pretend or roleplay sending without calling this tool.`;
-    } else if (hasDraftEmailTool) {
-      actionDirective = `2. Two-Phase Action Safety: Consequential operations (sending emails, mutating records) MUST be drafted and approved by ${ownerRef} before dispatch. Never claim an email is sent until confirm_action succeeds.`;
-    } else {
-      actionDirective = `2. Capability Boundary: You have NO connected email tools or calendar tools. Never claim you can send emails, dispatch messages, or schedule meetings. If asked, inform the user you do not have email or calendar tools.`;
-    }
+    const actionDirective = activeTools.length > 0
+      ? `2. Autonomous Tool Execution: Proactively execute your active connected tools whenever requested by ${ownerRef}, strictly conforming to each tool's argument schema. Never simulate execution in text.`
+      : `2. Capability Boundary: You currently have NO connected function tools. Never claim you can perform external actions, dispatch emails, or mutate records. If asked, inform ${ownerRef} that no tools are currently connected.`;
 
     let microKernel = `${customPersona}
 

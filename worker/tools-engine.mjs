@@ -988,38 +988,6 @@ export class UniversalToolsRegistry {
         is_active: Boolean(r.is_active)
       }));
 
-      // Universal System Core: Ensure update_memory is always available for ALL users
-      if (!loaded.some(t => t.tool_slug === 'update_memory')) {
-        loaded.push({
-          tool_slug: 'update_memory',
-          display_name: '🧠 Remember Persistent Fact',
-          category: 'builtin',
-          description: 'Permanently saves or updates a durable fact, profile attribute, key entity (e.g. contact email, phone, role, preference), or note into the Persistent Fact Notebook.',
-          parameters_schema: {
-            type: 'OBJECT',
-            required: ['key', 'value'],
-            properties: {
-              key: {
-                type: 'STRING',
-                description: 'Short identifier for the fact (e.g. "close_friend_navneet", "ankush_email", "office_hours", "preferred_tone")'
-              },
-              value: {
-                type: 'STRING',
-                description: 'The exact factual information to remember permanently.'
-              },
-              memory_type: {
-                type: 'STRING',
-                enum: ['fact', 'preference', 'entity', 'rule', 'profile'],
-                description: 'Category of memory (default: "fact")'
-              }
-            }
-          },
-          execution_config: { handler: 'update_memory' },
-          rbac_roles: ['admin', 'guest', 'customer'],
-          is_active: true
-        });
-      }
-
       return loaded;
     } catch (err) {
       console.error('[UniversalToolsRegistry] Failed to load tools from database:', err.message);
