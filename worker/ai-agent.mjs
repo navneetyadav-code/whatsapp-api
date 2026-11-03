@@ -274,7 +274,9 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
     ? activeTools.map(t => `• ${t.display_name || t.tool_slug} [slug: ${t.tool_slug}]: ${t.description || 'Active utility'}`).join('\n')
     : '• NONE (You have NO connected function tools)';
 
-  const hasEmailTool = activeTools.some(t => t.tool_slug === 'draft_email' || t.tool_slug === 'send_email');
+  const directEmailTool = activeTools.find(t => (t.tool_slug.includes('email') || t.tool_slug.includes('mail') || t.tool_slug.includes('brevo')) && t.tool_slug !== 'draft_email');
+  const hasDraftEmailTool = activeTools.some(t => t.tool_slug === 'draft_email');
+  const hasEmailTool = Boolean(directEmailTool || hasDraftEmailTool);
   const hasMemoryTool = activeTools.some(t => t.tool_slug === 'update_memory');
 
   const memoryInstruction = hasMemoryTool
@@ -313,9 +315,14 @@ CRITICAL BOUNDARIES FOR EXTERNAL CONTACT:
       ? systemPersona.trim()
       : `You are the dedicated Personal AI Assistant to ${ownerRef}.`;
 
-    const actionDirective = hasEmailTool
-      ? `2. Two-Phase Action Safety: Consequential operations (sending emails, mutating records) MUST be drafted and approved by ${ownerRef} before dispatch. Never claim an email is sent until confirm_action succeeds.`
-      : `2. Capability Boundary: You have NO connected email tools or calendar tools. Never claim you can send emails, dispatch messages, or schedule meetings. If asked, inform the user you do not have email or calendar tools.`;
+    let actionDirective = '';
+    if (directEmailTool && !hasDraftEmailTool) {
+      actionDirective = `2. Direct Email Dispatch: You have a connected email tool '${directEmailTool.tool_slug}'. When ${ownerRef} instructs you to send an email, call '${directEmailTool.tool_slug}' directly with recipient email, name, subject, and content. Never pretend or roleplay sending without calling this tool.`;
+    } else if (hasDraftEmailTool) {
+      actionDirective = `2. Two-Phase Action Safety: Consequential operations (sending emails, mutating records) MUST be drafted and approved by ${ownerRef} before dispatch. Never claim an email is sent until confirm_action succeeds.`;
+    } else {
+      actionDirective = `2. Capability Boundary: You have NO connected email tools or calendar tools. Never claim you can send emails, dispatch messages, or schedule meetings. If asked, inform the user you do not have email or calendar tools.`;
+    }
 
     let microKernel = `${customPersona}
 

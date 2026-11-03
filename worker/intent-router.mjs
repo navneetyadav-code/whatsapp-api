@@ -81,23 +81,22 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
   const activeToolSlugs = new Set();
   const skillDirectives = [];
 
-  // In Personal Assistant mode, all executive tools are available to Boss at all times
+  const installedSlugs = new Set(allTools.map(t => t.tool_slug));
+
+  // In Personal Assistant mode, all active tools configured for the user are available to Boss
   if (isPersonalMode) {
-    activeToolSlugs.add('get_current_time');
-    activeToolSlugs.add('update_memory');
-    activeToolSlugs.add('draft_email');
-    activeToolSlugs.add('confirm_action');
-    const crmTool = allTools.find(t => t.tool_slug === 'crm' || t.tool_slug === 'assistgroup_crm' || t.category === 'crm' || t.tool_slug.includes('crm'));
-    if (crmTool) activeToolSlugs.add(crmTool.tool_slug);
-    activeToolSlugs.add('web_search');
-    activeToolSlugs.add('evaluate_math');
+    for (const tool of allTools) {
+      if (tool.is_active !== 0 && tool.is_active !== false) {
+        activeToolSlugs.add(tool.tool_slug);
+      }
+    }
   }
 
-  // State-Aware Draft Injection: If there is an active pending draft in this conversation,
-  // ALWAYS keep confirm_action and draft_email in scope so the LLM can seamlessly confirm or revise!
-  if (context?.pendingDraft) {
+  // State-Aware Draft Injection: Only if there is an active pending draft in this conversation
+  // AND confirm_action tool is actually installed
+  if (context?.pendingDraft && installedSlugs.has('confirm_action')) {
     activeToolSlugs.add('confirm_action');
-    activeToolSlugs.add('draft_email');
+    if (installedSlugs.has('draft_email')) activeToolSlugs.add('draft_email');
     if (!intents.includes('email_confirm') && !intents.includes('email_cancel') && !intents.includes('email_draft')) {
       skillDirectives.push(
         `PENDING ACTION APPROVAL (${context.pendingDraft.draft_code}):\n` +
@@ -111,67 +110,86 @@ export function composeSkillsAndTools(intents, allTools = [], isPersonalMode = t
   for (const intent of intents) {
     switch (intent) {
       case 'weather':
-        activeToolSlugs.add('get_weather');
+        if (installedSlugs.has('get_weather')) activeToolSlugs.add('get_weather');
         break;
 
       case 'math':
-        activeToolSlugs.add('evaluate_math');
+        if (installedSlugs.has('evaluate_math')) activeToolSlugs.add('evaluate_math');
         break;
 
       case 'time':
-        activeToolSlugs.add('get_current_time');
+        if (installedSlugs.has('get_current_time')) activeToolSlugs.add('get_current_time');
         break;
 
       case 'web_search':
-        activeToolSlugs.add('web_search');
+        if (installedSlugs.has('web_search')) activeToolSlugs.add('web_search');
         break;
 
       case 'crm_read':
-      case 'crm_write':
+      case 'crm_write': {
         const crmTool = allTools.find(t => t.tool_slug === 'crm' || t.tool_slug === 'assistgroup_crm' || t.category === 'crm' || t.tool_slug.includes('crm'));
-    if (crmTool) activeToolSlugs.add(crmTool.tool_slug);
-        skillDirectives.push(
-          `CRM PROTOCOL:\n• Autonomously call ${crmTool ? crmTool.tool_slug : 'crm'} for platform metrics, user lookups, or inquiry records.\n• Summarize numbers clearly with bold labels.`
-        );
+        if (crmTool) {
+          activeToolSlugs.add(crmTool.tool_slug);
+          skillDirectives.push(
+            `CRM PROTOCOL:\n• Autonomously call ${crmTool.tool_slug} for platform metrics, user lookups, or inquiry records.\n• Summarize numbers clearly with bold labels.`
+          );
+        }
         break;
+      }
 
-      case 'email_draft':
-        activeToolSlugs.add('draft_email');
-        skillDirectives.push(
-          `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• Call draft_email with to, subject, body. Prompt: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim email is sent until confirm_action succeeds.\n• RECIPIENT RULES:\n  - If ${context.ownerName || 'Boss'} says "to me" or asks for a report, recipient MUST be: ${context.ownerEmail || process.env.SMTP_FROM || process.env.SMTP_USER || 'admin@example.com'}.\n  - Never invent synthetic domain emails.`
-        );
+      case 'email_draft': {
+        const directEmailTool = allTools.find(t => (t.tool_slug.includes('email') || t.tool_slug.includes('mail') || t.tool_slug.includes('brevo')) && t.tool_slug !== 'draft_email' && (t.is_active !== 0 && t.is_active !== false));
+        const hasDraftEmail = installedSlugs.has('draft_email');
+
+        if (directEmailTool) {
+          activeToolSlugs.add(directEmailTool.tool_slug);
+          skillDirectives.push(
+            `EMAIL DISPATCH DIRECTIVE:\n• Boss requested to send an email.\n• Autonomously call '${directEmailTool.tool_slug}' directly with arguments: { email, name, subject, htmlContent }.\n• Do NOT simulate or pretend to draft. Call '${directEmailTool.tool_slug}' to dispatch the real email immediately.\n• If Boss says "to me" or asks for a report to themselves, recipient email MUST be: ${context.ownerEmail || 'navneetyadav982008@gmail.com'}.`
+          );
+        } else if (hasDraftEmail) {
+          activeToolSlugs.add('draft_email');
+          skillDirectives.push(
+            `EMAIL DRAFTING PROTOCOL (TWO-PHASE SAFETY):\n• Call draft_email with to, subject, body. Prompt: "Reply *'Send'* or *'Yes'* to dispatch, or tell me what to edit."\n• NEVER claim email is sent until confirm_action succeeds.\n• RECIPIENT RULES:\n  - If ${context.ownerName || 'Boss'} says "to me" or asks for a report, recipient MUST be: ${context.ownerEmail || process.env.SMTP_FROM || process.env.SMTP_USER || 'admin@example.com'}.\n  - Never invent synthetic domain emails.`
+          );
+        }
         break;
+      }
 
       case 'email_confirm':
-        activeToolSlugs.add('confirm_action');
-        skillDirectives.push(
-          `EMAIL DISPATCH PROTOCOL:\n• Boss has confirmed the pending email draft.\n• Immediately call confirm_action with the draft_code to dispatch the email via SMTP.\n• Report the delivery confirmation upon success.`
-        );
+        if (installedSlugs.has('confirm_action')) {
+          activeToolSlugs.add('confirm_action');
+          skillDirectives.push(
+            `EMAIL DISPATCH PROTOCOL:\n• Boss has confirmed the pending email draft.\n• Immediately call confirm_action with the draft_code to dispatch the email via SMTP.\n• Report the delivery confirmation upon success.`
+          );
+        }
         break;
 
       case 'email_cancel':
-        activeToolSlugs.add('confirm_action');
-        skillDirectives.push(
-          `ACTION CANCELLATION PROTOCOL:\n• Boss requested to cancel/discard the pending draft.\n• Call confirm_action with action="cancel" to discard it safely.`
-        );
+        if (installedSlugs.has('confirm_action')) {
+          activeToolSlugs.add('confirm_action');
+          skillDirectives.push(
+            `ACTION CANCELLATION PROTOCOL:\n• Boss requested to cancel/discard the pending draft.\n• Call confirm_action with action="cancel" to discard it safely.`
+          );
+        }
         break;
 
       case 'memory':
-        activeToolSlugs.add('update_memory');
-        skillDirectives.push(
-          `PERSISTENT MEMORY PROTOCOL:\n• Boss requested to remember or note down a fact, preference, or contact details.\n• Autonomously call update_memory with key and value to store it permanently.`
-        );
+        if (installedSlugs.has('update_memory')) {
+          activeToolSlugs.add('update_memory');
+          skillDirectives.push(
+            `PERSISTENT MEMORY PROTOCOL:\n• Boss requested to remember or note down a fact, preference, or contact details.\n• Autonomously call update_memory with key and value to store it permanently.`
+          );
+        }
         break;
 
       case 'escalation':
-        activeToolSlugs.add('escalate_to_human');
+        if (installedSlugs.has('escalate_to_human')) {
+          activeToolSlugs.add('escalate_to_human');
+        }
         break;
 
       case 'general_assistant':
       default:
-        activeToolSlugs.add('web_search');
-        activeToolSlugs.add('evaluate_math');
-        activeToolSlugs.add('get_current_time');
         break;
     }
   }
