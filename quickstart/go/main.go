@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const defaultURL = "https://whatsapp-api-xepo.onrender.com/api/send.php"
+const defaultURL = "https://whatsgateway.onrender.com/api/send.php"
 
 // Client handles requests to the WhatsApp API Hub
 type Client struct {

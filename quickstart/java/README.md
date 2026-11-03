@@ -27,5 +27,5 @@ java SendWhatsApp 919876543210 "Transaction confirmed!"
 ## ⚙️ Environment Variables
 ```bash
 export WA_API_KEY="wa_live_YOUR_KEY"
-export WA_API_URL="https://whatsapp-api-xepo.onrender.com/api/send.php"
+export WA_API_URL="https://whatsgateway.onrender.com/api/send.php"
 ```

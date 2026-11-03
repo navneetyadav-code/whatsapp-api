@@ -27,7 +27,7 @@ use WhatsAppHub\WhatsAppClient;
 
 $client = new WhatsAppClient(
     'wa_live_YOUR_KEY_HERE',
-    'https://whatsapp-api-xepo.onrender.com/api/send.php' // Or local endpoint
+    'https://whatsgateway.onrender.com/api/send.php' // Or local endpoint
 );
 
 // 1. Send Standard Text Message
@@ -53,5 +53,5 @@ if ($ok) {
 ## ⚙️ Environment Variables
 ```bash
 export WA_API_KEY="wa_live_YOUR_KEY"
-export WA_API_URL="https://whatsapp-api-xepo.onrender.com/api/send.php"
+export WA_API_URL="https://whatsgateway.onrender.com/api/send.php"
 ```

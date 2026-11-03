@@ -346,7 +346,7 @@
                     </div>
                     
                     <div class="bg-slate-900 rounded-lg p-3 text-[11px] font-mono text-slate-200 overflow-x-auto leading-relaxed border border-slate-800">
-                        <pre id="quickstartCodeBox" class="text-slate-200"><code><span class="text-emerald-400">curl</span> -X POST "<?= e(base_url('api/send.php')) ?>" \
+                        <pre id="quickstartCodeBox" class="text-slate-200"><code><span class="text-emerald-400">curl</span> -X POST "<?= e(public_url('api/send.php')) ?>" \
   -H <span class="text-amber-300">"Content-Type: application/json"</span> \
   -H <span class="text-amber-300">"X-API-Key: wa_live_YOUR_API_KEY_HERE"</span> \
   -d <span class="text-sky-300">'{
@@ -900,7 +900,7 @@
             const codeBox = document.getElementById('quickstartCodeBox');
             const copyBtn = document.getElementById('copyQuickstartBtn');
             const copyLabel = document.getElementById('copyQuickstartLabel');
-            const sendEndpoint = '<?= e(base_url('api/send.php')) ?>';
+            const sendEndpoint = '<?= e(public_url('api/send.php')) ?>';
 
             const snippets = {
                 curl: {

@@ -10,7 +10,7 @@ namespace WhatsAppHub;
  */
 class WhatsAppClient
 {
-    public const DEFAULT_URL = 'https://whatsapp-api-xepo.onrender.com/api/send.php';
+    public const DEFAULT_URL = 'https://whatsgateway.onrender.com/api/send.php';
 
     private string $apiKey;
     private string $apiUrl;

@@ -31,7 +31,7 @@ except ImportError:
 class WhatsAppHubClient:
     """Professional client for WhatsApp API Gateway."""
 
-    DEFAULT_API_URL = "https://whatsapp-api-xepo.onrender.com/api/send.php"
+    DEFAULT_API_URL = "https://whatsgateway.onrender.com/api/send.php"
 
     def __init__(self, api_key: Optional[str] = None, api_url: Optional[str] = None):
         self.api_key = api_key or os.getenv("WA_API_KEY", "")

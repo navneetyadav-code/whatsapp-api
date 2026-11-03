@@ -17,7 +17,7 @@ declare(strict_types=1);
 $apiUrl = 'http://localhost/wa/public/api/send.php';
 
 // For Live Render Deployment (uncomment when running against live server):
-// $apiUrl = 'https://whatsapp-api-xepo.onrender.com/api/send.php';
+// $apiUrl = 'https://whatsgateway.onrender.com/api/send.php';
 
 // Your API Key from Dashboard -> API Keys
 $apiKey = 'wa_live_YOUR_ACTUAL_API_KEY_HERE';

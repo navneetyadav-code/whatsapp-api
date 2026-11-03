@@ -16,7 +16,7 @@ declare(strict_types=1);
 // DEFAULT CONFIGURATION
 // ==============================================================================
 $defaultApiKey = 'wa_live_YOUR_ACTUAL_API_KEY_HERE';
-$defaultApiUrl = 'https://whatsapp-api-xepo.onrender.com/api/send';
+$defaultApiUrl = 'https://whatsgateway.onrender.com/api/send';
 
 $responseResult = null;
 $error = null;
@@ -223,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div class="p-4 bg-slate-50 border-t border-slate-200 text-center text-xs text-slate-400">
-            Powered by <a href="https://whatsapp-api-xepo.onrender.com" target="_blank" class="font-semibold text-slate-600 hover:underline">WhatsApp API Hub</a> &bull; Baileys Engine
+            Powered by <a href="https://whatsgateway.onrender.com" target="_blank" class="font-semibold text-slate-600 hover:underline">WhatsApp API Hub</a> &bull; Baileys Engine
         </div>
 
     </div>

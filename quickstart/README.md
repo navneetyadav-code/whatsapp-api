@@ -22,7 +22,7 @@ If you just want to test sending a message immediately from your command line:
 
 ### 1. Standard Clean Format (Recommended)
 ```bash
-curl -X POST "https://whatsapp-api-xepo.onrender.com/api/send.php" \
+curl -X POST "https://whatsgateway.onrender.com/api/send.php" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: wa_live_YOUR_API_KEY" \
   -d '{
@@ -34,7 +34,7 @@ curl -X POST "https://whatsapp-api-xepo.onrender.com/api/send.php" \
 
 ### 2. Meta WhatsApp Cloud API Format (Drop-In)
 ```bash
-curl -X POST "https://whatsapp-api-xepo.onrender.com/api/send.php" \
+curl -X POST "https://whatsgateway.onrender.com/api/send.php" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer wa_live_YOUR_API_KEY" \
   -d '{

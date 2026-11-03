@@ -29,7 +29,7 @@ except ImportError:
     HAS_REQUESTS = False
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".whatsapp_cli.json")
-DEFAULT_CLOUD_URL = "https://whatsapp-api-xepo.onrender.com/api/send.php"
+DEFAULT_CLOUD_URL = "https://whatsgateway.onrender.com/api/send.php"
 DEFAULT_LOCAL_URL = "http://localhost/whatsapp-api/public/api/send.php"
 
 

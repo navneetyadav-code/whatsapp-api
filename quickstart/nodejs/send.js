@@ -14,7 +14,7 @@
 const readline = require('readline');
 
 class WhatsAppClient {
-  static DEFAULT_URL = 'https://whatsapp-api-xepo.onrender.com/api/send.php';
+  static DEFAULT_URL = 'https://whatsgateway.onrender.com/api/send.php';
 
   constructor(apiKey, apiUrl = WhatsAppClient.DEFAULT_URL) {
     this.apiKey = apiKey || process.env.WA_API_KEY || '';

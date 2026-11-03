@@ -3,9 +3,7 @@
         <div>
             <div class="flex items-center gap-2.5">
                 <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">API Keys</h1>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                    Bearer Auth v1
-                </span>
+
             </div>
             <p class="text-[13px] text-slate-500 mt-1 font-medium">Provision Bearer tokens, configure IP allowlists, and enforce burst rate limits for external integrations.</p>
         </div>
@@ -20,47 +18,6 @@
                 <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                 <span>Create API Key</span>
             </button>
-        </div>
-    </div>
-
-    <!-- Telemetry & Health Ribbon -->
-    <div class="bg-white rounded-xl border border-slate-200/80 shadow-subtle mb-6 overflow-hidden">
-        <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-            <div class="p-4 flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-semibold text-slate-500 tracking-tight flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Active Provisioned Keys
-                    </div>
-                    <div class="text-xl font-bold text-slate-900 font-mono tabular-nums tracking-tight mt-1"><?= $activeApiKeyCount ?> <span class="text-[13px] font-normal text-slate-400">/ <?= count($apiKeys) ?></span></div>
-                    <div class="text-[11px] text-slate-400 mt-0.5">SHA-256 hashed storage</div>
-                </div>
-                <div class="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-                </div>
-            </div>
-            
-            <div class="p-4 flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-semibold text-slate-500 tracking-tight">Baseline Rate Governance</div>
-                    <div class="text-xl font-bold text-slate-900 font-mono tabular-nums tracking-tight mt-1">20 - 300 <span class="text-[13px] font-normal text-slate-400">req / min</span></div>
-                    <div class="text-[11px] text-slate-400 mt-0.5">Leaky bucket burst protection</div>
-                </div>
-                <div class="w-9 h-9 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                </div>
-            </div>
-            
-            <div class="p-4 flex items-center justify-between">
-                <div>
-                    <div class="text-[11px] font-semibold text-slate-500 tracking-tight">Access Firewall Guard</div>
-                    <div class="text-xl font-bold text-slate-900 tracking-tight mt-1">IP & Anti-Ban</div>
-                    <div class="text-[11px] text-slate-400 mt-0.5">Per-key CIDR allowlists & humanizer</div>
-                </div>
-                <div class="w-9 h-9 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -94,8 +51,8 @@
                         </span>
                     </div>
                     <div class="relative flex items-center">
-                        <input id="newBearerToken" readonly value="<?= e($newCredentials['api_key']) ?>" class="block w-full pr-24 pl-3.5 py-2.5 text-[12px] border border-emerald-300/80 rounded-xl bg-white text-slate-900 font-mono shadow-subtle focus:outline-none focus:ring-2 focus:ring-emerald-500/20 select-all">
-                        <button type="button" onclick="copyTokenToClipboard('newBearerToken', this)" class="absolute right-1.5 px-3 py-1.5 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-all flex items-center gap-1.5 btn-tactile">
+                        <input id="newBearerToken" readonly value="<?= e($newCredentials['api_key']) ?>" onclick="copyTokenToClipboard('newBearerToken', document.getElementById('copyNewTokenBtn'))" class="block w-full pr-24 pl-3.5 py-2.5 text-[12px] border border-emerald-300/80 rounded-xl bg-white text-slate-900 font-mono shadow-subtle focus:outline-none focus:ring-2 focus:ring-emerald-500/20 select-all cursor-pointer hover:bg-emerald-50/40 transition-colors" title="Click to copy API Key">
+                        <button id="copyNewTokenBtn" type="button" onclick="copyTokenToClipboard('newBearerToken', this)" class="absolute right-1.5 px-3 py-1.5 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-all flex items-center gap-1.5 btn-tactile">
                             <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                             <span>Copy</span>
                         </button>
@@ -118,7 +75,7 @@
                         <span>Terminal Test Request:</span>
                         <button type="button" onclick="copySnippetText(this)" class="text-emerald-400 hover:text-emerald-300 font-sans text-[11px]">Copy cURL</button>
                     </div>
-                    <pre class="leading-relaxed select-all">curl -X POST <?= e(base_url('api/send')) ?> \
+                    <pre class="leading-relaxed select-all">curl -X POST "<?= e(public_url('api/send.php')) ?>" \
   -H "Authorization: Bearer <?= e($newCredentials['api_key']) ?>" \
   -H "Content-Type: application/json" \
   -d '{"to": "1234567890", "message": "Hello from API"}'</pre>
@@ -725,16 +682,23 @@
         // Quick Copy Helpers
         function copyTokenToClipboard(inputId, button) {
             const input = document.getElementById(inputId);
+            if (!input) return;
             input.select();
             navigator.clipboard.writeText(input.value).then(() => {
-                const originalHtml = button.innerHTML;
-                button.innerHTML = `
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                    <span class="text-emerald-700 font-bold">Copied!</span>
-                `;
-                setTimeout(() => {
-                    button.innerHTML = originalHtml;
-                }, 2000);
+                const targetBtn = button || document.getElementById('copyNewTokenBtn');
+                if (targetBtn) {
+                    const originalHtml = targetBtn.innerHTML;
+                    targetBtn.innerHTML = `
+                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                        <span class="text-emerald-700 font-bold">Copied!</span>
+                    `;
+                    setTimeout(() => {
+                        targetBtn.innerHTML = originalHtml;
+                    }, 2000);
+                }
+                if (typeof showToast === 'function') {
+                    showToast('API Key copied to clipboard!', 'success');
+                }
             });
         }
 

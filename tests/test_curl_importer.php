@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../src/lib/CurlImporter.php';
 
-$curl = 'curl -X POST "https://whatsapp-api-xepo.onrender.com/api/messages.php" \
+$curl = 'curl -X POST "https://whatsgateway.onrender.com/api/messages.php" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer wa_live_test123" \
   -d \'{

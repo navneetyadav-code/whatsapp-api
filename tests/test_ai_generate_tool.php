@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../src/bootstrap.php';
 require_once __DIR__ . '/../src/lib/CurlImporter.php';
 
-$rawCurl = 'curl -X POST "https://whatsapp-api-xepo.onrender.com/api/messages.php" \
+$rawCurl = 'curl -X POST "https://whatsgateway.onrender.com/api/messages.php" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer wa_live_dummy_token_123" \
   -d \'{

@@ -21,7 +21,7 @@ import java.util.Scanner;
  */
 public class SendWhatsApp {
 
-    private static final String DEFAULT_URL = "https://whatsapp-api-xepo.onrender.com/api/send.php";
+    private static final String DEFAULT_URL = "https://whatsgateway.onrender.com/api/send.php";
 
     public static void main(String[] args) {
         String apiKey = System.getenv("WA_API_KEY");

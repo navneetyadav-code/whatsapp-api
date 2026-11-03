@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://whatsapp-api-xepo.onrender.com" target="_blank" rel="noopener noreferrer">
+  <a href="https://whatsgateway.onrender.com" target="_blank" rel="noopener noreferrer">
     <img src="public/assets/logo_white.png" alt="WhatsGateway Logo" width="128" style="border-radius: 50%;">
   </a>
 </p>
@@ -26,13 +26,13 @@
   <a href="https://github.com/WhiskeySockets/Baileys"><img src="https://img.shields.io/badge/Engine-Baileys%20v7-25D366.svg?style=flat-square&logo=whatsapp&logoColor=white" alt="Baileys Engine"></a>
   <a href="https://www.mysql.com/"><img src="https://img.shields.io/badge/Database-MySQL%20%7C%20MariaDB%20%7C%20TiDB-4479A1.svg?style=flat-square&logo=mysql&logoColor=white" alt="Database"></a>
   <a href="Dockerfile"><img src="https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat-square&logo=docker&logoColor=white" alt="Docker Ready"></a>
-  <a href="https://whatsapp-api-xepo.onrender.com"><img src="https://img.shields.io/badge/Live%20Demo-Online-success?style=flat-square&logo=render" alt="Live Demo"></a>
+  <a href="https://whatsgateway.onrender.com"><img src="https://img.shields.io/badge/Live%20Demo-Online-success?style=flat-square&logo=render" alt="Live Demo"></a>
 </p>
 
 <p align="center">
   <a href="#quick-start"><b>🚀 Quick Start</b></a> •
   <a href="#api-quick-reference"><b>📖 API Reference</b></a> •
-  <a href="https://whatsapp-api-xepo.onrender.com" target="_blank"><b>⚡ Live Demo</b></a> •
+  <a href="https://whatsgateway.onrender.com" target="_blank"><b>⚡ Live Demo</b></a> •
   <a href="#system-architecture"><b>🏗️ Architecture</b></a> •
   <a href="#why-whatsgateway"><b>⚖️ Why WhatsGateway</b></a> •
   <a href="#client-sdks"><b>💻 SDKs</b></a> •

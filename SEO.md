@@ -10,7 +10,7 @@ The repository metadata has been configured with high-intent keywords:
 - **Description:**  
   `⚡ WhatsGateway: Free, self-hosted WhatsApp API & AI Agent Gateway. High-performance Twilio & Meta Cloud API alternative. Send unlimited messages, media, broadcasts, webhooks, and AI function-calling bot workflows powered by Baileys, Node.js & PHP.`
 - **Website URL:**  
-  `https://whatsapp-api-xepo.onrender.com`
+  `https://whatsgateway.onrender.com`
 - **Discussions:**  
   Enabled (`gh repo edit --enable-discussions`) to allow community Q&A, indexing user-generated keywords.
 

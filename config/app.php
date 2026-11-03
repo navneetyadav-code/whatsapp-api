@@ -96,7 +96,7 @@ return [
     'app' => [
         'env' => $appEnv,
         'name' => config_env('APP_NAME', 'WhatsGateway'),
-        'public_url' => rtrim((string) config_env('APP_PUBLIC_URL', $appEnv === 'production' ? '' : 'http://localhost/whatsapp-api/public'), '/'),
+        'public_url' => rtrim((string) (config_env('APP_PUBLIC_URL') ?: (config_env('APP_URL') ?: ($appEnv === 'production' ? '' : 'http://localhost/whatsapp-api/public'))), '/'),
         'base_path' => config_env('APP_BASE_PATH', $appEnv === 'production' ? '' : '/whatsapp-api/public'),
         'session_name' => config_env('APP_SESSION_NAME', 'whatsgateway_session'),
         'secure_cookies' => config_bool('APP_SECURE_COOKIES', $appEnv === 'production'),

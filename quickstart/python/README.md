@@ -25,7 +25,7 @@ from send import WhatsAppHubClient
 
 client = WhatsAppHubClient(
     api_key="wa_live_YOUR_KEY_HERE",
-    api_url="https://whatsapp-api-xepo.onrender.com/api/send.php"  # Or your local endpoint
+    api_url="https://whatsgateway.onrender.com/api/send.php"  # Or your local endpoint
 )
 
 # Send via Standard Format
@@ -46,9 +46,9 @@ You can export credentials so you don't need to pass them each time:
 ```bash
 # Windows PowerShell:
 $env:WA_API_KEY="wa_live_YOUR_KEY"
-$env:WA_API_URL="https://whatsapp-api-xepo.onrender.com/api/send.php"
+$env:WA_API_URL="https://whatsgateway.onrender.com/api/send.php"
 
 # Linux / Mac Bash:
 export WA_API_KEY="wa_live_YOUR_KEY"
-export WA_API_URL="https://whatsapp-api-xepo.onrender.com/api/send.php"
+export WA_API_URL="https://whatsgateway.onrender.com/api/send.php"
 ```

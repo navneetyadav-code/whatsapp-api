@@ -70,7 +70,7 @@ This guide provides full instructions for hosting the **WhatsApp API Gateway** 1
 | `DEFAULT_COUNTRY_CODE` | `91` | India (+91) |
 
 7. Click **Create Web Service**.
-8. Render will build the Docker image and start the container. When the deployment finishes, status will turn **Live** with a public URL like `https://whatsapp-api-xxxx.onrender.com`.
+8. Render will build the Docker image and start the container. When the deployment finishes, status will turn **Live** with a public URL like `https://whatsgateway.onrender.com`.
 
 ---
 
