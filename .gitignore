@@ -26,6 +26,12 @@ __pycache__/
 /test.php
 /public/test.php
 
+# Database Backups & Dumps
+storage/backups/*
+!storage/backups/.gitkeep
+*.sql.gz
+*.sql.bak
+
 # AI Training Datasets & Exports
 training/output/
 training/data/
