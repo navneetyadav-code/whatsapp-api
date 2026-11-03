@@ -372,10 +372,8 @@ ${actionDirective}
  * Call Google Gemini API with Autonomous Multi-Turn Function Calling Support
  */
 async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
-  let modelName = model || process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash';
-  if (!modelName || modelName.includes('3.5') || modelName.includes('3.8')) {
-    modelName = 'gemini-2.5-flash';
-  }
+  // Use the exact model chosen by the user without hardcoded overrides
+  const modelName = (model && String(model).trim()) || process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash';
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
   // Dynamically load active custom & built-in tools for this user from ai_custom_tools
@@ -394,8 +392,10 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   const maxTurns = 4; // Up to 3 autonomous tool turns + final synthesis
   let turn = 0;
 
-  // Primary model with resilient fallback cascade for transient Google 503/429 spikes
-  const fallbackList = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash,gemini-2.0-flash,gemini-1.5-flash').split(',').map(m => m.trim()).filter(Boolean);
+  // Strictly respect the user's choice; fallback models are only added if explicitly configured via GEMINI_FALLBACK_MODELS env
+  const fallbackList = process.env.GEMINI_FALLBACK_MODELS
+    ? process.env.GEMINI_FALLBACK_MODELS.split(',').map(m => m.trim()).filter(Boolean)
+    : [];
   const candidateModels = Array.from(new Set([modelName, ...fallbackList]));
 
   while (turn < maxTurns) {
