@@ -373,6 +373,9 @@ ${actionDirective}
  */
 async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
   let modelName = model || process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash';
+  if (!modelName || modelName.includes('3.5') || modelName.includes('3.8')) {
+    modelName = 'gemini-2.5-flash';
+  }
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
   // Dynamically load active custom & built-in tools for this user from ai_custom_tools
@@ -506,18 +509,33 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
       userTools = toolsContext.scopedTools || await UniversalToolsRegistry.loadUserTools(toolsContext.userId, toolsContext.db);
       const callerRole = toolsContext.callerRole || 'guest';
       const declarations = UniversalToolsRegistry.compileDeclarationsForRole(userTools, callerRole);
-      openAiTools = declarations.map(d => ({
-        type: 'function',
-        function: {
-          name: d.name,
-          description: d.description,
-          parameters: {
-            type: 'object',
-            properties: d.parameters?.properties || {},
-            required: d.parameters?.required || []
+      openAiTools = declarations.map(d => {
+        const cleanProps = {};
+        const rawProps = d.parameters?.properties || {};
+        for (const [pKey, pVal] of Object.entries(rawProps)) {
+          if (!pVal || typeof pVal !== 'object') continue;
+          const pType = (typeof pVal.type === 'string') ? pVal.type.toLowerCase() : 'string';
+          cleanProps[pKey] = {
+            type: ['string', 'number', 'integer', 'boolean', 'array', 'object'].includes(pType) ? pType : 'string',
+            description: pVal.description || pKey
+          };
+          if (Array.isArray(pVal.enum)) {
+            cleanProps[pKey].enum = pVal.enum;
           }
         }
-      }));
+        return {
+          type: 'function',
+          function: {
+            name: d.name,
+            description: d.description || d.name,
+            parameters: {
+              type: 'object',
+              properties: cleanProps,
+              required: Array.isArray(d.parameters?.required) ? d.parameters.required : []
+            }
+          }
+        };
+      });
     } catch (e) {
       console.error('[AI Agent] Failed to compile Groq tools:', e.message);
     }
