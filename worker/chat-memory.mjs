@@ -72,9 +72,9 @@ export class ChatMemoryEngine {
    * @param {string} currentMessage
    * @returns {Array<{ role: string, parts: Array<{ text: string }> }>}
    */
-  static buildGeminiContents(systemPrompt, historyTurns, currentMessage) {
+  static buildGeminiContents(systemPrompt, historyTurns, currentMessage, useNativeSystemInstruction = true) {
     const contents = [];
-    const systemPrefix = systemPrompt ? `[Instructions]\n${systemPrompt}\n\n` : '';
+    const systemPrefix = (!useNativeSystemInstruction && systemPrompt) ? `[Instructions]\n${systemPrompt}\n\n` : '';
 
     // Filter out currentMessage if it is already present as the last user turn in history
     let cleanTurns = Array.isArray(historyTurns) ? [...historyTurns] : [];
@@ -89,29 +89,51 @@ export class ChatMemoryEngine {
     if (cleanTurns.length === 0) {
       contents.push({
         role: 'user',
-        parts: [{ text: `${systemPrefix}[Customer Message]\n${currentMessage}` }]
+        parts: [{ text: systemPrefix ? `${systemPrefix}[Customer Message]\n${currentMessage}` : currentMessage }]
       });
       return contents;
     }
 
-    // Append history turns
+    // Append history turns with role alternation normalization
     for (let i = 0; i < cleanTurns.length; i++) {
       const turn = cleanTurns[i];
-      let turnText = turn.body;
+      let turnText = (turn.body || '').trim();
+      if (!turnText) continue;
+
       if (i === 0 && systemPrefix && turn.role === 'user') {
         turnText = `${systemPrefix}[Customer Message]\n${turnText}`;
       }
-      contents.push({
-        role: turn.role === 'model' ? 'model' : 'user',
-        parts: [{ text: turnText }]
+
+      const mappedRole = (turn.role === 'model' || turn.senderType === 'bot') ? 'model' : 'user';
+
+      // Ensure strict alternation in contents (merge consecutive turns of same role)
+      if (contents.length > 0 && contents[contents.length - 1].role === mappedRole) {
+        contents[contents.length - 1].parts[0].text += `\n${turnText}`;
+      } else {
+        contents.push({
+          role: mappedRole,
+          parts: [{ text: turnText }]
+        });
+      }
+    }
+
+    // Ensure contents list does not start with 'model' (Gemini API requirement)
+    if (contents.length > 0 && contents[0].role === 'model') {
+      contents.unshift({
+        role: 'user',
+        parts: [{ text: 'Hello' }]
       });
     }
 
-    // Append current message as the final user turn
-    contents.push({
-      role: 'user',
-      parts: [{ text: currentMessage }]
-    });
+    // Append current message as the final user turn (merge if previous turn was user)
+    if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+      contents[contents.length - 1].parts[0].text += `\n${currentMessage}`;
+    } else {
+      contents.push({
+        role: 'user',
+        parts: [{ text: currentMessage }]
+      });
+    }
 
     return contents;
   }

@@ -306,7 +306,10 @@ CRITICAL BOUNDARIES FOR EXTERNAL CONTACT:
       : `You are the dedicated Personal AI Assistant to ${ownerRef}.`;
 
     const actionDirective = activeTools.length > 0
-      ? `2. Autonomous Tool Execution: Proactively execute your active connected tools whenever requested by ${ownerRef}, strictly conforming to each tool's argument schema. Never simulate execution in text.`
+      ? `2. Autonomous Tool Execution: Proactively execute your active connected tools whenever requested by ${ownerRef}, strictly conforming to each tool's argument schema. Never simulate execution in text.
+3. Multi-Turn Coreference & Parameter Resolution: When ${ownerRef} instructs you to perform an action on previously drafted, discussed, or mentioned content (e.g., 'send this email', 'send it to xyz', 'forward this', 'use that number', 'bhej do'):
+   - Autonomously extract and synthesize all required arguments (such as subject, body/htmlContent, recipient name, phone, or dates) from the preceding conversation history.
+   - Execute the appropriate tool immediately in the same turn. NEVER ask ${ownerRef} to re-type, confirm, or re-provide information that already exists in recent conversation turns.`
       : `2. Capability Boundary: You currently have NO connected function tools. Never claim you can perform external actions, dispatch emails, or mutate records. If asked, inform ${ownerRef} that no tools are currently connected.`;
 
     let microKernel = `${customPersona}
@@ -400,9 +403,16 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
       }
     };
 
+    if (systemPrompt && systemPrompt.trim()) {
+      payload.systemInstruction = {
+        parts: [{ text: systemPrompt.trim() }]
+      };
+    }
+
     // Supply tools on turns < maxTurns; omit on final turn to guarantee text synthesis
     if (toolDeclarations.length > 0 && turn < maxTurns) {
       payload.tools = [{ functionDeclarations: toolDeclarations }];
+      payload.tool_config = { function_calling_config: { mode: 'AUTO' } };
     }
 
     let response;
