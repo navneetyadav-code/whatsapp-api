@@ -156,6 +156,7 @@ function create_user_records(PDO $pdo, string $name, string $email, string $phon
     $userId = (int) $pdo->lastInsertId();
     $pdo->prepare('INSERT INTO whatsapp_sessions (user_id) VALUES (?)')->execute([$userId]);
     $pdo->prepare('INSERT INTO webhooks (user_id) VALUES (?)')->execute([$userId]);
+    $pdo->prepare('INSERT IGNORE INTO ai_agent_settings (user_id, enabled, auto_reply_enabled, provider_priority, agent_mode, owner_name) VALUES (?, 1, 1, "gemini", "support", "Boss")')->execute([$userId]);
     return $userId;
 }
 

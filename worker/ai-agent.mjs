@@ -392,7 +392,7 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
   let turn = 0;
 
   // Primary model with resilient fallback cascade for transient Google 503/429 spikes
-  const fallbackList = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.8-flash').split(',').map(m => m.trim()).filter(Boolean);
+  const fallbackList = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-2.5-flash,gemini-2.0-flash,gemini-1.5-flash').split(',').map(m => m.trim()).filter(Boolean);
   const candidateModels = Array.from(new Set([modelName, ...fallbackList]));
 
   while (turn < maxTurns) {

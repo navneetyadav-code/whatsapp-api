@@ -88,29 +88,8 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
   // 2. Existing conversation exists: check if closed or active
   if (conv.status === 'closed') {
     const isWakeup = isWakeupTrigger(messagePreview);
-    if (!isWakeup) {
-      // Conversation is closed and user did NOT send /start or start.
-      // Keep conversation closed, DO NOT spawn a new session, DO NOT wake the chatbot!
-      await db.execute(
-        `UPDATE chat_conversations
-         SET contact_name = COALESCE(?, contact_name),
-             last_message = ?,
-             last_message_at = NOW(),
-             unread_count = unread_count + 1
-         WHERE id = ?`,
-        [senderName, messagePreview.slice(0, 200), conv.id]
-      );
-      return {
-        conversationId: conv.id,
-        sessionUuid: conv.session_uuid || generateSessionUuid(),
-        isNewSession: false,
-        status: 'closed',
-        botPaused: true,
-        wokeUp: false
-      };
-    }
-
-    // User explicitly sent /start or start to wake up the bot! Fresh session begins!
+    // Auto-reopen closed conversations on any incoming message with fresh session
+    // Only remain silent if human agent explicitly paused the bot (bot_paused = 1)
     sessionUuid = generateSessionUuid();
     isNewSession = true;
 
@@ -138,7 +117,7 @@ export async function resolveActiveSession(db, userId, senderPhone, senderName =
       isNewSession: true,
       status: 'open',
       botPaused: false,
-      wokeUp: true
+      wokeUp: isWakeup
     };
   }
 

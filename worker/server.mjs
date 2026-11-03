@@ -1505,36 +1505,82 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             }
           }
 
-          // Pre-fetch active AI agent settings to resolve persona mode & admin caller role
-          const [aiSettingsRows] = await db.execute(
-            'SELECT * FROM ai_agent_settings WHERE user_id = ? AND enabled = 1 AND auto_reply_enabled = 1 LIMIT 1',
-            [userId]
-          );
-          const aiSettings = aiSettingsRows && aiSettingsRows.length > 0 ? aiSettingsRows[0] : null;
-          if (aiSettings) {
-            try {
-              const [pKeys] = await db.execute(
-                'SELECT provider, api_key, model FROM ai_provider_keys WHERE user_id = ? AND is_active = 1 ORDER BY priority ASC, id ASC',
+          // Pre-fetch or auto-provision active AI agent settings to resolve persona mode & admin caller role
+          let aiSettings = null;
+          try {
+            const [aiSettingsRows] = await db.execute(
+              'SELECT * FROM ai_agent_settings WHERE user_id = ? LIMIT 1',
+              [userId]
+            );
+            if (aiSettingsRows && aiSettingsRows.length > 0) {
+              const row = aiSettingsRows[0];
+              if (Number(row.enabled ?? 1) === 1 && Number(row.auto_reply_enabled ?? 1) === 1) {
+                aiSettings = row;
+              }
+            } else {
+              // Auto-seed default ai_agent_settings row in DB for this user
+              await db.execute(
+                `INSERT INTO ai_agent_settings (user_id, enabled, auto_reply_enabled, provider_priority, agent_mode, owner_name)
+                 VALUES (?, 1, 1, 'gemini', 'support', 'Boss')
+                 ON DUPLICATE KEY UPDATE enabled = 1, auto_reply_enabled = 1`,
                 [userId]
               );
-              if (pKeys && pKeys.length > 0) {
-                for (const pk of pKeys) {
-                  const prov = (pk.provider || '').toLowerCase();
-                  if (prov === 'gemini' && !aiSettings.gemini_api_key && pk.api_key) {
-                    aiSettings.gemini_api_key = pk.api_key;
-                    if (pk.model) aiSettings.gemini_model = pk.model;
-                  } else if (prov === 'groq' && !aiSettings.groq_api_key && pk.api_key) {
-                    aiSettings.groq_api_key = pk.api_key;
-                    if (pk.model) aiSettings.groq_model = pk.model;
-                  } else if (prov === 'openrouter' && !aiSettings.openrouter_api_key && pk.api_key) {
-                    aiSettings.openrouter_api_key = pk.api_key;
-                    if (pk.model) aiSettings.openrouter_model = pk.model;
-                  }
+              const [newRows] = await db.execute('SELECT * FROM ai_agent_settings WHERE user_id = ? LIMIT 1', [userId]);
+              if (newRows && newRows.length > 0) {
+                aiSettings = newRows[0];
+              }
+            }
+          } catch (settErr) {
+            logger.warn({ err: settErr.message, userId }, '[Worker] Error checking ai_agent_settings, using fallback');
+          }
+
+          if (!aiSettings) {
+            aiSettings = {
+              user_id: userId,
+              enabled: 1,
+              auto_reply_enabled: 1,
+              provider_priority: 'gemini',
+              agent_mode: 'support',
+              owner_name: 'Boss',
+              temperature: 0.4,
+              max_tokens: 1200
+            };
+          }
+
+          // Fetch user-isolated keys from ai_provider_keys table
+          try {
+            const [pKeys] = await db.execute(
+              'SELECT provider, api_key, model FROM ai_provider_keys WHERE user_id = ? AND is_active = 1 ORDER BY priority ASC, id ASC',
+              [userId]
+            );
+            if (pKeys && pKeys.length > 0) {
+              for (const pk of pKeys) {
+                const prov = (pk.provider || '').toLowerCase();
+                if (prov === 'gemini' && !aiSettings.gemini_api_key && pk.api_key) {
+                  aiSettings.gemini_api_key = pk.api_key;
+                  if (pk.model) aiSettings.gemini_model = pk.model;
+                } else if (prov === 'groq' && !aiSettings.groq_api_key && pk.api_key) {
+                  aiSettings.groq_api_key = pk.api_key;
+                  if (pk.model) aiSettings.groq_model = pk.model;
+                } else if (prov === 'openrouter' && !aiSettings.openrouter_api_key && pk.api_key) {
+                  aiSettings.openrouter_api_key = pk.api_key;
+                  if (pk.model) aiSettings.openrouter_model = pk.model;
                 }
               }
-            } catch (kErr) {
-              logger.warn({ err: kErr.message }, '[Worker] Failed to query ai_provider_keys fallback');
             }
+          } catch (kErr) {
+            logger.warn({ err: kErr.message }, '[Worker] Failed to query ai_provider_keys fallback');
+          }
+
+          // Environment variable fallbacks (e.g. Render dashboard environment variables)
+          if (!aiSettings.gemini_api_key && process.env.GEMINI_API_KEY) {
+            aiSettings.gemini_api_key = process.env.GEMINI_API_KEY;
+          }
+          if (!aiSettings.groq_api_key && process.env.GROQ_API_KEY) {
+            aiSettings.groq_api_key = process.env.GROQ_API_KEY;
+          }
+          if (!aiSettings.openrouter_api_key && process.env.OPENROUTER_API_KEY) {
+            aiSettings.openrouter_api_key = process.env.OPENROUTER_API_KEY;
           }
           const isPersonalMode = aiSettings?.agent_mode === 'personal';
           const ownerName = aiSettings?.owner_name || 'Boss';

@@ -80,7 +80,9 @@ try {
         $keyId = (int) $pdo->lastInsertId();
     }
 
-    // Keep ai_agent_settings populated if currently blank
+    // Ensure ai_agent_settings exists and is enabled for this user
+    $pdo->prepare('INSERT INTO ai_agent_settings (user_id, enabled, auto_reply_enabled, provider_priority, agent_mode, owner_name) VALUES (?, 1, 1, "gemini", "support", "Boss") ON DUPLICATE KEY UPDATE enabled = 1, auto_reply_enabled = 1')->execute([$userId]);
+
     $activeKey = $finalKey ?? $apiKey;
     $activeModel = $finalModel ?? ($model ?: null);
     if ($provider === 'gemini') {
