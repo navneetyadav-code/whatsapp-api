@@ -590,8 +590,8 @@
             </button>
         </div>
 
-        <!-- Tabs -->
-        <div class="flex items-center gap-1.5 border-b border-slate-200/80 pb-2 mb-3">
+        <!-- Tabs & Dynamic AI Key Selector -->
+        <div class="flex items-center gap-1.5 border-b border-slate-200/80 pb-2 mb-3 flex-wrap">
             <button type="button" onclick="switchImporterTab('curl')" id="tabBtnCurl" class="importer-tab-btn px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-900 text-white shadow-2xs transition-all cursor-pointer">
                 cURL
             </button>
@@ -603,6 +603,14 @@
             </button>
             <button type="button" onclick="switchImporterTab('shared')" id="tabBtnShared" class="importer-tab-btn px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer">
                 Shared Hosting
+            </button>
+
+            <!-- Dynamic AI Key & Model Selector Trigger (loaded from /ai-credentials) -->
+            <button type="button" onclick="openImporterKeySelectorModal()" id="tabBtnKeySelect" class="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs transition-all cursor-pointer" title="Choose which AI Key & Model to use from AI Credentials">
+                <svg class="w-3.5 h-3.5 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                <span>AI Key:</span>
+                <span id="importerSelectedKeyLabel" class="font-bold truncate max-w-[130px]">Auto Cascade</span>
+                <svg class="w-3 h-3 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
         </div>
 
@@ -656,7 +664,14 @@
         </div>
 
         <!-- Action Row -->
-        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-end">
+        <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5 text-xs text-slate-500">
+                <span class="text-slate-400">Selected Engine:</span>
+                <button type="button" onclick="openImporterKeySelectorModal()" class="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-1 rounded-lg cursor-pointer transition-colors" title="Click to switch AI Key or Model">
+                    <span id="footerSelectedKeyText">⚡ Auto Cascade (Gemini → Groq → OpenRouter)</span>
+                    <svg class="w-3 h-3 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+            </div>
             <button type="button" id="btnAiGenerate" onclick="generateToolFromAI()" class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs active:scale-[0.98] transition-all cursor-pointer">
                 <span>Generate Tool Definition</span>
             </button>
@@ -718,6 +733,50 @@
                 </button>
                 <button type="button" onclick="saveGeneratedToolDirectly()" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-2xs cursor-pointer">
                     Save Tool
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================= -->
+<!-- AI KEY & MODEL SELECTOR MODAL (from /ai-credentials)      -->
+<!-- ========================================================= -->
+<div id="importerKeySelectorModal" class="fixed inset-0 z-[60] bg-slate-950/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden" onclick="if(event.target===this) closeImporterKeySelectorModal()" role="dialog" aria-modal="true" aria-labelledby="importerKeySelectorTitle">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[min(760px,calc(100vh-2rem))] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 border border-slate-200/90">
+        <!-- Header -->
+        <div class="flex items-start justify-between gap-4 px-5 py-4 sm:px-6 sm:py-5 border-b border-slate-200/80 shrink-0">
+            <div>
+                <h3 id="importerKeySelectorTitle" class="text-base font-bold tracking-tight text-slate-950 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    <span>Choose an AI connection</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+                    Choose which provider key &amp; model to synthesize this tool. Loaded dynamically from <a href="<?= e(base_url('ai-credentials')) ?>" target="_blank" class="text-indigo-600 underline font-medium">AI Credentials ↗</a>.
+                </p>
+            </div>
+            <button type="button" onclick="closeImporterKeySelectorModal()" class="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer" aria-label="Close">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <!-- Scrollable Key List -->
+        <div class="px-5 py-4 sm:px-6 space-y-3 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/50" id="importerKeyListContainer">
+            <!-- Rendered dynamically by JavaScript -->
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="px-5 py-3.5 sm:px-6 border-t border-slate-200/80 flex items-center justify-end shrink-0 gap-2 bg-white">
+            <a href="<?= e(base_url('ai-credentials')) ?>" target="_blank" rel="noopener" class="hidden sm:inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold mr-auto">
+                <span>Manage Keys in AI Credentials</span>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="closeImporterKeySelectorModal()" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" onclick="applyImporterKeySelection()" class="px-4 py-2 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 active:scale-[0.98] cursor-pointer">
+                    Use this connection
                 </button>
             </div>
         </div>
@@ -886,6 +945,14 @@
 
 <script>
     const appStorePresetsCatalog = <?= json_encode($appStorePresets ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+    const availableAiKeysCatalog = <?= json_encode($allAiKeysForModal ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+    const defaultAiProviderPriority = <?= json_encode($defaultProviderPriority ?? 'gemini') ?>;
+
+    let selectedAiKeyId = 'auto';
+    let selectedAiKeyLabel = 'Auto Cascade';
+    let tempSelectedAiKeyId = 'auto';
+    let importerKeySelectorPreviousFocus = null;
+
     let activeImporterTab = 'curl';
     let currentGeneratedTool = null;
     let currentFilterCategory = 'all';
@@ -1343,6 +1410,182 @@
         document.getElementById('aiImporterModal').classList.add('hidden');
     }
 
+    function openImporterKeySelectorModal() {
+        tempSelectedAiKeyId = selectedAiKeyId;
+        renderImporterKeyList();
+        const modal = document.getElementById('importerKeySelectorModal');
+        if (modal) {
+            importerKeySelectorPreviousFocus = document.activeElement;
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            modal.querySelector('button[aria-label]')?.focus();
+        }
+    }
+
+    function closeImporterKeySelectorModal() {
+        const modal = document.getElementById('importerKeySelectorModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            if (importerKeySelectorPreviousFocus && typeof importerKeySelectorPreviousFocus.focus === 'function') {
+                importerKeySelectorPreviousFocus.focus();
+            }
+            importerKeySelectorPreviousFocus = null;
+        }
+    }
+
+    function renderImporterKeyList() {
+        const container = document.getElementById('importerKeyListContainer');
+        if (!container) return;
+
+        let html = '';
+
+        // 1. Production Offline cURL Importer Option
+        const isOfflineChecked = (tempSelectedAiKeyId === 'offline');
+        html += `
+            <div class="p-3.5 rounded-xl border transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${isOfflineChecked ? 'border-emerald-500 bg-emerald-50/70 ring-1 ring-emerald-500/20' : 'border-slate-200 bg-white hover:border-emerald-300 hover:shadow-sm'}" onclick="onTempKeySelect('offline')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onTempKeySelect('offline')}" role="radio" aria-checked="${isOfflineChecked}" tabindex="0">
+                <div class="flex items-start gap-3.5">
+                    <input type="radio" name="importer_key_radio" value="offline" ${isOfflineChecked ? 'checked' : ''} onchange="onTempKeySelect('offline')" class="mt-1 w-4 h-4 text-emerald-600 focus:ring-emerald-500 cursor-pointer">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-sm font-bold text-slate-950 flex items-center gap-1.5">
+                                <span>⚡ Production Offline cURL Importer</span>
+                            </span>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider">Fast &amp; Offline</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                            Deterministic PHP engine (CurlImporter). Parses verbs, headers, auth tokens, parameters, and JSON payloads instantly with zero AI token usage.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 2. Auto Cascade Option
+        const isAutoChecked = (tempSelectedAiKeyId === 'auto' || !tempSelectedAiKeyId);
+        html += `
+            <div class="p-3.5 rounded-xl border transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${isAutoChecked ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-500/20' : 'border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm'}" onclick="onTempKeySelect('auto')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onTempKeySelect('auto')}" role="radio" aria-checked="${isAutoChecked}" tabindex="0">
+                <div class="flex items-start gap-3.5">
+                    <input type="radio" name="importer_key_radio" value="auto" ${isAutoChecked ? 'checked' : ''} onchange="onTempKeySelect('auto')" class="mt-1 w-4 h-4 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-sm font-bold text-slate-950 flex items-center gap-1.5">
+                                <span>🤖 Auto Cascade (AI Copilot)</span>
+                            </span>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700 uppercase tracking-wider">Recommended</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                            Automatically routes prompts and docs through your highest-priority keys from AI Credentials (Gemini → Groq → OpenRouter) with failover.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 3. Render each configured key (using key label & saved model from AI Credentials)
+        if (availableAiKeysCatalog && availableAiKeysCatalog.length > 0) {
+            html += `<div class="flex items-center justify-between pt-3 pb-1"><span class="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">API Keys from AI Credentials</span><span class="text-[10px] text-slate-400">${availableAiKeysCatalog.length} configured</span></div>`;
+
+            availableAiKeysCatalog.forEach(k => {
+                const isChecked = (String(tempSelectedAiKeyId) === String(k.id));
+                const prov = (k.provider || 'gemini').toLowerCase();
+                let provBadge = 'bg-slate-100 text-slate-700 border-slate-200';
+                let provTitle = 'AI Provider';
+
+                if (prov === 'gemini') {
+                    provBadge = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                    provTitle = 'Google Gemini';
+                } else if (prov === 'groq') {
+                    provBadge = 'bg-amber-50 text-amber-800 border-amber-200';
+                    provTitle = 'Groq';
+                } else if (prov === 'openrouter') {
+                    provBadge = 'bg-purple-50 text-purple-700 border-purple-200';
+                    provTitle = 'OpenRouter';
+                }
+
+                const statusHtml = (Number(k.is_active) === 0)
+                    ? `<span class="text-slate-400 text-[10px] font-medium">Paused</span>`
+                    : (k.status === 'error'
+                        ? `<span class="text-rose-600 text-[10px] font-medium">● Error</span>`
+                        : `<span class="text-emerald-600 text-[10px] font-medium">● Active</span>`);
+
+                html += `
+                    <div class="p-3.5 rounded-xl border transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${isChecked ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-500/20' : 'border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm'}" onclick="onTempKeySelect('${escapeHtml(String(k.id))}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onTempKeySelect('${escapeHtml(String(k.id))}')}" role="radio" aria-checked="${isChecked}" tabindex="0">
+                        <div class="flex items-start gap-3.5">
+                            <input type="radio" name="importer_key_radio" value="${escapeHtml(String(k.id))}" ${isChecked ? 'checked' : ''} onchange="onTempKeySelect('${escapeHtml(String(k.id))}')" class="mt-0.5 w-4 h-4 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between gap-1 flex-wrap">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border ${provBadge}">
+                                            ${escapeHtml(provTitle)}
+                                        </span>
+                                        <span class="text-sm font-bold text-slate-950 truncate" title="${escapeHtml(k.label || '')}">
+                                            ${escapeHtml(k.label || 'API Key')}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[10px]">
+                                        <span class="text-slate-400 font-mono">#${escapeHtml(String(k.priority || 1))}</span>
+                                        ${statusHtml}
+                                    </div>
+                                </div>
+                                ${k.model ? `<div class="mt-1 text-[11px] font-mono text-slate-500"><span class="text-slate-400">Model:</span> <span class="font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/80">${escapeHtml(k.model)}</span></div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            html += `
+                <div class="p-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center space-y-2">
+                    <p class="text-xs text-slate-600 font-medium">No custom AI keys configured in your account.</p>
+                    <p class="text-[11px] text-slate-500">Add Gemini, Groq, or OpenRouter keys in AI Credentials to use custom models.</p>
+                    <a href="<?= e(base_url('ai-credentials')) ?>" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors">
+                        <span>+ Configure Keys at /ai-credentials</span>
+                    </a>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+    }
+
+    function onTempKeySelect(id) {
+        tempSelectedAiKeyId = id;
+        renderImporterKeyList();
+    }
+
+    function handleKeyCardClick(id) {
+        onTempKeySelect(id);
+    }
+
+    function applyImporterKeySelection() {
+        selectedAiKeyId = tempSelectedAiKeyId;
+
+        const headerLabel = document.getElementById('importerSelectedKeyLabel');
+        const footerLabel = document.getElementById('footerSelectedKeyText');
+
+        if (selectedAiKeyId === 'offline') {
+            selectedAiKeyLabel = 'Offline cURL Parser';
+            if (headerLabel) headerLabel.textContent = 'Offline cURL';
+            if (footerLabel) footerLabel.textContent = '⚡ Offline cURL Engine (Deterministic / Zero AI Tokens)';
+        } else if (selectedAiKeyId === 'auto') {
+            selectedAiKeyLabel = 'Auto Cascade';
+            if (headerLabel) headerLabel.textContent = 'Auto Cascade';
+            if (footerLabel) footerLabel.textContent = '🤖 Auto Cascade (AI Multi-Key Failover)';
+        } else {
+            const keyObj = (availableAiKeysCatalog || []).find(k => String(k.id) === String(selectedAiKeyId));
+            const prov = keyObj ? (keyObj.provider || '').toUpperCase() : 'AI';
+            const label = keyObj ? (keyObj.label || 'Key') : 'Key #' + selectedAiKeyId;
+            const model = keyObj ? (keyObj.model || '') : '';
+
+            selectedAiKeyLabel = `${label}` + (model ? ` (${model})` : '');
+            if (headerLabel) headerLabel.textContent = label;
+            if (footerLabel) footerLabel.textContent = `🔑 ${prov}: ${label}` + (model ? ` (${model})` : '');
+        }
+
+        closeImporterKeySelectorModal();
+    }
+
     function switchImporterTab(tab) {
         activeImporterTab = tab;
         ['curl', 'prompt', 'docs', 'shared'].forEach(t => {
@@ -1417,13 +1660,23 @@
         loading.classList.remove('hidden');
         resultBox.classList.add('hidden');
         document.getElementById('importerTestBox').classList.add('hidden');
-        loadingText.textContent = 'Parsing & generating...';
+        if (selectedAiKeyId === 'offline') {
+            loadingText.textContent = 'Parsing via Offline cURL Engine...';
+        } else if (selectedAiKeyId !== 'auto') {
+            loadingText.textContent = 'Synthesizing with ' + selectedAiKeyLabel + '...';
+        } else {
+            loadingText.textContent = 'Parsing & synthesizing...';
+        }
 
         try {
             const res = await fetch('<?= e(base_url('api/tools/ai-generate-tool.php')) ?>', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ raw_content: rawContent, input_type: inputType }),
+                body: JSON.stringify({
+                    raw_content: rawContent,
+                    input_type: inputType,
+                    selected_key_id: selectedAiKeyId
+                }),
                 credentials: 'same-origin'
             });
 
