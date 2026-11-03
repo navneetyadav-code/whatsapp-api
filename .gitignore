@@ -38,6 +38,9 @@ tidb_ai_trainer.php
 training/*tidb*
 .env.tidb
 .env.production
+AI-Prod Traning/
+AI-Prod-Training/
+ai-prod-training/
 
 # AI Training Datasets & Exports
 training/output/
