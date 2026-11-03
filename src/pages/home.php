@@ -14,6 +14,7 @@ $seoDesc = 'Production-grade, self-hosted WhatsApp API gateway powered by Bailey
     <title><?= e($seoTitle) ?></title>
     <meta name="description" content="<?= e($seoDesc) ?>">
     <link rel="canonical" href="<?= e(public_url('')) ?>">
+    <meta name="google-site-verification" content="P3hy5jAa7_Pr1e297_44DkPwCZ19osoAm7jTmSAnQIo" />
     
     <!-- Favicon Suite -->
     <link rel="icon" type="image/png" sizes="32x32" href="<?= e(base_url('assets/favicon-32x32.png')) ?>">
