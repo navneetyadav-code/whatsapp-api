@@ -23,6 +23,9 @@ __pycache__/
 
 /.archify/
 /scratch/
+/.agent/
+/.agents/
+/rules/
 /test.php
 /public/test.php
 
