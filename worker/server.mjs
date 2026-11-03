@@ -1775,13 +1775,17 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                           const activeSessionUuid = freshConv[0].session_uuid;
 
-                          // Step B: Retrieve recent multi-turn conversation memory (enforces 45-min rolling TTL decay)
-                          const historyTurns = await ChatMemoryEngine.getRecentTurns(db, conv.id, activeSessionUuid, 6, 45);
-
-                          // Step C: Check for query resolution / customer satisfaction
-                          // In Personal Assistant mode, customer feedback surveys and auto-closing are completely disabled!
                           const isPersonalMode = aiSettings.agent_mode === 'personal';
                           const feedbackAllowed = !isPersonalMode && Number(aiSettings.feedback_enabled ?? 1) === 1;
+
+                          // Step B: Retrieve recent multi-turn conversation memory
+                          const historyTurns = await ChatMemoryEngine.getRecentTurns(
+                            db,
+                            conv.id,
+                            activeSessionUuid,
+                            16,
+                            isPersonalMode ? null : 180
+                          );
 
                           if (!isPersonalMode && feedbackAllowed) {
                             const resolutionCheck = ChatResolutionEngine.detectResolution(consolidatedText, historyTurns);
@@ -1876,7 +1880,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                             );
 
                             let callerRole = 'guest';
-                            if (isAdminCaller) {
+                            if (isAdminCaller || isPersonalMode) {
                               callerRole = 'admin';
                             } else {
                               const [custRows] = await db.execute(

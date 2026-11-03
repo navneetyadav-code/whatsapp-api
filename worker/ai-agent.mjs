@@ -373,7 +373,7 @@ ${actionDirective}
  */
 async function callGemini(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
   // Use the exact model chosen by the user without hardcoded overrides
-  const modelName = (model && String(model).trim()) || process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash';
+  const modelName = (model && String(model).trim()) || process.env.DEFAULT_GEMINI_MODEL || 'gemini-3.5-flash';
   const contents = ChatMemoryEngine.buildGeminiContents(systemPrompt, conversationHistory, userMessage);
 
   // Dynamically load active custom & built-in tools for this user from ai_custom_tools
@@ -465,12 +465,17 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
         const fnName = call.functionCall.name;
         const fnArgs = call.functionCall.args || {};
         const result = await UniversalToolsRegistry.executeTool(fnName, fnArgs, userTools, toolsContext);
-        functionResponseParts.push({
+        const structuredResponse = (typeof result === 'object' && result !== null) ? result : { result: String(result ?? '') };
+        const respPart = {
           functionResponse: {
             name: fnName,
-            response: result
+            response: structuredResponse
           }
-        });
+        };
+        if (call.functionCall.id || call.id) {
+          respPart.functionResponse.id = call.functionCall.id || call.id;
+        }
+        functionResponseParts.push(respPart);
       }
 
       contents.push(candidate.content);
@@ -495,6 +500,36 @@ async function callGemini(apiKey, model, systemPrompt, userMessage, temperature 
 /**
  * Call Groq API (OpenAI compatible with full Function Calling loop)
  */
+/**
+ * Recursively sanitizes JSON schema for Groq / OpenAI compatibility:
+ * - Lowercases schema types ('STRING' -> 'string', 'OBJECT' -> 'object')
+ * - Adds default items for arrays
+ * - Preserves nested properties, enums, descriptions, and required arrays
+ */
+function sanitizeJsonSchemaForOpenAi(schema) {
+  if (!schema || typeof schema !== 'object') {
+    return { type: 'object', properties: {} };
+  }
+  const clean = Array.isArray(schema) ? [] : {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (k === 'type' && typeof v === 'string') {
+      const lower = v.toLowerCase();
+      clean[k] = ['string', 'number', 'integer', 'boolean', 'array', 'object', 'null'].includes(lower) ? lower : 'string';
+    } else if (v && typeof v === 'object') {
+      clean[k] = sanitizeJsonSchemaForOpenAi(v);
+    } else {
+      clean[k] = v;
+    }
+  }
+  if (clean.type === 'array' && !clean.items) {
+    clean.items = { type: 'string' };
+  }
+  if (clean.type === 'object' && !clean.properties) {
+    clean.properties = {};
+  }
+  return clean;
+}
+
 async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 0.4, maxTokens = 500, conversationHistory = [], toolsContext = null) {
   const modelName = model || process.env.DEFAULT_GROQ_MODEL || 'openai/gpt-oss-120b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
@@ -513,12 +548,8 @@ async function callGroq(apiKey, model, systemPrompt, userMessage, temperature = 
         type: 'function',
         function: {
           name: d.name,
-          description: d.description,
-          parameters: {
-            type: 'object',
-            properties: d.parameters?.properties || {},
-            required: d.parameters?.required || []
-          }
+          description: d.description || d.name,
+          parameters: sanitizeJsonSchemaForOpenAi(d.parameters)
         }
       }));
     } catch (e) {

@@ -3,22 +3,20 @@
  * -----------------------------------------------
  * Retrieves, windows, and structures recent conversation dialogue turns
  * from the database to give the AI engine human-like conversational memory.
- * Supports rolling Time-To-Live (TTL) decay to avoid 24/7 memory bloat.
+ * Preserves multi-hour context continuity while avoiding prompt bloat.
  */
 
 export class ChatMemoryEngine {
   /**
    * Fetch recent dialogue turns for the active working session
-   * Enforces rolling Time-To-Live (TTL) inactivity decay: if silence exceeds ttlMinutes,
-   * working memory resets to a fresh slate to prevent 24/7 context pollution.
    * @param {Object} db - MySQL connection/pool
    * @param {number|string} conversationId
    * @param {string} [sessionUuid]
-   * @param {number} [maxTurns=6] - Max historical messages to include
-   * @param {number} [ttlMinutes=45] - Inactivity decay window in minutes (default 45)
-   * @returns {Promise<Array<{ senderType: string, body: string, role: string }>>}
+   * @param {number} [maxTurns=16] - Max historical messages to include
+   * @param {number|null} [ttlMinutes=null] - Inactivity decay window in minutes (null = disabled)
+   * @returns {Promise<Array<{ senderType: string, body: string, role: string, openAiRole: string }>>}
    */
-  static async getRecentTurns(db, conversationId, sessionUuid = null, maxTurns = 6, ttlMinutes = 45) {
+  static async getRecentTurns(db, conversationId, sessionUuid = null, maxTurns = 16, ttlMinutes = null) {
     if (!conversationId) return [];
 
     let query = `
@@ -32,7 +30,8 @@ export class ChatMemoryEngine {
     const params = [conversationId];
 
     if (sessionUuid) {
-      query += ' AND (session_uuid = ? OR session_uuid IS NULL)';
+      // Prioritize active session but retain recent historical continuity (up to 24h)
+      query += ' AND (session_uuid = ? OR session_uuid IS NULL OR created_at >= NOW() - INTERVAL 24 HOUR)';
       params.push(sessionUuid);
     }
 
@@ -42,7 +41,7 @@ export class ChatMemoryEngine {
     }
 
     query += ' ORDER BY id DESC LIMIT ?';
-    params.push(Math.max(2, Math.min(maxTurns, 20)));
+    params.push(Math.max(2, Math.min(Number(maxTurns) || 16, 30)));
 
     try {
       const [rows] = await db.execute(query, params);
@@ -67,7 +66,7 @@ export class ChatMemoryEngine {
   }
 
   /**
-   * Build Gemini-compatible contents array including history
+   * Build Gemini-compatible contents array including history with strict deduplication
    * @param {string} systemPrompt
    * @param {Array<{ role: string, body: string }>} historyTurns
    * @param {string} currentMessage
@@ -75,11 +74,19 @@ export class ChatMemoryEngine {
    */
   static buildGeminiContents(systemPrompt, historyTurns, currentMessage) {
     const contents = [];
-
-    // System instruction is prepended to the first turn or combined
     const systemPrefix = systemPrompt ? `[Instructions]\n${systemPrompt}\n\n` : '';
 
-    if (!historyTurns || historyTurns.length === 0) {
+    // Filter out currentMessage if it is already present as the last user turn in history
+    let cleanTurns = Array.isArray(historyTurns) ? [...historyTurns] : [];
+    if (cleanTurns.length > 0 && currentMessage) {
+      const last = cleanTurns[cleanTurns.length - 1];
+      if ((last.role === 'user' || last.senderType === 'contact') &&
+          last.body.trim().toLowerCase() === currentMessage.trim().toLowerCase()) {
+        cleanTurns.pop();
+      }
+    }
+
+    if (cleanTurns.length === 0) {
       contents.push({
         role: 'user',
         parts: [{ text: `${systemPrefix}[Customer Message]\n${currentMessage}` }]
@@ -88,8 +95,8 @@ export class ChatMemoryEngine {
     }
 
     // Append history turns
-    for (let i = 0; i < historyTurns.length; i++) {
-      const turn = historyTurns[i];
+    for (let i = 0; i < cleanTurns.length; i++) {
+      const turn = cleanTurns[i];
       let turnText = turn.body;
       if (i === 0 && systemPrefix && turn.role === 'user') {
         turnText = `${systemPrefix}[Customer Message]\n${turnText}`;
@@ -100,22 +107,17 @@ export class ChatMemoryEngine {
       });
     }
 
-    // Ensure the current message is the final user turn
-    const lastTurn = contents[contents.length - 1];
-    if (lastTurn && lastTurn.role === 'user') {
-      lastTurn.parts[0].text += `\n${currentMessage}`;
-    } else {
-      contents.push({
-        role: 'user',
-        parts: [{ text: currentMessage }]
-      });
-    }
+    // Append current message as the final user turn
+    contents.push({
+      role: 'user',
+      parts: [{ text: currentMessage }]
+    });
 
     return contents;
   }
 
   /**
-   * Build OpenAI / Groq compatible messages array including history
+   * Build OpenAI / Groq compatible messages array including history with strict deduplication
    * @param {string} systemPrompt
    * @param {Array<{ openAiRole: string, body: string }>} historyTurns
    * @param {string} currentMessage
@@ -128,8 +130,18 @@ export class ChatMemoryEngine {
       messages.push({ role: 'system', content: systemPrompt });
     }
 
-    if (historyTurns && historyTurns.length > 0) {
-      for (const turn of historyTurns) {
+    // Filter out currentMessage if it is already present as the last user turn in history
+    let cleanTurns = Array.isArray(historyTurns) ? [...historyTurns] : [];
+    if (cleanTurns.length > 0 && currentMessage) {
+      const last = cleanTurns[cleanTurns.length - 1];
+      if ((last.role === 'user' || last.openAiRole === 'user' || last.senderType === 'contact') &&
+          last.body.trim().toLowerCase() === currentMessage.trim().toLowerCase()) {
+        cleanTurns.pop();
+      }
+    }
+
+    if (cleanTurns.length > 0) {
+      for (const turn of cleanTurns) {
         messages.push({
           role: turn.openAiRole || (turn.senderType === 'contact' ? 'user' : 'assistant'),
           content: turn.body
