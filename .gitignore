@@ -32,6 +32,13 @@ storage/backups/*
 *.sql.gz
 *.sql.bak
 
+# TiDB Cloud Production AI Training & Private Credentials (Strictly Ignored)
+*tidb*
+tidb_ai_trainer.php
+training/*tidb*
+.env.tidb
+.env.production
+
 # AI Training Datasets & Exports
 training/output/
 training/data/
