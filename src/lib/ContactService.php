@@ -46,12 +46,29 @@ class ContactService
 
         $search = mb_substr(trim($search), 0, 100);
         if ($search !== '') {
-            $escaped = addcslashes($search, '%_\\');
-            $term = '%' . $escaped . '%';
-            $where[] = '(name LIKE ? OR phone LIKE ? OR notes LIKE ?)';
-            $params[] = $term;
-            $params[] = $term;
-            $params[] = $term;
+            $words = preg_split('/\s+/', $search, -1, PREG_SPLIT_NO_EMPTY);
+            foreach ($words as $word) {
+                $escaped = addcslashes($word, '%_\\');
+                $term = '%' . $escaped . '%';
+                $lowerTerm = '%' . mb_strtolower($escaped) . '%';
+
+                $digits = preg_replace('/\D/', '', $word);
+                $digitTerm = ($digits !== '' && strlen($digits) >= 3) ? '%' . $digits . '%' : null;
+
+                if ($digitTerm !== null) {
+                    $where[] = '(LOWER(name) LIKE ? OR phone LIKE ? OR normalized_phone LIKE ? OR LOWER(notes) LIKE ?)';
+                    $params[] = $lowerTerm;
+                    $params[] = $term;
+                    $params[] = $digitTerm;
+                    $params[] = $lowerTerm;
+                } else {
+                    $where[] = '(LOWER(name) LIKE ? OR phone LIKE ? OR normalized_phone LIKE ? OR LOWER(notes) LIKE ?)';
+                    $params[] = $lowerTerm;
+                    $params[] = $term;
+                    $params[] = $term;
+                    $params[] = $lowerTerm;
+                }
+            }
         }
 
         $whereSql = implode(' AND ', $where);
