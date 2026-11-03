@@ -961,6 +961,14 @@ async function executeWebhookTool(executionConfig, args = {}) {
 // 3. UNIVERSAL TOOLS REGISTRY & GEMINI SCHEMA GENERATOR
 // ---------------------------------------------------------------------------
 
+function formatActionPreview(tool, args) {
+  const name = tool.display_name || tool.tool_slug;
+  const entries = Object.entries(args || {}).filter(([k]) => k !== 'skipConfirmation');
+  if (entries.length === 0) return `${name}`;
+  const details = entries.map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).slice(0, 3).join(', ');
+  return `${name} (${details})`;
+}
+
 export class UniversalToolsRegistry {
   /**
    * Loads all active tools for a given user from ai_custom_tools table
@@ -970,7 +978,8 @@ export class UniversalToolsRegistry {
 
     try {
       const [rows] = await db.execute(
-        `SELECT tool_slug, display_name, category, description, parameters_schema, execution_config, rbac_roles, is_active
+        `SELECT tool_slug, display_name, category, description, parameters_schema, execution_config, rbac_roles, is_active,
+                requires_confirmation, confirmation_prompt, semantic_keywords, timeout_ms, max_retries
          FROM ai_custom_tools
          WHERE user_id = ? AND is_active = 1
          ORDER BY id ASC`,
@@ -985,7 +994,12 @@ export class UniversalToolsRegistry {
         parameters_schema: typeof r.parameters_schema === 'string' ? JSON.parse(r.parameters_schema) : (r.parameters_schema || {}),
         execution_config: typeof r.execution_config === 'string' ? JSON.parse(r.execution_config) : (r.execution_config || {}),
         rbac_roles: typeof r.rbac_roles === 'string' ? JSON.parse(r.rbac_roles) : (r.rbac_roles || ['admin']),
-        is_active: Boolean(r.is_active)
+        is_active: Boolean(r.is_active),
+        requires_confirmation: Boolean(r.requires_confirmation),
+        confirmation_prompt: r.confirmation_prompt || null,
+        semantic_keywords: r.semantic_keywords || '',
+        timeout_ms: Number(r.timeout_ms) || 5000,
+        max_retries: Number(r.max_retries) || 1
       }));
 
       return loaded;
@@ -1037,6 +1051,35 @@ export class UniversalToolsRegistry {
     const userId = context.userId || 1;
     const db = context.db;
 
+    // 0. Handle System Generic Action Confirmation Tools
+    if (toolName === 'confirm_pending_action') {
+      const actionCode = String(args?.action_code || '').trim();
+      if (!actionCode) return { error: 'Missing action_code to confirm.' };
+      const [rows] = await db.execute(
+        `SELECT * FROM ai_pending_actions 
+         WHERE user_id = ? AND action_code = ? AND status = 'pending' AND expires_at > NOW() 
+         LIMIT 1`,
+        [userId, actionCode]
+      );
+      if (!rows || rows.length === 0) {
+        return { error: `Pending action "${actionCode}" was not found, has already been executed, or has expired.` };
+      }
+      const pending = rows[0];
+      await db.execute('UPDATE ai_pending_actions SET status = "confirmed", updated_at = NOW() WHERE id = ?', [pending.id]);
+      const targetArgs = typeof pending.tool_arguments === 'string' ? JSON.parse(pending.tool_arguments) : (pending.tool_arguments || {});
+      return await UniversalToolsRegistry.executeTool(pending.tool_slug, targetArgs, tools, { ...context, skipConfirmation: true });
+    }
+
+    if (toolName === 'cancel_pending_action') {
+      const actionCode = String(args?.action_code || '').trim();
+      if (!actionCode) return { error: 'Missing action_code to cancel.' };
+      await db.execute(
+        'UPDATE ai_pending_actions SET status = "cancelled", updated_at = NOW() WHERE user_id = ? AND action_code = ? AND status = "pending"',
+        [userId, actionCode]
+      );
+      return { cancelled: true, message: `Action "${actionCode}" has been discarded safely.` };
+    }
+
     // 1. Locate tool in catalog
     const tool = tools.find(t => t.tool_slug === toolName);
 
@@ -1053,6 +1096,41 @@ export class UniversalToolsRegistry {
       };
       await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, deniedResponse, 0, 'denied');
       return deniedResponse;
+    }
+
+    // 3. Two-Phase Action Confirmation Interceptor:
+    // If the tool is configured to require user approval, stage into ai_pending_actions
+    if (tool.requires_confirmation && !context.skipConfirmation) {
+      const actionCode = `ACT-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+      const summary = formatActionPreview(tool, args);
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min expiry
+      try {
+        await db.execute(
+          `INSERT INTO ai_pending_actions 
+           (user_id, conversation_id, action_code, tool_slug, tool_arguments, preview_summary, status, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)`,
+          [
+            userId,
+            context.conversationId || 0,
+            actionCode,
+            tool.tool_slug,
+            JSON.stringify(args || {}),
+            summary,
+            expiresAt
+          ]
+        );
+        const stageResult = {
+          staged: true,
+          requires_confirmation: true,
+          action_code: actionCode,
+          summary,
+          prompt: tool.confirmation_prompt || `⚠️ This action requires your confirmation. Reply *"Confirm"* to execute, or *"Cancel"* to discard.`
+        };
+        await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, stageResult, Date.now() - startTime, 'staged');
+        return stageResult;
+      } catch (stageErr) {
+        console.error('[UniversalToolsRegistry] Action staging failed:', stageErr.message);
+      }
     }
 
     // 3. Execute according to category

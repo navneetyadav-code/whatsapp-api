@@ -1831,27 +1831,28 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           let replyText = null;
                           try {
                             // Check for active pending draft in this conversation (for 2-phase confirmation routing)
-                            let pendingDraft = null;
+                            let pendingAction = null;
                             try {
-                              const [draftRows] = await db.execute(
-                                `SELECT id, draft_code, action_type, recipient, subject, body_content, status
-                                 FROM ai_action_drafts
+                              const [actionRows] = await db.execute(
+                                `SELECT id, action_code, tool_slug, preview_summary, status
+                                 FROM ai_pending_actions
                                  WHERE user_id = ? AND conversation_id = ? AND status = 'pending' AND expires_at > NOW()
                                  ORDER BY id DESC LIMIT 1`,
                                 [userId, conv.id]
                               );
-                              if (draftRows && draftRows.length > 0) {
-                                pendingDraft = draftRows[0];
+                              if (actionRows && actionRows.length > 0) {
+                                pendingAction = actionRows[0];
                               }
-                            } catch (draftErr) {
-                              console.warn('[Server] Failed to query pending drafts:', draftErr.message);
+                            } catch (actionErr) {
+                              console.warn('[Server] Failed to query pending actions:', actionErr.message);
                             }
 
-                            // Hybrid Intent Routing & Dynamic Tool/Skill Composition
-                            const detectedIntents = await detectIntents(consolidatedText, { pendingDraft });
+                            // Dynamic Intent Routing & Adaptive Tool Composition
+                            const detectedIntents = await detectIntents(consolidatedText, { pendingAction });
                             const allUserTools = await UniversalToolsRegistry.loadUserTools(userId, db);
                             const { activeIntents, filteredTools, skillDirectives } = composeSkillsAndTools(detectedIntents, allUserTools, isPersonalMode, {
-                              pendingDraft,
+                              pendingAction,
+                              userMessage: consolidatedText,
                               ownerName: aiSettings.owner_name || '',
                               ownerEmail: aiSettings.owner_email || ''
                             });

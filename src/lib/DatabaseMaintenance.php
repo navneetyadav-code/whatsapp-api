@@ -36,6 +36,7 @@ final class DatabaseMaintenance
     public const CLEANED_TABLES = [
         'chat_messages'          => 'Live chat messages and conversation history',
         'chat_conversations'     => 'Live chat conversation sessions',
+        'ai_pending_actions'     => 'Pending two-phase action staging and confirmation queue',
         'chat_escalations'       => 'Live chat support escalations',
         'chat_feedback'          => 'Live chat satisfaction ratings and feedback',
         'inbound_messages'       => 'Received WhatsApp webhook messages',

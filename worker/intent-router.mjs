@@ -1,95 +1,171 @@
 /**
- * Tiered Hybrid Intent Router & Skill Composer
+ * Production Universal Dynamic Intent Router & Tool Composer
  * -------------------------------------------------------------
- * Combines 0ms Lexical/Regex Fast-Path with Multi-Label Capability Composition
- * and State-Aware Confirmation Detection for Two-Phase Execution.
+ * 100% Data-Driven, Zero Hardcoded Slugs, Zero Regex Dictionaries.
+ * 
+ * Features:
+ *  1. Adaptive Fast-Path: When active tools <= 15, passes all native declarations (0ms).
+ *  2. Semantic BM25 Ranker: When tools > 15, dynamically ranks and selects Top-K candidates.
+ *  3. Generic Two-Phase Action Protocol: Dynamic staging and confirmation of high-impact tools.
  */
 
-// 1. Core Lexical Pattern Matchers
-const INTENT_PATTERNS = {
-  weather: /\b(weather|temperature|forecast|barometer|climate|sunny|raining|rainfall)\b/i,
-  math: /\b(math|calculate|calculation|\d+[\+\-\*\/]\d+|percentage|square root|sum of)\b/i,
-  time: /\b(time|clock|ist|office hours|working hours|time now|current time)\b/i,
-  web_search: /\b(search|google|lookup|who is|what is the latest|news|find online|browse)\b/i,
-  crm_read: /\b(crm|metrics|inquir(y|ies)|lead(s)?|user(s)?|pricing plan(s)?|god mode|storage files|cloudinary|audit log(s)?)\b/i,
-  crm_write: /\b(update inquiry|change status|add inquiry|create inquiry|new lead)\b/i,
-  email_draft: /\b(draft|mail|email|compose|write (an? )?(email|mail)|send (an? )?(email|mail))\b/i,
-  email_confirm: /^(yes+|yeah|yep|ya|send( it)?|proceed|approve(d)?|bhej do|bhejdo|ha(an)? bhej do|confirm(ed)?|ok send|sure send|do it|okay send|ok|okay)\b/i,
-  email_cancel: /\b(cancel|discard|don't send|dont send|abort|stop|mat bhejo|ignore draft|no don't send)\b/i,
-  memory: /\b(remember|note down|save this|keep in mind|yad rakhna|yaad rakhna|note karo)\b/i,
-  escalation: /\b(human|manager|agent|support representative|escalate|talk to human)\b/i
-};
-
-const COMPOUND_CONJUNCTIONS = /\b(and|then|also|as well as|based on|what (i|we) emailed|that inquiry|along with)\b/i;
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'am', 'and', 'or', 'to', 'in', 'on', 'at', 'by',
+  'for', 'with', 'about', 'of', 'from', 'it', 'this', 'that', 'these', 'those', 'please', 'can',
+  'could', 'would', 'should', 'will', 'do', 'does', 'did', 'bhai', 'yrr', 'hai', 'ho', 'bhi', 'se', 'ko', 'ki', 'ka', 'ke'
+]);
 
 /**
- * Detects all active intents for an incoming message with State-Aware context
+ * Tokenize text into normalized searchable tokens
+ */
+export function tokenizeText(text) {
+  if (!text || typeof text !== 'string') return [];
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(t => t.length > 1 && !STOP_WORDS.has(t));
+}
+
+/**
+ * Compute lexical relevance score between user message tokens and tool metadata
+ */
+export function scoreToolRelevance(messageTokens, tool) {
+  if (!messageTokens || messageTokens.length === 0) return 0;
+
+  const searchableText = [
+    tool.display_name || '',
+    tool.tool_slug || '',
+    tool.description || '',
+    tool.semantic_keywords || ''
+  ].join(' ').toLowerCase();
+
+  const toolTokens = new Set(tokenizeText(searchableText));
+  if (toolTokens.size === 0) return 0;
+
+  let matches = 0;
+  for (const token of messageTokens) {
+    if (toolTokens.has(token)) {
+      matches += 1.5;
+    } else {
+      // Substring match for partial terms
+      for (const tToken of toolTokens) {
+        if (tToken.includes(token) || token.includes(tToken)) {
+          matches += 0.8;
+          break;
+        }
+      }
+    }
+  }
+
+  return matches / Math.sqrt(toolTokens.size + 1);
+}
+
+/**
+ * Detect general conversational intent
  */
 export async function detectIntents(text, context = {}) {
   const clean = (text || '').trim();
   if (!clean) return ['general_assistant'];
 
-  // Check if there is an active pending draft waiting for approval in this conversation
-  const hasPendingDraft = Boolean(context.pendingDraft);
-
-  // If Boss replies while a draft is pending, evaluate state-aware confirmation or revision
-  if (hasPendingDraft) {
-    if (INTENT_PATTERNS.email_cancel.test(clean)) {
-      return ['email_cancel'];
-    }
-    if (/\b(change|add|update|revise|edit|modify|instead of)\b/i.test(clean)) {
-      return ['email_draft'];
-    }
-    if (
-      INTENT_PATTERNS.email_confirm.test(clean) ||
-      /\b(send|dispatch|bhej|approve|confirm|proceed|go ahead|try again|resend|retry|send again|try to send|kardo|kar do)\b/i.test(clean)
-    ) {
-      return ['email_confirm'];
-    }
+  if (context.pendingAction) {
+    return ['action_confirmation'];
   }
 
-  // Tier 1: Fast-Path Evaluation
-  const matches = [];
-  for (const [intent, regex] of Object.entries(INTENT_PATTERNS)) {
-    if (regex.test(clean)) {
-      matches.push(intent);
-    }
-  }
-
-  const isCompound = COMPOUND_CONJUNCTIONS.test(clean);
-
-  // If simple, unambiguous single match without compound conjunctions -> Return immediately (0ms)
-  if (!isCompound && matches.length === 1) {
-    return matches;
-  }
-
-  // If multiple intents matched (e.g. crm_read + email_draft) -> Multi-Intent Composition
-  if (matches.length > 0) {
-    // Deduplicate and filter out conflict states
-    const unique = Array.from(new Set(matches));
-    return unique;
-  }
-
-  // Default fallback to general conversational assistant
-  return ['general_assistant'];
+  return ['tool_invocation'];
 }
 
 /**
- * Dynamic Skill & Tool Composer: Filters tools & injects micro-plugins on-demand
+ * System tool declaration for confirm_pending_action
  */
+export const SYSTEM_CONFIRM_TOOL = {
+  tool_slug: 'confirm_pending_action',
+  display_name: '✅ Confirm Pending Action',
+  category: 'system_action',
+  description: 'Confirms and executes a pending action that was staged and is awaiting user approval.',
+  parameters_schema: {
+    type: 'OBJECT',
+    required: ['action_code'],
+    properties: {
+      action_code: {
+        type: 'STRING',
+        description: 'The unique action code (e.g., ACT-3F2A81) of the pending action to execute.'
+      }
+    }
+  },
+  rbac_roles: ['admin', 'customer', 'guest'],
+  is_active: true
+};
+
 /**
- * Dynamic Skill & Tool Composer: Passes user-configured active tools dynamically.
- * Zero hardcoded tools, zero phantom tools, and zero hardcoded fallbacks.
+ * System tool declaration for cancel_pending_action
+ */
+export const SYSTEM_CANCEL_TOOL = {
+  tool_slug: 'cancel_pending_action',
+  display_name: '❌ Cancel Pending Action',
+  category: 'system_action',
+  description: 'Cancels and discards a pending action that was staged and is awaiting user approval.',
+  parameters_schema: {
+    type: 'OBJECT',
+    required: ['action_code'],
+    properties: {
+      action_code: {
+        type: 'STRING',
+        description: 'The unique action code (e.g., ACT-3F2A81) of the pending action to cancel.'
+      }
+    }
+  },
+  rbac_roles: ['admin', 'customer', 'guest'],
+  is_active: true
+};
+
+/**
+ * Dynamic Skill & Tool Composer:
+ * - Direct Fast-Path for <= 15 tools (0ms).
+ * - Semantic Ranking for > 15 tools.
+ * - Dynamic Pending Action State Injection.
  */
 export function composeSkillsAndTools(intents = [], allTools = [], isPersonalMode = true, context = {}) {
-  // Purely dynamic: load all active tools configured by the user from database
-  const filteredTools = Array.isArray(allTools)
+  const skillDirectives = [];
+  const activeTools = Array.isArray(allTools)
     ? allTools.filter(t => t && t.is_active !== 0 && t.is_active !== false)
     : [];
 
+  let candidateTools = activeTools;
+
+  // Semantic Ranking Fast-Path threshold
+  const MAX_DIRECT_TOOLS = 15;
+  if (activeTools.length > MAX_DIRECT_TOOLS && context.userMessage) {
+    const tokens = tokenizeText(context.userMessage);
+    const scored = activeTools.map(tool => ({
+      tool,
+      score: scoreToolRelevance(tokens, tool)
+    }));
+
+    // Sort descending by relevance score
+    scored.sort((a, b) => b.score - a.score);
+
+    // Pick top 6 or any tool with score > 0.5
+    candidateTools = scored
+      .filter((s, idx) => idx < 6 || s.score > 0.5)
+      .map(s => s.tool);
+  }
+
+  // Universal Two-Phase State Injection: If there is an active pending action awaiting approval
+  if (context?.pendingAction) {
+    const pa = context.pendingAction;
+    candidateTools = [SYSTEM_CONFIRM_TOOL, SYSTEM_CANCEL_TOOL, ...candidateTools];
+    skillDirectives.push(
+      `PENDING ACTION APPROVAL (${pa.action_code}):\n` +
+      `• A previous action is awaiting approval: "${pa.preview_summary}".\n` +
+      `• If approved (e.g. user says "yes", "confirm", "proceed", "send", "bhej do"), call confirm_pending_action with action_code="${pa.action_code}".\n` +
+      `• If cancelled (e.g. user says "no", "cancel", "stop", "mat bhejo"), call cancel_pending_action with action_code="${pa.action_code}".`
+    );
+  }
+
   return {
     activeIntents: intents || ['general_assistant'],
-    filteredTools,
-    skillDirectives: []
+    filteredTools: candidateTools,
+    skillDirectives
   };
 }
