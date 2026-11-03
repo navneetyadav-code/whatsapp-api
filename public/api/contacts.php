@@ -21,7 +21,7 @@ if ($method === 'POST') {
 // -------------------------------------------------------------------------
 // PII Security Enforcement: Strictly reject phone numbers in URL query strings
 // -------------------------------------------------------------------------
-if (isset($_GET['phone']) || isset($_GET['recipient'])) {
+if (isset($_GET['phone'])) {
     json_response([
         'ok' => false,
         'error' => 'Security & Privacy Violation: Raw phone numbers cannot be transmitted in URL query parameters to prevent access log leakage. Use synthetic contact "id" in URL, or provide "phone" in the encrypted JSON request body.',

@@ -172,30 +172,43 @@ class ContactService
             throw new InvalidArgumentException("Invalid phone number format: {$rawPhone}");
         }
 
-        $rawName = mb_substr(trim((string) ($data['name'] ?? 'Contact')), 0, 100);
-        if ($rawName === '') {
-            $rawName = 'Contact';
-        }
+        $nameProvided = array_key_exists('name', $data) && trim((string) $data['name']) !== '';
+        $rawName = $nameProvided ? mb_substr(trim((string) $data['name']), 0, 100) : 'Contact';
 
-        $notes = isset($data['notes']) ? mb_substr(trim((string) $data['notes']), 0, 500) : null;
-        $optIn = isset($data['opt_in'])
+        $notesProvided = array_key_exists('notes', $data);
+        $notes = $notesProvided ? (isset($data['notes']) ? mb_substr(trim((string) $data['notes']), 0, 500) : null) : null;
+
+        $optInProvided = array_key_exists('opt_in', $data);
+        $optIn = $optInProvided
             ? (filter_var($data['opt_in'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? (bool) $data['opt_in'] ? 1 : 0)
             : 1;
 
         $pdo = Database::pdo();
+
+        // Check if contact already exists (by raw phone OR normalized phone) to prevent duplicates and data loss
+        $existing = self::getByPhone($userId, $rawPhone);
+        if ($existing) {
+            $finalName = $nameProvided ? $rawName : (string) $existing['name'];
+            $finalNotes = $notesProvided ? $notes : $existing['notes'];
+            $finalOptIn = $optInProvided ? $optIn : (int) $existing['opt_in'];
+
+            $updateStmt = $pdo->prepare(
+                'UPDATE contacts 
+                 SET name = ?, phone = ?, normalized_phone = ?, opt_in = ?, notes = ? 
+                 WHERE id = ? AND user_id = ?'
+            );
+            $updateStmt->execute([$finalName, $rawPhone, $normalized, $finalOptIn, $finalNotes, (int) $existing['id'], $userId]);
+            return self::getById($userId, (int) $existing['id']) ?? [];
+        }
+
+        // New contact insertion
         $stmt = $pdo->prepare(
             'INSERT INTO contacts (user_id, name, phone, normalized_phone, opt_in, notes)
-             VALUES (?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE
-                name = VALUES(name),
-                normalized_phone = VALUES(normalized_phone),
-                opt_in = VALUES(opt_in),
-                notes = VALUES(notes)'
+             VALUES (?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([$userId, $rawName, $rawPhone, $normalized, $optIn, $notes]);
-
-        $contact = self::getByPhone($userId, $rawPhone);
-        return $contact ?? [];
+        $newId = (int) $pdo->lastInsertId();
+        return self::getById($userId, $newId) ?? [];
     }
 
     /**

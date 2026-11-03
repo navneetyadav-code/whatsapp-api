@@ -19,7 +19,7 @@ if ($method !== 'POST' && $method !== 'DELETE') {
 // -------------------------------------------------------------------------
 // PII Security Enforcement: Strictly reject phone numbers in query strings
 // -------------------------------------------------------------------------
-if (isset($_GET['phone']) || isset($_GET['recipient'])) {
+if (isset($_GET['phone'])) {
     json_response([
         'ok' => false,
         'error' => 'Security & Privacy Violation: Raw phone numbers cannot be transmitted in URL query parameters to prevent access log leakage. Transmit the phone number securely inside the encrypted JSON request body.',
