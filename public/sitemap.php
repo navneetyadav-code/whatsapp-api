@@ -6,9 +6,34 @@ require_once dirname(__DIR__) . '/src/bootstrap.php';
 
 $urls = [
     [
-        'loc' => public_url('index.php?page=docs'),
+        'loc' => public_url(''),
         'priority' => '1.0',
+        'changefreq' => 'daily',
+    ],
+    [
+        'loc' => public_url('docs'),
+        'priority' => '0.9',
         'changefreq' => 'weekly',
+    ],
+    [
+        'loc' => public_url('login'),
+        'priority' => '0.8',
+        'changefreq' => 'monthly',
+    ],
+    [
+        'loc' => public_url('register'),
+        'priority' => '0.7',
+        'changefreq' => 'monthly',
+    ],
+    [
+        'loc' => public_url('privacy'),
+        'priority' => '0.5',
+        'changefreq' => 'yearly',
+    ],
+    [
+        'loc' => public_url('terms'),
+        'priority' => '0.5',
+        'changefreq' => 'yearly',
     ],
 ];
 

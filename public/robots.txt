@@ -3,3 +3,5 @@ Allow: /
 Disallow: /api/
 Disallow: /session.php
 Disallow: /test-page.php
+
+Sitemap: https://whatsgateway.onrender.com/sitemap.xml

@@ -10,4 +10,4 @@ echo "Allow: /\n";
 echo "Disallow: /api/\n";
 echo "Disallow: /session.php\n";
 echo "Disallow: /test-page.php\n\n";
-echo 'Sitemap: ' . public_url('sitemap.php') . "\n";
+echo 'Sitemap: ' . public_url('sitemap.xml') . "\n";
