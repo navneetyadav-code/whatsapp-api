@@ -422,12 +422,20 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-600 mb-1">Auth Header (optional)</label>
-                            <input type="text" name="rest_auth_header" id="modalRestAuth" placeholder="Bearer token..." class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                            <input type="text" name="rest_auth_header" id="modalRestAuth" placeholder="Bearer token... or wa_live_..." class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
                         </div>
                         <div>
                             <label class="block text-[11px] font-semibold text-slate-600 mb-1">Response Path Filter (optional)</label>
                             <input type="text" name="rest_response_path" id="modalRestPath" placeholder="data or result.status" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
                         </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-[11px] font-semibold text-slate-600">Custom Headers (JSON)</label>
+                            <span class="text-[10px] text-slate-400">e.g. {"X-API-Key": "wa_live_...", "Accept": "application/json"}</span>
+                        </div>
+                        <textarea name="headers_json" id="modalHeadersJson" rows="2" placeholder='{"X-API-Key": "wa_live_..."}' class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg resize-y bg-white"></textarea>
                     </div>
 
                     <div>
@@ -1107,6 +1115,7 @@
         document.getElementById('modalDescription').value = '';
         document.getElementById('modalRestUrl').value = '';
         document.getElementById('modalRestAuth').value = '';
+        document.getElementById('modalHeadersJson').value = '';
         document.getElementById('modalRestPath').value = '';
         document.getElementById('modalRestBodyTemplate').value = '';
         document.getElementById('modalWebhookUrl').value = '';
@@ -1188,9 +1197,10 @@
         if (cat === 'rest_api') {
             document.getElementById('modalRestMethod').value = exec.method || 'GET';
             document.getElementById('modalRestUrl').value = exec.url || '';
-            document.getElementById('modalRestAuth').value = exec.headers?.Authorization || '';
+            document.getElementById('modalRestAuth').value = exec.headers?.Authorization || exec.headers?.['X-API-Key'] || exec.headers?.['x-api-key'] || '';
             document.getElementById('modalRestPath').value = exec.response_path || '';
             document.getElementById('modalRestBodyTemplate').value = exec.body_template ? (typeof exec.body_template === 'string' ? exec.body_template : JSON.stringify(exec.body_template, null, 2)) : '';
+            document.getElementById('modalHeadersJson').value = exec.headers ? JSON.stringify(exec.headers, null, 2) : '';
         } else if (cat === 'webhook') {
             document.getElementById('modalWebhookUrl').value = exec.target_url || '';
         } else if (cat === 'shared_env_api') {
@@ -1363,9 +1373,10 @@
         if (cat === 'rest_api') {
             document.getElementById('modalRestMethod').value = exec.method || 'GET';
             document.getElementById('modalRestUrl').value = exec.url || '';
-            document.getElementById('modalRestAuth').value = exec.headers?.Authorization || '';
+            document.getElementById('modalRestAuth').value = exec.headers?.Authorization || exec.headers?.['X-API-Key'] || exec.headers?.['x-api-key'] || '';
             document.getElementById('modalRestPath').value = exec.response_path || '';
             document.getElementById('modalRestBodyTemplate').value = exec.body_template ? (typeof exec.body_template === 'string' ? exec.body_template : JSON.stringify(exec.body_template, null, 2)) : '';
+            document.getElementById('modalHeadersJson').value = exec.headers ? JSON.stringify(exec.headers, null, 2) : '';
         } else if (cat === 'webhook') {
             document.getElementById('modalWebhookUrl').value = exec.target_url || '';
         } else if (cat === 'shared_env_api') {
@@ -1829,8 +1840,9 @@
         if (cat === 'rest_api') {
             document.getElementById('modalRestMethod').value = exec.method || 'GET';
             document.getElementById('modalRestUrl').value = exec.url || '';
-            document.getElementById('modalRestAuth').value = exec.headers?.Authorization || '';
+            document.getElementById('modalRestAuth').value = exec.headers?.Authorization || exec.headers?.['X-API-Key'] || exec.headers?.['x-api-key'] || '';
             document.getElementById('modalRestPath').value = exec.response_path || '';
+            document.getElementById('modalHeadersJson').value = exec.headers ? JSON.stringify(exec.headers, null, 2) : '';
             if (exec.body_template) {
                 document.getElementById('modalRestBodyTemplate').value = typeof exec.body_template === 'string'
                     ? exec.body_template
