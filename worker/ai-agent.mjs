@@ -275,10 +275,10 @@ export function buildPromptWithRag(systemPersona, retrievedChunks, customerMessa
     : '• NONE (You have NO connected function tools)';
 
   const toolGrounding = `\n\n--- ACTIVE CONNECTED TOOLS ---\n${toolListText}\n
-STRICT TOOL & CAPABILITY BOUNDARIES (ZERO TOLERANCE FOR HALLUCINATION):
-1. You have ONLY the active connected tools listed above. If asked what tools or capabilities you have, you MUST ONLY list these specific tools.
-2. If asked about ANY capability or external action not supported by the tools listed above, you MUST explicitly state that you DO NOT have that tool or capability.
-3. NEVER SIMULATE OR ROLEPLAY ACTIONS: Do NOT pretend to execute actions, send messages, dispatch emails, or mutate records without executing the real tool call. If you cannot execute a real tool call for it, state directly that you cannot perform it.`;
+CAPABILITY BOUNDARIES (ZERO HALLUCINATION):
+1. You have ONLY the active connected tools listed above. List only these if asked.
+2. If asked about any unsupported capability, state explicitly that you do not have that tool.
+3. NEVER simulate or roleplay actions: Execute real tool calls only. Never pretend an action was executed.`;
 
   // 2. Real-Time Temporal Anchor
   const temporalAnchor = options.currentDateTime
@@ -328,6 +328,11 @@ ${actionDirective}
       microKernel += '\n\n' + skillDirectives.join('\n\n');
     }
 
+    if (Array.isArray(options.trainingExamples) && options.trainingExamples.length > 0) {
+      const exBlocks = options.trainingExamples.map(e => `[User Directive]: ${e.user_prompt}\n[Assistant Action & Reply]: ${e.assistant_response}`).join('\n\n');
+      microKernel += `\n\n--- GOLDEN FEW-SHOT EXAMPLES ---\n${exBlocks}`;
+    }
+
     return {
       systemPrompt: microKernel,
       userMessage: customerMessage
@@ -356,7 +361,11 @@ ${actionDirective}
   }
 
   const defaultPrompt = 'You are a helpful customer support assistant on WhatsApp.';
-  const fullSystem = (systemPersona || defaultPrompt) + contextBlock + toolGrounding + temporalAnchor + callerAnchor;
+  let fullSystem = (systemPersona || defaultPrompt) + contextBlock + toolGrounding + temporalAnchor + callerAnchor;
+  if (Array.isArray(options.trainingExamples) && options.trainingExamples.length > 0) {
+    const exBlocks = options.trainingExamples.map(e => `[User]: ${e.user_prompt}\n[Assistant]: ${e.assistant_response}`).join('\n\n');
+    fullSystem += `\n\n--- GOLDEN FEW-SHOT EXAMPLES ---\n${exBlocks}`;
+  }
   return {
     systemPrompt: fullSystem,
     userMessage: customerMessage
