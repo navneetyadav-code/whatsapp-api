@@ -516,6 +516,18 @@ function normalizeRecipient(value) {
   return { jid: `${digits}@s.whatsapp.net`, normalizedTo: digits, isGroup: false };
 }
 
+function generateDeterministicMessageId(queueId) {
+  if (!queueId) {
+    return (typeof generateMessageID === 'function') ? generateMessageID() : `WG_${Date.now()}`;
+  }
+  if (process.env.WA_MESSAGE_ID_FORMAT === 'literal') {
+    return `WG_${queueId}`;
+  }
+  // WhatsApp Web standard 3EB0 prefix + deterministic hex hash derived from WG_<queueId>
+  const hash = crypto.createHash('sha256').update(`WG_${queueId}`).digest('hex').toUpperCase();
+  return '3EB0' + hash.substring(0, 18);
+}
+
 
 async function resolveJidToPhone(userId, jid, session = null) {
   if (!jid) return '';
@@ -2154,12 +2166,26 @@ async function cleanupExpiredLeases() {
          AND attempts >= max_attempts`
     );
 
+    // Expired leases that were in-flight with an assigned provider_message_id
+    // are rescheduled with a 15-second reconciliation window instead of being blindly resent
+    await db.execute(
+      `UPDATE message_queue
+       SET status = 'queued', locked_at = NULL, locked_by = NULL,
+           available_at = DATE_ADD(NOW(), INTERVAL 15 SECOND),
+           error_message = 'Worker lease expired while in-flight; marked as uncertain for reconciliation.'
+       WHERE status = 'processing'
+         AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         AND provider_message_id IS NOT NULL
+         AND attempts < max_attempts`
+    );
+
     const [expiredRows] = await db.execute(
       `UPDATE message_queue
        SET status = 'queued', locked_at = NULL, locked_by = NULL,
            error_message = COALESCE(error_message, 'Worker lease expired; message returned to the retry queue.')
        WHERE status = 'processing'
          AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         AND provider_message_id IS NULL
          AND attempts < max_attempts`
     );
     if (expiredRows.affectedRows > 0) {
@@ -2436,10 +2462,10 @@ async function sendQueuedMessage(message) {
   }
 
   // 2. Deterministic Message ID (Idempotency Key):
-  // Preserve existing provider_message_id across retries, or generate one before network write.
+  // Preserve existing provider_message_id across retries, or generate one deterministically from the queue ID.
   let clientMessageId = message.provider_message_id || currentQueueStatus[0]?.provider_message_id;
   if (!clientMessageId) {
-    clientMessageId = (typeof generateMessageID === 'function') ? generateMessageID() : `WG_${message.id}_${Date.now()}`;
+    clientMessageId = generateDeterministicMessageId(message.id);
     message.provider_message_id = clientMessageId;
     try {
       await db.execute(
