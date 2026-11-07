@@ -17,12 +17,12 @@ async function main() {
     db,
     userId: 1,
     conversationId: null,
-    callerPhone: '+919507286092', // Navneet's number (Admin role)
+    callerPhone: process.env.TEST_CALLER_PHONE || '+14155552671', // Test caller (Admin role)
     callerRole: 'admin',
     toolsConfig
   };
 
-  const systemPrompt = 'You are the intelligent WhatsApp AI Assistant for AssistGroup. Always use tools to answer questions precisely.';
+  const systemPrompt = 'You are the intelligent WhatsApp AI Assistant for our company. Always use tools to answer questions precisely.';
 
   // Test 1: Math calculation
   console.log('[E2E Test 1] Math calculation via evaluate_math:');
@@ -46,14 +46,14 @@ async function main() {
     console.log('  ✅ Current Time test PASS');
   }
 
-  // Test 3: AssistGroup Pricing & Packages
-  console.log('\n[E2E Test 3] AssistGroup Pricing via assistgroup_get_services_pricing:');
+  // Test 3: Services & Pricing Inquiry
+  console.log('\n[E2E Test 3] Services & Pricing Inquiry:');
   const pricingQuery = 'What web development packages and pricing plans do you offer?';
   console.log('  Customer:', pricingQuery);
   const pricingReply = await generateAiReply(aiSettings, systemPrompt, pricingQuery, [], context);
   console.log('  AI Reply:\n', pricingReply);
   if (pricingReply && pricingReply.length > 20) {
-    console.log('  ✅ AssistGroup Services & Pricing test PASS');
+    console.log('  ✅ Services & Pricing test PASS');
   }
 
   // Test 4: Web Search

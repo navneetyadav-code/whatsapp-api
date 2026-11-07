@@ -60,15 +60,15 @@ const ISO_TO_DIAL = {
 };
 
 function resolveDefaultCountryCode(val) {
-  const raw = String(val || '').trim().toLowerCase();
+  const raw = String(val || process.env.DEFAULT_COUNTRY_CODE || '').trim().toLowerCase();
   if (ISO_TO_DIAL[raw]) {
     return ISO_TO_DIAL[raw];
   }
   const digits = raw.replace(/\D/g, '');
-  return digits || '91';
+  return digits || (process.env.DEFAULT_COUNTRY_CODE ? String(process.env.DEFAULT_COUNTRY_CODE).replace(/\D/g, '') : '1');
 }
 
-const DEFAULT_COUNTRY_CODE = resolveDefaultCountryCode(process.env.DEFAULT_COUNTRY_CODE || '91');
+const DEFAULT_COUNTRY_CODE = resolveDefaultCountryCode(process.env.DEFAULT_COUNTRY_CODE || '1');
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
 const SEND_DELAY_MS = Number(process.env.SEND_DELAY_MS || 2500);
 const QUEUE_POLL_MS = Number(process.env.QUEUE_POLL_MS || 3000);
@@ -1862,7 +1862,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                             const userFacts = isPersonalMode ? await ChatFactMemory.loadUserFacts(db, userId, senderPhone, consolidatedText) : { factsText: '' };
                             const relevantTrainingExamples = await getRelevantTrainingExamples(db, userId, consolidatedText, 2);
                             const currentDateTime = new Date().toLocaleString('en-US', {
-                              timeZone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
+                              timeZone: process.env.APP_TIMEZONE || 'UTC',
                               dateStyle: 'full',
                               timeStyle: 'short'
                             });

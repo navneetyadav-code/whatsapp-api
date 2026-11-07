@@ -18,7 +18,7 @@ This guide provides full instructions for hosting the **WhatsApp API Gateway** 1
 ## Step 1: Database Setup on TiDB Cloud
 
 1. Log in to [TiDB Cloud](https://tidbcloud.com/).
-2. Open your cluster SQL Editor (e.g. `assistgroup`).
+2. Open your cluster SQL Editor (e.g. `whatsgateway`).
 3. Open `prod/schema_production.sql`.
 4. Copy the entire contents of `schema_production.sql`.
 5. Paste it into the TiDB Cloud SQL Editor.

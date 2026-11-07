@@ -224,7 +224,7 @@ export function evaluateSafeMath(expression) {
  */
 export function getCurrentCustomTime(config = {}, context = {}) {
   const isPersonalMode = context.agentMode === 'personal' || config.agent_mode === 'personal';
-  const tz = config.timezone || 'Asia/Kolkata';
+  const tz = config.timezone || process.env.APP_TIMEZONE || 'UTC';
   const now = new Date();
   
   let localString;
@@ -597,7 +597,7 @@ export async function handleInspectRecentActions(args, context) {
   const { db, conversationId, userId } = context;
   const limit = Math.max(1, Math.min(Number(args?.limit) || 2, 5));
 
-  if (!db || !conversationId) {
+  if (!db || !conversationId || !userId) {
     return { recent_actions: [], count: 0, message: 'No active conversation history to inspect.' };
   }
 
@@ -608,7 +608,7 @@ export async function handleInspectRecentActions(args, context) {
        FROM ai_action_audit_log
        WHERE user_id = ? AND conversation_id = ? AND tool_slug != 'inspect_recent_actions'
        ORDER BY id DESC LIMIT ${safeLimit}`,
-      [userId || 1, conversationId]
+      [userId, conversationId]
     );
 
     const actions = (rows || []).map(r => {
@@ -1127,7 +1127,10 @@ export class UniversalToolsRegistry {
   static async executeTool(toolName, args, tools = [], context = {}) {
     const startTime = Date.now();
     const callerRole = context.callerRole || 'guest';
-    const userId = context.userId || 1;
+    const userId = context.userId;
+    if (!userId) {
+      return { error: 'Authentication required: missing userId in tool execution context.' };
+    }
     const db = context.db;
 
     // 0. Handle System Generic Action Confirmation Tools

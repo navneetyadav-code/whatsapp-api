@@ -69,7 +69,7 @@ function redirect_to(string $path): never
 }
 
 function default_country_dial_code(): string {
-    $default = strtolower((string) config_env('DEFAULT_COUNTRY_CODE', 'in'));
+    $default = strtolower((string) config_env('DEFAULT_COUNTRY_CODE', '1'));
     $isoMap = [
         'in' => '91', 'us' => '1', 'ca' => '1', 'gb' => '44', 'uk' => '44',
         'au' => '61', 'ae' => '971', 'pk' => '92', 'bd' => '880', 'ng' => '234',
@@ -78,7 +78,7 @@ function default_country_dial_code(): string {
         'ru' => '7', 'za' => '27', 'ke' => '254', 'eg' => '20'
     ];
     $countryDial = $isoMap[$default] ?? preg_replace('/\D/', '', $default);
-    return $countryDial !== '' ? $countryDial : '91';
+    return $countryDial !== '' ? $countryDial : '1';
 }
 
 function normalize_phone(string $phone): string {

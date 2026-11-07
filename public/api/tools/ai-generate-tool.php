@@ -170,7 +170,7 @@ $lastAiError = null;
 if ($hasAiKeys) {
     if ($isSharedHosting) {
         $contextHint = $isCurl 
-            ? "The user has provided a Shared Hosting API cURL (e.g. cPanel / ByetHost / InfinityFree / Apache virtual host / AssistGroup):\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT) . "\nEnsure the tool is fully configured for shared hosting execution without aes errors, preserving Accept: application/json and all query/route parameters."
+            ? "The user has provided a Shared Hosting API cURL (e.g. cPanel / ByetHost / InfinityFree / Apache virtual host):\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT) . "\nEnsure the tool is fully configured for shared hosting execution without aes errors, preserving Accept: application/json and all query/route parameters."
             : "The user has provided the following Shared Hosting requirement or API documentation:\n\"{$rawContent}\"";
     } else {
         $contextHint = $isCurl 
