@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Normalize phone number
     $cleanPhone = preg_replace('/[^\d+]/', '', $phone);
     if (!str_starts_with($cleanPhone, '+')) {
-        $countryCode = config_env('DEFAULT_COUNTRY_CODE', '91');
+        $countryCode = config_env('DEFAULT_COUNTRY_CODE', '1');
         $codeDigits = ($countryCode === 'in') ? '91' : preg_replace('/\D/', '', (string) $countryCode);
         if (strlen($cleanPhone) === 10) {
             $cleanPhone = '+' . ($codeDigits ?: '91') . $cleanPhone;
@@ -384,7 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         document.addEventListener("DOMContentLoaded", function() {
             const phoneInput = document.querySelector('input[name="phone"]');
             if (phoneInput && window.intlTelInput) {
-                const defaultCc = "<?= e(config_env('DEFAULT_COUNTRY_CODE', 'in')) ?>";
+                const defaultCc = "<?= e(config_env('DEFAULT_COUNTRY_CODE', '1')) ?>";
                 const isoCode = (defaultCc === '91' || defaultCc === '+91') ? 'in' : defaultCc.toLowerCase();
                 const iti = window.intlTelInput(phoneInput, {
                     initialCountry: isoCode, 

@@ -61,6 +61,62 @@ export function scoreToolRelevance(messageTokens, tool) {
   return matches / Math.sqrt(toolTokens.size + 1);
 }
 
+const trainingExamplesCache = new Map();
+
+/**
+ * Dynamically retrieves relevant few-shot training examples using BM25 token overlap.
+ * 100% data-driven: zero hardcoded categories, slugs, or prompts.
+ */
+export async function getRelevantTrainingExamples(db, userId, userMessage, topK = 2) {
+  if (!db || !userId || !userMessage || typeof userMessage !== 'string') return [];
+
+  let cached = trainingExamplesCache.get(userId);
+  if (!cached || Date.now() > cached.expiresAt) {
+    try {
+      const [rows] = await db.execute(
+        `SELECT id, example_type, user_prompt, assistant_response, category
+         FROM ai_training_examples
+         WHERE user_id = ? AND is_active = 1`,
+        [userId]
+      );
+      cached = { expiresAt: Date.now() + 5 * 60 * 1000, examples: rows || [] };
+      trainingExamplesCache.set(userId, cached);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  const examples = cached?.examples;
+  if (!examples || examples.length === 0) return [];
+
+  const tokens = tokenizeText(userMessage);
+  if (tokens.length === 0) return [];
+
+  const scored = examples.map(ex => {
+    const searchable = `${ex.user_prompt} ${ex.category}`.toLowerCase();
+    const exTokens = new Set(tokenizeText(searchable));
+    if (exTokens.size === 0) return { ...ex, score: 0 };
+    let score = 0;
+    for (const t of tokens) {
+      if (exTokens.has(t)) {
+        score += 1.5;
+      } else {
+        for (const et of exTokens) {
+          if (et.includes(t) || t.includes(et)) {
+            score += 0.8;
+            break;
+          }
+        }
+      }
+    }
+    return { ...ex, score: score / Math.sqrt(exTokens.size + 1) };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+
+  return scored.filter(s => s.score > 0.35).slice(0, topK);
+}
+
 /**
  * Detect general conversational intent
  */

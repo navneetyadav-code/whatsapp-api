@@ -735,9 +735,14 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Process Authorization header
+        // Process Authorization / API Key header
         if (!empty($_POST['rest_auth_header'])) {
-            $executionConfig['headers']['Authorization'] = trim((string) $_POST['rest_auth_header']);
+            $authVal = trim((string) $_POST['rest_auth_header']);
+            if (str_starts_with($authVal, 'wa_live_') || str_starts_with($authVal, 'wa_test_')) {
+                $executionConfig['headers']['X-API-Key'] = $authVal;
+            } else {
+                $executionConfig['headers']['Authorization'] = $authVal;
+            }
         }
 
         // Process Request Body Template (JSON string or array)

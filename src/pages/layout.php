@@ -40,6 +40,11 @@ $isPersonalMode = ($agentMode === 'personal');
     <meta property="og:title" content="<?= e($seo['title']) ?>">
     <meta property="og:description" content="<?= e($seo['description']) ?>">
     <meta property="og:site_name" content="WhatsGateway">
+    <meta property="og:image" content="<?= e(base_url('assets/social-preview.png')) ?>">
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="640">
+    <meta property="og:image:alt" content="WhatsGateway - Open-Source WhatsApp API and AI Agent Gateway">
+    <meta name="twitter:image" content="<?= e(base_url('assets/social-preview.png')) ?>">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">

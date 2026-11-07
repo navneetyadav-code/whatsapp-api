@@ -30,7 +30,7 @@ async function runTests() {
 
   const testUserId = 1;
   const testConvId = 666666;
-  const context = { db, userId: testUserId, conversationId: testConvId };
+  const context = { db, userId: testUserId, conversationId: testConvId, ownerEmail: 'owner@example.com' };
 
   // Case 1: Boss asks "detach to me"
   console.log('👉 Case 1: Recipient is "detach to me"');
@@ -40,29 +40,29 @@ async function runTests() {
     body: 'Details of 500 error.'
   }, context);
   assert(res1.success, 'Case 1 failed: ' + res1.error);
-  assert.strictEqual(res1.recipient, 'info.assistgroupofficial@gmail.com');
+  assert.strictEqual(res1.recipient, 'owner@example.com');
   console.log(`   ✅ Correctly routed to Boss primary email: ${res1.recipient}`);
 
   // Case 2: Model hallucinations like "ankush@assistgroup.com"
   console.log('\n👉 Case 2: Model hallucinations like "ankush@assistgroup.com"');
   const res2 = await handleDraftEmail({
-    to: 'ankush@assistgroup.com',
+    to: 'hallucinated@example.com',
     subject: 'CRM Incident Report',
     body: 'Details of 500 error.'
   }, context);
   assert(res2.success, 'Case 2 failed: ' + res2.error);
-  assert.strictEqual(res2.recipient, 'info.assistgroupofficial@gmail.com');
+  assert.strictEqual(res2.recipient, 'owner@example.com');
   console.log(`   ✅ Intercepted bogus domain and corrected to: ${res2.recipient}`);
 
   // Case 3: Legitimate external contact (Ankush personal email)
-  console.log('\n👉 Case 3: Legitimate external contact (ankushkumary113@gmail.com)');
+  console.log('\n👉 Case 3: Legitimate external contact (client@external-domain.com)');
   const res3 = await handleDraftEmail({
-    to: 'ankushkumary113@gmail.com',
+    to: 'client@external-domain.com',
     subject: 'Tomorrow plans',
     body: 'See you next week.'
   }, context);
   assert(res3.success, 'Case 3 failed: ' + res3.error);
-  assert.strictEqual(res3.recipient, 'ankushkumary113@gmail.com');
+  assert.strictEqual(res3.recipient, 'client@external-domain.com');
   console.log(`   ✅ Retained verified external recipient: ${res3.recipient}`);
 
   // Clean up

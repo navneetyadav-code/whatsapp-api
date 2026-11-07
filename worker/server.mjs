@@ -30,7 +30,7 @@ import { ChatMemoryEngine } from './chat-memory.mjs';
 import { ChatFactMemory } from './chat-fact-memory.mjs';
 import { ChatPresenceManager } from './chat-presence.mjs';
 import { ChatResolutionEngine } from './chat-resolution.mjs';
-import { detectIntents, composeSkillsAndTools } from './intent-router.mjs';
+import { detectIntents, composeSkillsAndTools, getRelevantTrainingExamples } from './intent-router.mjs';
 import { UniversalToolsRegistry } from './tools-engine.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -60,15 +60,15 @@ const ISO_TO_DIAL = {
 };
 
 function resolveDefaultCountryCode(val) {
-  const raw = String(val || '').trim().toLowerCase();
+  const raw = String(val || process.env.DEFAULT_COUNTRY_CODE || '').trim().toLowerCase();
   if (ISO_TO_DIAL[raw]) {
     return ISO_TO_DIAL[raw];
   }
   const digits = raw.replace(/\D/g, '');
-  return digits || '91';
+  return digits || (process.env.DEFAULT_COUNTRY_CODE ? String(process.env.DEFAULT_COUNTRY_CODE).replace(/\D/g, '') : '1');
 }
 
-const DEFAULT_COUNTRY_CODE = resolveDefaultCountryCode(process.env.DEFAULT_COUNTRY_CODE || '91');
+const DEFAULT_COUNTRY_CODE = resolveDefaultCountryCode(process.env.DEFAULT_COUNTRY_CODE || '1');
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
 const SEND_DELAY_MS = Number(process.env.SEND_DELAY_MS || 2500);
 const QUEUE_POLL_MS = Number(process.env.QUEUE_POLL_MS || 3000);
@@ -1860,8 +1860,9 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                             // In Personal Assistant mode, business customer support knowledge base retrieval is strictly banned/disabled!
                             const relevantChunks = isPersonalMode ? [] : await retrieveRelevantKnowledge(db, userId, consolidatedText, 3, 0.15);
                             const userFacts = isPersonalMode ? await ChatFactMemory.loadUserFacts(db, userId, senderPhone, consolidatedText) : { factsText: '' };
+                            const relevantTrainingExamples = await getRelevantTrainingExamples(db, userId, consolidatedText, 2);
                             const currentDateTime = new Date().toLocaleString('en-US', {
-                              timeZone: process.env.APP_TIMEZONE || 'Asia/Kolkata',
+                              timeZone: process.env.APP_TIMEZONE || 'UTC',
                               dateStyle: 'full',
                               timeStyle: 'short'
                             });
@@ -1876,6 +1877,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                                 ownerName: aiSettings.owner_name || '',
                                 skillDirectives,
                                 factsText: userFacts.factsText,
+                                trainingExamples: relevantTrainingExamples,
                                 availableTools: filteredTools,
                                 currentDateTime,
                                 callerPhone: senderPhone,
@@ -1906,6 +1908,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               isAdminCaller,
                               agentMode: aiSettings.agent_mode || 'support',
                               ownerName: aiSettings.owner_name || 'Boss',
+                              sessionUuid: activeSessionUuid,
                               toolsConfig,
                               scopedTools: filteredTools
                             };

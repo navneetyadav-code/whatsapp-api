@@ -30,6 +30,8 @@ $pdo = Database::pdo();
 $input = json_decode(file_get_contents('php://input'), true) ?: ($_POST ?? []);
 $rawContent = trim((string) ($input['raw_content'] ?? ''));
 $inputType = trim((string) ($input['input_type'] ?? 'auto')); // auto | curl | prompt | docs | shared | shared_hosting
+$selectedKeyId = trim((string) ($input['selected_key_id'] ?? 'auto'));
+$selectedModel = trim((string) ($input['selected_model'] ?? ''));
 $isSharedHosting = in_array($inputType, ['shared', 'shared_hosting'], true);
 
 if ($rawContent === '') {
@@ -44,6 +46,30 @@ if ($rawContent === '') {
 // -----------------------------------------------------------------------------
 $parsedCurl = CurlImporter::parse($rawContent);
 $isCurl = ($parsedCurl !== null);
+
+// If user explicitly chose Offline cURL Importer (Fast / Zero AI Tokens)
+if (in_array($selectedKeyId, ['offline', 'curl', 'offline_curl'], true)) {
+    if ($parsedCurl !== null) {
+        $finalTool = $parsedCurl;
+        if ($isSharedHosting) {
+            if (!isset($finalTool['execution_config']['headers']['Accept']) && !isset($finalTool['execution_config']['headers']['accept'])) {
+                $finalTool['execution_config']['headers']['Accept'] = 'application/json';
+            }
+        }
+        json_response([
+            'ok' => true,
+            'source' => $isSharedHosting ? 'Shared Hosting Engine Copilot (Offline)' : 'Production Offline cURL Engine (Deterministic)',
+            'tool' => $finalTool
+        ]);
+        exit;
+    } else {
+        json_response([
+            'ok' => false,
+            'error' => 'The Offline cURL Importer requires a valid cURL command (e.g. curl -X GET "https://api..."). If you are importing via Plain Prompt or API Docs, please select an AI Key from AI Credentials or Auto Cascade.'
+        ], 422);
+        exit;
+    }
+}
 
 // -----------------------------------------------------------------------------
 // STEP 2: AI COPILOT SYNTHESIS (GEMINI -> GROQ -> OPENROUTER CASCADE)
@@ -104,15 +130,47 @@ $providerOrder = match ($priority) {
     default => ['gemini', 'groq', 'openrouter']
 };
 
+// Check if user requested a specific AI key & model from /ai-credentials
+$targetKey = null;
+if ($selectedKeyId !== '' && $selectedKeyId !== 'auto') {
+    if (is_numeric($selectedKeyId)) {
+        $kid = (int) $selectedKeyId;
+        foreach ($dbKeys as $k) {
+            if ((int) $k['id'] === $kid) {
+                $targetKey = $k;
+                break;
+            }
+        }
+        if (!$targetKey) {
+            $findStmt = $pdo->prepare('SELECT id, provider, label, api_key, model, priority, is_active FROM ai_provider_keys WHERE id = ? AND user_id = ? LIMIT 1');
+            $findStmt->execute([$kid, $userId]);
+            $targetKey = $findStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+    } elseif (str_starts_with($selectedKeyId, 'legacy_')) {
+        $legProv = str_replace('legacy_', '', $selectedKeyId);
+        if (!empty($keysByProvider[$legProv])) {
+            $targetKey = $keysByProvider[$legProv][0];
+            $targetKey['provider'] = $legProv;
+        }
+    }
+
+    if ($targetKey !== null) {
+        $prov = strtolower(trim((string) ($targetKey['provider'] ?? 'gemini')));
+        $keysByProvider = [$prov => [$targetKey]];
+        $providerOrder = [$prov];
+    }
+}
+
 $hasAiKeys = !empty($keysByProvider['gemini']) || !empty($keysByProvider['groq']) || !empty($keysByProvider['openrouter']);
 
 $aiResult = null;
 $usedProvider = null;
+$lastAiError = null;
 
 if ($hasAiKeys) {
     if ($isSharedHosting) {
         $contextHint = $isCurl 
-            ? "The user has provided a Shared Hosting API cURL (e.g. cPanel / ByetHost / InfinityFree / Apache virtual host / AssistGroup):\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT) . "\nEnsure the tool is fully configured for shared hosting execution without aes errors, preserving Accept: application/json and all query/route parameters."
+            ? "The user has provided a Shared Hosting API cURL (e.g. cPanel / ByetHost / InfinityFree / Apache virtual host):\n{$rawContent}\n\nPre-extracted baseline structure:\n" . json_encode($parsedCurl, JSON_PRETTY_PRINT) . "\nEnsure the tool is fully configured for shared hosting execution without aes errors, preserving Accept: application/json and all query/route parameters."
             : "The user has provided the following Shared Hosting requirement or API documentation:\n\"{$rawContent}\"";
     } else {
         $contextHint = $isCurl 
@@ -222,6 +280,7 @@ PROMPT;
     $promptPayload = $systemInstruction . "\n\nINPUT DATA:\n" . $contextHint;
 
     // Execute Multi-Provider & Multi-Key Auto-Failover Cascade
+    $isSpecificKey = ($targetKey !== null);
     foreach ($providerOrder as $prov) {
         if ($aiResult !== null) break;
         $keys = $keysByProvider[$prov] ?? [];
@@ -233,7 +292,7 @@ PROMPT;
 
             if ($prov === 'gemini') {
                 $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['gemini_model'] ?? 'gemini-3.5-flash'))) ?: 'gemini-3.5-flash';
-                $candidates = array_unique([$baseModel, 'gemini-2.5-flash', 'gemini-flash-latest']);
+                $candidates = $isSpecificKey ? [$baseModel] : array_unique([$baseModel, 'gemini-2.5-flash', 'gemini-flash-latest']);
                 foreach ($candidates as $candModel) {
                     try {
                         $url = "https://generativelanguage.googleapis.com/v1beta/models/{$candModel}:generateContent?key={$apiKey}";
@@ -267,12 +326,17 @@ PROMPT;
                                 $usedProvider = "Google Gemini ({$candModel})";
                                 break 2;
                             }
+                        } else {
+                            $errJson = json_decode((string) $resp, true);
+                            $lastAiError = $errJson['error']['message'] ?? "Gemini HTTP $code";
                         }
-                    } catch (\Throwable $e) {}
+                    } catch (\Throwable $e) {
+                        $lastAiError = $e->getMessage();
+                    }
                 }
             } elseif ($prov === 'groq') {
                 $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['groq_model'] ?? 'openai/gpt-oss-120b'))) ?: 'openai/gpt-oss-120b';
-                $candidates = array_unique([$baseModel, 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile']);
+                $candidates = $isSpecificKey ? [$baseModel] : array_unique([$baseModel, 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile']);
                 foreach ($candidates as $candModel) {
                     try {
                         $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
@@ -307,12 +371,17 @@ PROMPT;
                                 $usedProvider = "Groq ({$candModel})";
                                 break 2;
                             }
+                        } else {
+                            $errJson = json_decode((string) $resp, true);
+                            $lastAiError = $errJson['error']['message'] ?? "Groq HTTP $code";
                         }
-                    } catch (\Throwable $e) {}
+                    } catch (\Throwable $e) {
+                        $lastAiError = $e->getMessage();
+                    }
                 }
             } elseif ($prov === 'openrouter') {
                 $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free'))) ?: 'meta-llama/llama-3.3-70b-instruct:free';
-                $candidates = array_unique([$baseModel, 'meta-llama/llama-3.3-70b-instruct:free', 'meta-llama/llama-3.3-70b-instruct']);
+                $candidates = $isSpecificKey ? [$baseModel] : array_unique([$baseModel, 'meta-llama/llama-3.3-70b-instruct:free', 'meta-llama/llama-3.3-70b-instruct']);
                 foreach ($candidates as $candModel) {
                     try {
                         $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
@@ -348,12 +417,43 @@ PROMPT;
                                 $usedProvider = "OpenRouter ({$candModel})";
                                 break 2;
                             }
+                        } else {
+                            $errJson = json_decode((string) $resp, true);
+                            $lastAiError = $errJson['error']['message'] ?? "OpenRouter HTTP $code";
                         }
-                    } catch (\Throwable $e) {}
+                    } catch (\Throwable $e) {
+                        $lastAiError = $e->getMessage();
+                    }
                 }
             }
         }
     }
+}
+
+// If user specifically requested an AI key and it failed:
+if ($targetKey !== null && $aiResult === null) {
+    // If input is a valid cURL command, gracefully fall back to the production offline cURL parser
+    if ($parsedCurl !== null) {
+        $finalTool = $parsedCurl;
+        if ($isSharedHosting) {
+            if (!isset($finalTool['execution_config']['headers']['Accept']) && !isset($finalTool['execution_config']['headers']['accept'])) {
+                $finalTool['execution_config']['headers']['Accept'] = 'application/json';
+            }
+        }
+        json_response([
+            'ok' => true,
+            'source' => 'Production Offline cURL Engine (Fallback)',
+            'tool' => $finalTool,
+            'warning' => "Selected AI key '{$targetKey['label']}' failed (" . ($lastAiError ?: 'Error') . "), so the tool was safely generated using the Production Offline cURL Importer."
+        ]);
+        exit;
+    }
+
+    json_response([
+        'ok' => false,
+        'error' => "Selected AI key '{$targetKey['label']}' (" . ($targetKey['model'] ?? 'default') . ") failed to generate tool: " . ($lastAiError ?: 'Model returned empty or invalid schema. Check your API key in /ai-credentials.')
+    ], 422);
+    exit;
 }
 
 // -----------------------------------------------------------------------------

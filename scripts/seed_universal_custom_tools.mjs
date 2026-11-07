@@ -10,14 +10,14 @@ async function seed() {
 
   const userId = 1;
 
-  // Retrieve existing bot token if available in assistgroup DB
-  let botToken = '';
+// (Optional token retrieval skipped for generic seed)
+  let botToken = process.env.SAMPLE_BOT_TOKEN || 'sample_bot_token';
   try {
     const agDb = await mysql.createConnection({
       host: '127.0.0.1',
       user: 'root',
       password: '',
-      database: 'assistgroup'
+      database: 'crm_example'
     });
     const [tokens] = await agDb.execute("SELECT token FROM admin_api_tokens WHERE token_name = 'whatsapp-ai-bot-live' AND status = 'active' LIMIT 1");
     if (tokens.length > 0) {
@@ -144,10 +144,10 @@ async function seed() {
 
     // 6. Shared Hosting Dual-Environment API: AssistGroup CRM Connector
     {
-      tool_slug: 'assistgroup_crm',
-      display_name: '🏢 AssistGroup Dual-Env API',
+      tool_slug: 'crm_dual_env',
+      display_name: '🏢 Example Dual-Env CRM',
       category: 'shared_env_api',
-      description: 'Query official AssistGroup pricing packages, team profiles, and submit client inquiries to the CRM system.',
+      description: 'Query pricing packages, team profiles, and submit client inquiries to the CRM system.',
       parameters_schema: {
         type: 'OBJECT',
         properties: {
@@ -162,11 +162,11 @@ async function seed() {
         active_env: 'local',
         environments: {
           local: {
-            base_url: 'http://localhost/assistgroup/api/admin/v1',
+            base_url: 'http://localhost/crm/api/admin/v1',
             bearer_token: botToken
           },
           live: {
-            base_url: 'https://assistgroup.gt.tc/api/admin/v1',
+            base_url: 'https://example.com/api/admin/v1',
             bearer_token: botToken
           }
         },

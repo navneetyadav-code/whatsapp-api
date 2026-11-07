@@ -224,7 +224,7 @@ export function evaluateSafeMath(expression) {
  */
 export function getCurrentCustomTime(config = {}, context = {}) {
   const isPersonalMode = context.agentMode === 'personal' || config.agent_mode === 'personal';
-  const tz = config.timezone || 'Asia/Kolkata';
+  const tz = config.timezone || process.env.APP_TIMEZONE || 'UTC';
   const now = new Date();
   
   let localString;
@@ -587,6 +587,85 @@ export async function handleUpdateMemory(args, context) {
     type: res.type,
     message: `Stored fact permanently in ${scopeLabel}: "${res.key}" = "${res.value}"`
   };
+}
+
+/**
+ * Universal Action Inspection Handler: Retrieves recent verified tool executions
+ * completely tool-agnostic without knowing schemas or parameter names.
+ */
+export async function handleInspectRecentActions(args, context) {
+  const { db, conversationId, userId } = context;
+  const limit = Math.max(1, Math.min(Number(args?.limit) || 2, 5));
+
+  if (!db || !conversationId || !userId) {
+    return { recent_actions: [], count: 0, message: 'No active conversation history to inspect.' };
+  }
+
+  try {
+    const safeLimit = Math.max(1, Math.min(parseInt(args?.limit, 10) || 2, 5));
+    const [rows] = await db.execute(
+      `SELECT tool_slug, input_payload, output_payload, created_at
+       FROM ai_action_audit_log
+       WHERE user_id = ? AND conversation_id = ? AND tool_slug != 'inspect_recent_actions'
+       ORDER BY id DESC LIMIT ${safeLimit}`,
+      [userId, conversationId]
+    );
+
+    const actions = (rows || []).map(r => {
+      let input = r.input_payload;
+      if (typeof input === 'string') {
+        try { input = JSON.parse(input); } catch {}
+      }
+      let output = r.output_payload;
+      if (typeof output === 'string') {
+        try { output = JSON.parse(output); } catch {}
+      }
+      return {
+        action: r.tool_slug,
+        parameters: input,
+        result: output,
+        executed_at: r.created_at
+      };
+    });
+
+    return {
+      recent_actions: actions,
+      count: actions.length,
+      note: 'These are the verified executed actions and their exact parameters from this conversation.'
+    };
+  } catch (err) {
+    return { error: `Failed to inspect recent actions: ${err.message}` };
+  }
+}
+
+/**
+ * Universal Leaf Truncator: Generically compresses and bounds any payload
+ * without knowing the tool's parameter names or schema.
+ */
+export function sanitizePayloadForAudit(payload, maxChars = 300) {
+  if (payload === null || payload === undefined) return payload;
+  if (typeof payload === 'string') {
+    const clean = payload.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return clean.length > maxChars ? clean.slice(0, maxChars) + '... [truncated]' : clean;
+  }
+  if (typeof payload === 'number' || typeof payload === 'boolean') {
+    return payload;
+  }
+  if (Array.isArray(payload)) {
+    return payload.slice(0, 8).map(item => sanitizePayloadForAudit(item, maxChars));
+  }
+  if (typeof payload === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(payload)) {
+      if (/password|token|secret|api_key|apikey/i.test(k)) {
+        out[k] = '[redacted]';
+      } else {
+        out[k] = sanitizePayloadForAudit(v, maxChars);
+      }
+    }
+    return out;
+  }
+  return String(payload);
 }
 
 // ---------------------------------------------------------------------------
@@ -1048,7 +1127,10 @@ export class UniversalToolsRegistry {
   static async executeTool(toolName, args, tools = [], context = {}) {
     const startTime = Date.now();
     const callerRole = context.callerRole || 'guest';
-    const userId = context.userId || 1;
+    const userId = context.userId;
+    if (!userId) {
+      return { error: 'Authentication required: missing userId in tool execution context.' };
+    }
     const db = context.db;
 
     // 0. Handle System Generic Action Confirmation Tools
@@ -1152,6 +1234,8 @@ export class UniversalToolsRegistry {
           result = await handleConfirmAction(args, context);
         } else if (handler === 'update_memory') {
           result = await handleUpdateMemory(args, context);
+        } else if (handler === 'inspect_recent_actions' || handler === 'builtin_audit_inspect') {
+          result = await handleInspectRecentActions(args, context);
         } else {
           result = { error: `Unknown built-in handler: ${handler}` };
         }
@@ -1173,6 +1257,28 @@ export class UniversalToolsRegistry {
 
     // 4. Record audit log
     await UniversalToolsRegistry.logInvocation(db, userId, context.callerPhone, callerRole, toolName, args, result, latency, status);
+
+    // 5. Persist into conversation action audit log (Tool-Agnostic with recursive leaf truncation)
+    if (toolName !== 'inspect_recent_actions' && context.conversationId && db) {
+      try {
+        const cleanInput = sanitizePayloadForAudit(args);
+        const cleanOutput = sanitizePayloadForAudit(result);
+        await db.execute(
+          `INSERT INTO ai_action_audit_log (user_id, conversation_id, session_uuid, tool_slug, input_payload, output_payload)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            userId,
+            context.conversationId,
+            context.sessionUuid || null,
+            toolName,
+            JSON.stringify(cleanInput || {}),
+            JSON.stringify(cleanOutput || {})
+          ]
+        );
+      } catch (auditErr) {
+        // Fallback silently if table not reachable
+      }
+    }
 
     return result;
   }
