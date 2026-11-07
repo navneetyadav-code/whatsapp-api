@@ -92,6 +92,8 @@ final class InitialAdminMemoryStatement extends PDOStatement
             $this->pdo->sessions[] = ['user_id' => $params[0]];
         } elseif (str_starts_with($this->query, 'INSERT INTO webhooks')) {
             $this->pdo->webhooks[] = ['user_id' => $params[0]];
+        } elseif (str_starts_with($this->query, 'INSERT IGNORE INTO ai_agent_settings')) {
+            // Test double stub for ai_agent_settings
         } else {
             throw new RuntimeException('Unexpected prepared statement in test double.');
         }

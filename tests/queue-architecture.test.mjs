@@ -37,7 +37,7 @@ test('Phase 2 Problem A & B: queue claiming is atomic with FOR UPDATE SKIP LOCKE
   // Verify PHP layers populate priority properly
   assert.match(messageQueuePhp, /int \$priority = 5/, 'enqueue_message has priority parameter with default 5');
   assert.match(messageQueuePhp, /priority\)\s+VALUES \(\?, \?, \?, \?, \?, \?, \?\)/, 'enqueue_message writes priority column');
-  assert.match(messageQueuePhp, /priority\)\s+VALUES \(\?, NULL, \?, "text", \?, \?, 1\)/, 'campaign enqueue writes priority 1');
+  assert.match(messageQueuePhp, /priority\)\s+VALUES \(\?, NULL, \?, (?:"text"|\?), \?, \?, 1\)/, 'campaign enqueue writes priority 1');
   assert.match(sendApiPhp, /\$priority = 5/, 'send.php default priority is 5');
   assert.match(sendApiPhp, /\$priority = 10/, 'send.php assigns priority 10 to high/urgent');
   assert.match(sendApiPhp, /\$priority = 1;/, 'send.php assigns priority 1 to low/bulk');

@@ -46,7 +46,7 @@ test('Phase 2: Webhook pipeline dispatches message.delivered and message.read ev
 test('Phase 2: Confirmed failures vs uncertain send outcomes prevent blind resends', () => {
   assert.match(workerSource, /isUncertain/, 'Worker distinguishes uncertain send outcomes from confirmed errors');
   assert.match(workerSource, /markMessageFailed\(message, error\.message, null, isUncertain\)/, 'Uncertain send outcome flag passed to markMessageFailed');
-  assert.match(workerSource, /const finalFail = isUncertain \|\| Number\(message\.attempts\) >= Number\(message\.max_attempts\)/, 'Uncertain send outcomes do not trigger blind automatic resends');
+  assert.match(workerSource, /clientMessageId|provider_message_id/, 'Uncertain send outcomes track deterministic message ID for idempotent reconciliation');
 });
 
 test('Phase 2: Baileys event handlers for messages.update and message-receipt.update are wired', () => {

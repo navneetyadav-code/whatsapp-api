@@ -15,7 +15,8 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
-  useMultiFileAuthState
+  useMultiFileAuthState,
+  generateMessageID
 } from '@whiskeysockets/baileys';
 import {
   detectFrustrationAndEscalation,
@@ -79,6 +80,7 @@ const SESSION_DIR = process.env.WA_SESSION_DIR && !process.env.WA_SESSION_DIR.in
   ? resolve(process.env.WA_SESSION_DIR)
   : defaultSessionDir;
 const sessions = new Map();
+const activeUserRunners = new Map();
 let supportsSleepingColumn = true;
 
 function isMissingSleepingColumnError(error) {
@@ -730,6 +732,9 @@ async function recordWebhookDelivery(webhook, payload, status, error, attempt) {
 }
 
 function destroySocket(session) {
+  if (session?.userId) {
+    activeUserRunners.delete(String(session.userId));
+  }
   if (!session) return;
   if (session.reconnectTimer) {
     clearTimeout(session.reconnectTimer);
@@ -896,6 +901,7 @@ async function startSession(userId, force = false, waitForReady = true) {
                WHERE user_id = ? AND status = 'queued'`,
               [userId]
             );
+            triggerUserQueue(String(userId));
             setImmediate(processQueueOnce);
           } catch (flushErr) {
             logger.warn({ flushErr: flushErr.message, userId }, 'Failed to release waiting queue on device connection');
@@ -994,6 +1000,52 @@ async function startSession(userId, force = false, waitForReady = true) {
         logger.error({ error, userId }, 'Connection update failed');
       }
     });
+
+async function queueBotReply(userId, remoteJid, senderPhone, body, convId, sessionUuid, senderName = 'AI Assistant', options = {}) {
+  const textBody = String(body || '').trim();
+  if (!textBody) return null;
+
+  // 1. Record initial message in native chat_messages
+  const [chatInsert] = await db.execute(
+    `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, status)
+     VALUES (?, ?, ?, 'bot', ?, 'text', ?, 'sent')`,
+    [userId, convId || null, sessionUuid || null, senderName, textBody]
+  );
+  const chatMessageId = chatInsert.insertId;
+
+  if (convId) {
+    const consecutiveUpdate = options.incrementConsecutive
+      ? ', consecutive_bot_replies = consecutive_bot_replies + 1'
+      : (options.setConsecutiveOne ? ', consecutive_bot_replies = 1' : '');
+    await db.execute(
+      `UPDATE chat_conversations
+       SET last_message = ?,
+           last_message_at = NOW()${consecutiveUpdate}
+       WHERE id = ?`,
+      [textBody.slice(0, 200), convId]
+    );
+  }
+
+  // 2. Enqueue outbound bot/AI reply into message_queue with priority 10
+  const queuePayload = JSON.stringify({
+    source: 'ai_assistant',
+    conversation_id: convId || null,
+    session_uuid: sessionUuid || null,
+    chat_message_id: chatMessageId,
+    type: 'text'
+  });
+
+  const normalizedPhone = senderPhone || String(remoteJid).replace(/@.*$/, '');
+  const [queueInsert] = await db.execute(
+    `INSERT INTO message_queue (user_id, api_key_id, recipient, normalized_recipient, message_type, body, payload, priority, status)
+     VALUES (?, NULL, ?, ?, 'text', ?, ?, 10, 'queued')`,
+    [userId, remoteJid, normalizedPhone, textBody, queuePayload]
+  );
+
+  triggerUserQueue(String(userId));
+  logger.info({ userId, convId, chatMessageId, queueId: queueInsert.insertId }, 'Queued autonomous bot reply (priority 10)');
+  return { chatMessageId, queueId: queueInsert.insertId };
+}
 
 async function handleMessageStatusUpdate(userId, providerMessageId, newStatus, timestamp = null) {
   if (!providerMessageId) return;
@@ -1354,12 +1406,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                     `🔒 *This chat session is now closed.*\n` +
                     `If you ever want to chat again or have any questions, simply reply with */start* or *start* to begin a new chat session! 😊`;
                   try {
-                    const sentThanks = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: thanksText });
-                    await db.execute(
-                      `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
-                       VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, ?, 'sent')`,
-                      [userId, preConv.id, preConv.session_uuid || null, thanksText, sentThanks?.key?.id || null]
-                    );
+                    await queueBotReply(userId, msg.key.remoteJid, senderPhone, thanksText, preConv.id, preConv.session_uuid || null, 'Support Bot');
                   } catch (replyErr) {
                     logger.warn({ replyErr: replyErr.message }, 'Failed to dispatch feedback thank-you reply');
                   }
@@ -1645,12 +1692,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
 
                 const handoverMsg = 'I understand you need assistance from our team. I have escalated this conversation to our support representatives and paused automated replies. A team member will join you shortly. 🔔';
                 try {
-                  const sentHandover = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: handoverMsg });
-                  await db.execute(
-                    `INSERT INTO chat_messages (user_id, conversation_id, sender_type, sender_name, message_type, body, wa_message_id, status)
-                     VALUES (?, ?, 'bot', 'Support System', 'text', ?, ?, 'sent')`,
-                    [userId, convId, handoverMsg, sentHandover?.key?.id || null]
-                  );
+                  await queueBotReply(userId, msg.key.remoteJid, senderPhone, handoverMsg, convId, activeSessionUuid, 'Support System');
                 } catch (sendErr) {
                   logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch handover confirmation');
                 }
@@ -1689,16 +1731,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                 `I am your virtual assistant, ready to assist you with inquiries, services, and support.\n\n` +
                 `How can I help you today? ✨`;
             try {
-              const sentWelcome = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: welcomeText });
-              await db.execute(
-                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
-                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
-                [userId, conversationId, currentSessionUuid, welcomeText, sentWelcome?.key?.id || null]
-              );
-              await db.execute(
-                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
-                [welcomeText.slice(0, 200), conversationId]
-              );
+              await queueBotReply(userId, msg.key.remoteJid, senderPhone, welcomeText, conversationId, currentSessionUuid, 'AI Assistant', { setConsecutiveOne: true });
               aiHandled = true;
             } catch (sendErr) {
               logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch start welcome greeting');
@@ -1726,16 +1759,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                   : `🧹 *Working Context Cleared!*\nStarting a fresh topic session. How can I assist you or take a message for ${ownerName || 'the owner'}?`)
               : '🧹 *Conversation Context Cleared!*\nHow can I help you with a fresh inquiry today?';
             try {
-              const sentReset = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: resetReplyText });
-              await db.execute(
-                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
-                 VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
-                [userId, conversationId, currentSessionUuid, resetReplyText, sentReset?.key?.id || null]
-              );
-              await db.execute(
-                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW(), consecutive_bot_replies = 1 WHERE id = ?`,
-                [resetReplyText.slice(0, 200), conversationId]
-              );
+              await queueBotReply(userId, msg.key.remoteJid, senderPhone, resetReplyText, conversationId, currentSessionUuid, 'AI Assistant', { setConsecutiveOne: true });
               aiHandled = true;
             } catch (sendErr) {
               logger.warn({ sendErr: sendErr.message }, 'Failed to dispatch topic reset confirmation');
@@ -1794,16 +1818,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                               await closeSession(db, conv.id, resolutionCheck.remark, true, true);
 
                               const closureMsg = ChatResolutionEngine.getClosureMessage();
-                              const sentClosure = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: closureMsg });
-                              await db.execute(
-                                `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
-                                 VALUES (?, ?, ?, 'bot', 'Support Bot', 'text', ?, ?, 'sent')`,
-                                [userId, conv.id, activeSessionUuid, closureMsg, sentClosure?.key?.id || null]
-                              );
-                              await db.execute(
-                                `UPDATE chat_conversations SET last_message = ?, last_message_at = NOW() WHERE id = ?`,
-                                [closureMsg.slice(0, 200), conv.id]
-                              );
+                              await queueBotReply(userId, msg.key.remoteJid, senderPhone, closureMsg, conv.id, activeSessionUuid, 'Support Bot');
                               return;
                             }
                           }
@@ -1816,12 +1831,7 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           });
                           if (greetingCheck.shouldIntercept && greetingCheck.replyText) {
                             logger.info({ userId, senderPhone }, '⚡ Intercepted repeated greeting locally - saved LLM tokens!');
-                            const sentGreet = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: greetingCheck.replyText });
-                            await db.execute(
-                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
-                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
-                              [userId, conv.id, activeSessionUuid, greetingCheck.replyText, sentGreet?.key?.id || null]
-                            );
+                            await queueBotReply(userId, msg.key.remoteJid, senderPhone, greetingCheck.replyText, conv.id, activeSessionUuid, 'AI Assistant');
                             return;
                           }
 
@@ -1919,21 +1929,17 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
                           }
 
                           if (replyText && replyText.trim()) {
-                            const sentAiReply = await (session.sock || sock).sendMessage(msg.key.remoteJid, { text: replyText.trim() });
-                            await db.execute(
-                              `INSERT INTO chat_messages (user_id, conversation_id, session_uuid, sender_type, sender_name, message_type, body, wa_message_id, status)
-                               VALUES (?, ?, ?, 'bot', 'AI Assistant', 'text', ?, ?, 'sent')`,
-                              [userId, conv.id, activeSessionUuid, replyText.trim(), sentAiReply?.key?.id || null]
+                            await queueBotReply(
+                              userId,
+                              msg.key.remoteJid,
+                              senderPhone,
+                              replyText.trim(),
+                              conv.id,
+                              activeSessionUuid,
+                              'AI Assistant',
+                              { incrementConsecutive: true }
                             );
-                            await db.execute(
-                              `UPDATE chat_conversations
-                               SET last_message = ?,
-                                   last_message_at = NOW(),
-                                   consecutive_bot_replies = consecutive_bot_replies + 1
-                               WHERE id = ?`,
-                              [replyText.trim().slice(0, 200), conv.id]
-                            );
-                            logger.info({ userId, convId: conv.id }, 'Dispatched multi-turn AI reply');
+                            logger.info({ userId, convId: conv.id }, 'Dispatched multi-turn AI reply via message_queue (priority 10)');
                           }
                         } catch (debouncedErr) {
                           logger.error({ debouncedErr: debouncedErr.message, userId }, 'Error executing debounced AI reply');
@@ -2137,40 +2143,53 @@ async function safelyCleanupAttachment(message, payload) {
   }
 }
 
-async function claimNextMessage() {
-  await db.execute(
-    `UPDATE message_queue
-     SET status = 'failed', locked_at = NULL, locked_by = NULL,
-         error_message = COALESCE(error_message, 'Worker lease expired after the final delivery attempt.')
-     WHERE status = 'processing'
-       AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
-       AND attempts >= max_attempts`
-  );
+async function cleanupExpiredLeases() {
+  try {
+    await db.execute(
+      `UPDATE message_queue
+       SET status = 'failed', locked_at = NULL, locked_by = NULL,
+           error_message = COALESCE(error_message, 'Worker lease expired after the final delivery attempt.')
+       WHERE status = 'processing'
+         AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         AND attempts >= max_attempts`
+    );
 
-  const [expiredRows] = await db.execute(
-    `UPDATE message_queue
-     SET status = 'queued', locked_at = NULL, locked_by = NULL,
-         error_message = COALESCE(error_message, 'Worker lease expired; message returned to the retry queue.')
-     WHERE status = 'processing'
-       AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
-       AND attempts < max_attempts`
-  );
-  if (expiredRows.affectedRows > 0) {
-    logger.warn({ count: expiredRows.affectedRows }, 'Expired worker leases returned to the retry queue');
+    const [expiredRows] = await db.execute(
+      `UPDATE message_queue
+       SET status = 'queued', locked_at = NULL, locked_by = NULL,
+           error_message = COALESCE(error_message, 'Worker lease expired; message returned to the retry queue.')
+       WHERE status = 'processing'
+         AND (locked_at IS NULL OR locked_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))
+         AND attempts < max_attempts`
+    );
+    if (expiredRows.affectedRows > 0) {
+      logger.warn({ count: expiredRows.affectedRows }, 'Expired worker leases returned to the retry queue');
+    }
+  } catch (err) {
+    logger.warn({ err: err.message }, 'Failed during expired worker lease cleanup');
   }
+}
+
+async function claimNextMessage(userId = null) {
+  await cleanupExpiredLeases();
 
   // Atomic transaction claim with FOR UPDATE SKIP LOCKED
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
+    const userClause = (userId !== null && userId !== undefined) ? 'AND user_id = ?' : '';
+    const queryParams = (userId !== null && userId !== undefined) ? [userId] : [];
+
     const [rows] = await conn.execute(
       `SELECT * FROM message_queue
        WHERE status = 'queued'
          AND available_at <= NOW()
+         ${userClause}
        ORDER BY priority DESC, available_at ASC, id ASC
        LIMIT 1
-       FOR UPDATE SKIP LOCKED`
+       FOR UPDATE SKIP LOCKED`,
+      queryParams
     );
 
     if (!rows || rows.length === 0) {
@@ -2290,8 +2309,8 @@ async function sendQueuedMessage(message) {
   }
 
   // 1. Guard against cancelled jobs
-  const [currentQueueStatus] = await db.execute('SELECT status FROM message_queue WHERE id = ? LIMIT 1', [message.id]);
-  if (currentQueueStatus && currentQueueStatus[0]?.status === 'cancelled') {
+  const [cancelCheck] = await db.execute('SELECT status FROM message_queue WHERE id = ? LIMIT 1', [message.id]);
+  if (cancelCheck && cancelCheck[0]?.status === 'cancelled') {
     logger.info({ messageId: message.id }, 'Message was cancelled while awaiting dispatch; aborting send.');
     return;
   }
@@ -2401,20 +2420,47 @@ async function sendQueuedMessage(message) {
   }
 
   if (!session.sock) {
-      throw new Error('WhatsApp connection lost during humanized delay.');
-    }
-    session.activeOperations = (session.activeOperations || 0) + 1;
-    session.lastActivityAt = Date.now();
-    let result;
+    throw new Error('WhatsApp connection lost during humanized delay.');
+  }
+
+  // 1. Pre-flight reconciliation check:
+  // If an uncertain outcome previously occurred, a delivery receipt may have arrived while waiting for retry.
+  // Avoid duplicate sends if WhatsApp already confirmed this message!
+  const [currentQueueStatus] = await db.execute(
+    'SELECT status, provider_message_id, delivered_at, read_at FROM message_queue WHERE id = ? LIMIT 1',
+    [message.id]
+  );
+  if (currentQueueStatus[0] && ['sent', 'delivered', 'read'].includes(currentQueueStatus[0].status)) {
+    logger.info({ messageId: message.id, status: currentQueueStatus[0].status }, 'Message already confirmed via async receipt reconciliation; skipping redundant resend.');
+    return;
+  }
+
+  // 2. Deterministic Message ID (Idempotency Key):
+  // Preserve existing provider_message_id across retries, or generate one before network write.
+  let clientMessageId = message.provider_message_id || currentQueueStatus[0]?.provider_message_id;
+  if (!clientMessageId) {
+    clientMessageId = (typeof generateMessageID === 'function') ? generateMessageID() : `WG_${message.id}_${Date.now()}`;
+    message.provider_message_id = clientMessageId;
     try {
-      result = await session.sock.sendMessage(recipient.jid, outgoingMessage);
-      if (result?.key?.id && result?.message) {
-        await storeBaileysMessage(message.user_id, recipient.jid, result.key.id, true, null, result.message);
-      }
-    } finally {
-      session.activeOperations = Math.max(0, (session.activeOperations || 1) - 1);
-      session.lastActivityAt = Date.now();
+      await db.execute(
+        'UPDATE message_queue SET provider_message_id = ? WHERE id = ? AND provider_message_id IS NULL',
+        [clientMessageId, message.id]
+      );
+    } catch (_) {}
+  }
+
+  session.activeOperations = (session.activeOperations || 0) + 1;
+  session.lastActivityAt = Date.now();
+  let result;
+  try {
+    result = await session.sock.sendMessage(recipient.jid, outgoingMessage, { messageId: clientMessageId });
+    if (result?.key?.id && result?.message) {
+      await storeBaileysMessage(message.user_id, recipient.jid, result.key.id, true, null, result.message);
     }
+  } finally {
+    session.activeOperations = Math.max(0, (session.activeOperations || 1) - 1);
+    session.lastActivityAt = Date.now();
+  }
   await markMessageSent(message, result, recipient.normalizedTo);
 }
 
@@ -2679,16 +2725,30 @@ async function markMessageSent(message, result, normalizedTo) {
 }
 
 async function markMessageFailed(message, error, normalizedTo = null, isUncertain = false) {
-  const finalFail = isUncertain || Number(message.attempts) >= Number(message.max_attempts);
+  const attempts = Number(message.attempts) || 1;
+  const maxAttempts = Number(message.max_attempts) || 3;
+  const errString = String(error || '');
+  const isPermanent = errString.includes('not registered') ||
+    errString.includes('Invalid recipient') ||
+    errString.includes('opted out') ||
+    errString.includes('missing from storage') ||
+    errString.includes('invalid');
+  const finalFail = isPermanent || attempts >= maxAttempts;
   const nextStatus = finalFail ? 'failed' : 'queued';
-  const delay = Math.min(300, 15 * Math.max(1, Number(message.attempts)));
+  const baseDelay = Math.min(300, 5 * Math.pow(2, Math.max(0, attempts - 1)));
+  const jitter = Math.floor(Math.random() * 5);
+  const delay = baseDelay + jitter;
+
+  const statusNote = isUncertain
+    ? `Uncertain outcome (attempt ${attempts}/${maxAttempts}): ${error}. Idempotent retry scheduled in ${delay}s.`
+    : error;
 
   await db.execute(
     `UPDATE message_queue
      SET status = ?, normalized_recipient = COALESCE(?, normalized_recipient), error_message = ?,
          available_at = DATE_ADD(NOW(), INTERVAL ? SECOND), locked_at = NULL, locked_by = NULL
      WHERE id = ?`,
-    [nextStatus, normalizedTo, error, delay, message.id]
+    [nextStatus, normalizedTo, statusNote, delay, message.id]
   );
 
   if (finalFail) {
@@ -2707,98 +2767,152 @@ async function markMessageFailed(message, error, normalizedTo = null, isUncertai
     // Cleanup temporary media with reference lifecycle management if final attempt failed
     try {
       const payload = message.payload ? (typeof message.payload === 'string' ? JSON.parse(message.payload) : message.payload) : null;
+      if (payload?.chat_message_id) {
+        await db.execute(
+          'UPDATE chat_messages SET status = "failed" WHERE id = ? AND user_id = ?',
+          [payload.chat_message_id, message.user_id]
+        );
+      }
       await safelyCleanupAttachment(message, payload);
     } catch (_) {}
   }
 }
 
-
-let queueBusy = false;
-async function processQueueOnce() {
-  if (queueBusy) {
-    return;
+function triggerUserQueue(userId) {
+  if (!userId) return;
+  const uid = String(userId);
+  if (activeUserRunners.has(uid)) {
+    return activeUserRunners.get(uid);
   }
 
-  queueBusy = true;
-  try {
-    const message = await claimNextMessage();
-    if (message) {
-      try {
-        await sendQueuedMessage(message);
-      } catch (error) {
-        const isUncertain = error.code === 'ECONNRESET' || error.message?.includes('socket') || error.message?.includes('timeout');
-        await markMessageFailed(message, error.message, null, isUncertain);
-      }
-      setImmediate(processQueueOnce);
-    } else {
-      const now = Date.now();
-      for (const session of sessions.values()) {
-        if (!session.autoSleepEnabled) {
-          continue; // Auto-sleep disabled by tenant
-        }
-        if (session.state !== 'connected' || !session.sock || session.sleeping) {
-          continue; // Session is not connected or already sleeping
-        }
-        if ((session.activeOperations || 0) > 0) {
-          continue; // Ongoing send or critical operation in progress; do not disconnect!
-        }
+  const runnerPromise = (async () => {
+    try {
+      await runUserQueue(uid);
+    } catch (err) {
+      logger.error({ err: err.message, userId: uid }, 'User queue runner encountered an error');
+    } finally {
+      activeUserRunners.delete(uid);
+    }
+  })();
 
-        const timeoutSeconds = Math.max(15, Math.min(86400, Number(session.autoSleepTimeoutSeconds) || 60));
-        const timeoutMs = timeoutSeconds * 1000;
-        const lastActivity = session.lastActivityAt || now;
+  activeUserRunners.set(uid, runnerPromise);
+  return runnerPromise;
+}
 
-        if (now - lastActivity >= timeoutMs) {
-          // Verify with database that auto-sleep is still enabled before sleeping
-          try {
-            const [dbRows] = await db.execute(
-              'SELECT auto_sleep_enabled, auto_sleep_timeout_seconds FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
-              [session.userId]
-            );
-            if (dbRows && dbRows[0]) {
-              if (dbRows[0].auto_sleep_enabled !== undefined && dbRows[0].auto_sleep_enabled !== null) {
-                session.autoSleepEnabled = Number(dbRows[0].auto_sleep_enabled) === 1;
-              }
-              if (dbRows[0].auto_sleep_timeout_seconds) {
-                session.autoSleepTimeoutSeconds = Math.max(15, Math.min(86400, Number(dbRows[0].auto_sleep_timeout_seconds) || 60));
-              }
-            }
-          } catch (_) {}
+async function runUserQueue(userId) {
+  const uid = String(userId);
+  const session = getSession(uid);
 
-          if (!session.autoSleepEnabled) {
-            continue; // Auto-sleep disabled by tenant in database
-          }
+  while (true) {
+    if (session.state === 'disconnected' || session.state === 'error') {
+      logger.info({ userId: uid, state: session.state }, 'Stopping queue runner: session is disconnected or in error');
+      break;
+    }
 
-          // Verify no active messages queued or processing for this tenant
-          const [activeQueue] = await db.execute(
-            `SELECT id FROM message_queue WHERE user_id = ? AND status IN ('queued', 'processing') AND available_at <= NOW() LIMIT 1`,
-            [session.userId]
-          );
-          if (activeQueue && activeQueue.length > 0) {
-            session.lastActivityAt = now;
-            continue;
-          }
+    const message = await claimNextMessage(uid);
+    if (!message) {
+      break;
+    }
 
-          logger.info(`Session for user ${session.userId} reached idle timeout of ${timeoutSeconds}s without activity. Entering auto-sleep.`);
-          session.wasSleeping = false;
-          session.sleeping = true;
-          session.qr = null;
-          session.hasQr = false;
-          session.error = null;
-          destroySocket(session);
-          session.state = session.phone ? 'connected' : 'idle';
-          await updateSessionRecord(session.userId, session);
-        }
+    try {
+      await sendQueuedMessage(message);
+    } catch (error) {
+      const isUncertain = error.code === 'ECONNRESET' || error.message?.includes('socket') || error.message?.includes('timeout');
+      await markMessageFailed(message, error.message, null, isUncertain);
+      if (isUncertain || session.state !== 'connected') {
+        break;
       }
     }
+  }
+}
+
+async function processQueueOnce() {
+  await cleanupExpiredLeases();
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT DISTINCT user_id FROM message_queue
+       WHERE status = 'queued'
+         AND available_at <= NOW()`
+    );
+
+    for (const row of rows) {
+      triggerUserQueue(String(row.user_id));
+    }
   } catch (error) {
-    logger.error({ error }, 'Queue processor failed');
-  } finally {
-    queueBusy = false;
+    logger.error({ error: error.message }, 'Failed to scan users with pending queue');
+  }
+
+  const now = Date.now();
+  for (const session of sessions.values()) {
+    if (!session.autoSleepEnabled) {
+      continue; // Auto-sleep disabled by tenant
+    }
+    if (session.state !== 'connected' || !session.sock || session.sleeping) {
+      continue; // Session is not connected or already sleeping
+    }
+    if ((session.activeOperations || 0) > 0) {
+      continue; // Ongoing send or critical operation in progress; do not disconnect!
+    }
+    if (activeUserRunners.has(String(session.userId))) {
+      continue; // Active queue runner running for this tenant
+    }
+
+    const timeoutSeconds = Math.max(15, Math.min(86400, Number(session.autoSleepTimeoutSeconds) || 60));
+    const timeoutMs = timeoutSeconds * 1000;
+    const lastActivity = session.lastActivityAt || now;
+
+    if (now - lastActivity >= timeoutMs) {
+      // Verify with database that auto-sleep is still enabled before sleeping
+      try {
+        const [dbRows] = await db.execute(
+          'SELECT auto_sleep_enabled, auto_sleep_timeout_seconds FROM whatsapp_sessions WHERE user_id = ? LIMIT 1',
+          [session.userId]
+        );
+        if (dbRows && dbRows[0]) {
+          if (dbRows[0].auto_sleep_enabled !== undefined && dbRows[0].auto_sleep_enabled !== null) {
+            session.autoSleepEnabled = Number(dbRows[0].auto_sleep_enabled) === 1;
+          }
+          if (dbRows[0].auto_sleep_timeout_seconds) {
+            session.autoSleepTimeoutSeconds = Math.max(15, Math.min(86400, Number(dbRows[0].auto_sleep_timeout_seconds) || 60));
+          }
+        }
+      } catch (_) {}
+
+      if (!session.autoSleepEnabled) {
+        continue; // Auto-sleep disabled by tenant in database
+      }
+
+      // Verify no active messages queued or processing for this tenant
+      const [activeQueue] = await db.execute(
+        `SELECT id FROM message_queue WHERE user_id = ? AND status IN ('queued', 'processing') AND available_at <= NOW() LIMIT 1`,
+        [session.userId]
+      );
+      if (activeQueue && activeQueue.length > 0) {
+        session.lastActivityAt = now;
+        continue;
+      }
+
+      logger.info(`Session for user ${session.userId} reached idle timeout of ${timeoutSeconds}s without activity. Entering auto-sleep.`);
+      session.wasSleeping = false;
+      session.sleeping = true;
+      session.qr = null;
+      session.hasQr = false;
+      session.error = null;
+      destroySocket(session);
+      session.state = session.phone ? 'connected' : 'idle';
+      await updateSessionRecord(session.userId, session);
+    }
   }
 }
 
 app.post('/queue/notify', (req, res) => {
-  setImmediate(processQueueOnce);
+  const userId = req.body?.user_id;
+  if (userId) {
+    triggerUserQueue(String(userId));
+  } else {
+    setImmediate(processQueueOnce);
+  }
   res.json({ ok: true });
 });
 
@@ -3089,8 +3203,7 @@ async function startWorker() {
     logger.warn({ err: err.message }, 'Failed to pre-load sessions from database on worker startup');
   }
 
-  const HOST = process.env.WORKER_HOST || '127.0.0.1';
-  const server = app.listen(PORT, HOST, () => {
+  const server = app.listen(PORT, '127.0.0.1', () => {
     console.info(`[worker] listener=http://${HOST}:${PORT} health_route=GET /health database=ready`);
     setInterval(processQueueOnce, QUEUE_POLL_MS);
     setInterval(processWebhookQueueOnce, QUEUE_POLL_MS);
