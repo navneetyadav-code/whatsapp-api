@@ -73,6 +73,27 @@ const DEFAULT_COUNTRY_CODE = resolveDefaultCountryCode(process.env.DEFAULT_COUNT
 const WORKER_ID = `worker-${process.pid}-${Date.now()}`;
 const SEND_DELAY_MS = Number(process.env.SEND_DELAY_MS || 2500);
 const QUEUE_POLL_MS = Number(process.env.QUEUE_POLL_MS || 3000);
+const QUEUE_POLL_ACTIVE_MS = Number(process.env.QUEUE_POLL_ACTIVE_MS || 1000);
+const QUEUE_POLL_IDLE_MS = Number(process.env.QUEUE_POLL_IDLE_MS || 5000);
+let currentQueuePollMs = QUEUE_POLL_IDLE_MS;
+let queuePollTimer = null;
+
+function scheduleNextQueuePoll(delayMs = null) {
+  if (queuePollTimer) {
+    clearTimeout(queuePollTimer);
+    queuePollTimer = null;
+  }
+  const delay = (delayMs !== null && delayMs !== undefined) ? delayMs : currentQueuePollMs;
+  queuePollTimer = setTimeout(async () => {
+    try {
+      await processQueueOnce();
+    } catch (err) {
+      logger.error({ err: err.message }, 'Scheduled queue poll failed');
+    } finally {
+      scheduleNextQueuePoll();
+    }
+  }, delay);
+}
 const defaultSessionDir = process.platform === 'win32'
   ? resolve(__dirname, '..', '..', '..', 'whatsapp-api-data', 'sessions')
   : '/var/www/html/whatsapp-api-data/sessions';
@@ -2855,6 +2876,7 @@ async function runUserQueue(userId) {
 async function processQueueOnce() {
   await cleanupExpiredLeases();
 
+  let hasPending = false;
   try {
     const [rows] = await db.execute(
       `SELECT DISTINCT user_id FROM message_queue
@@ -2862,11 +2884,21 @@ async function processQueueOnce() {
          AND available_at <= NOW()`
     );
 
-    for (const row of rows) {
-      triggerUserQueue(String(row.user_id));
+    if (rows && rows.length > 0) {
+      hasPending = true;
+      for (const row of rows) {
+        triggerUserQueue(String(row.user_id));
+      }
     }
   } catch (error) {
     logger.error({ error: error.message }, 'Failed to scan users with pending queue');
+  }
+
+  // Adaptive Backoff: Poll every 1s when active, back off to 5s when idle
+  if (hasPending || activeUserRunners.size > 0) {
+    currentQueuePollMs = QUEUE_POLL_ACTIVE_MS; // 1000ms
+  } else {
+    currentQueuePollMs = QUEUE_POLL_IDLE_MS;   // 5000ms
   }
 
   const now = Date.now();
@@ -2933,6 +2965,10 @@ async function processQueueOnce() {
 }
 
 app.post('/queue/notify', (req, res) => {
+  // Adaptive Backoff: Wake immediately on notification and switch to active polling rate (1s)
+  currentQueuePollMs = QUEUE_POLL_ACTIVE_MS;
+  scheduleNextQueuePoll(0);
+
   const userId = req.body?.user_id;
   if (userId) {
     triggerUserQueue(String(userId));
@@ -3230,8 +3266,9 @@ async function startWorker() {
   }
 
   const server = app.listen(PORT, '127.0.0.1', () => {
-    console.info(`[worker] listener=http://${HOST}:${PORT} health_route=GET /health database=ready`);
-    setInterval(processQueueOnce, QUEUE_POLL_MS);
+    console.info(`[worker] listener=http://127.0.0.1:${PORT} health_route=GET /health database=ready`);
+    // Adaptive queue polling loop (legacy compatibility: setInterval(processQueueOnce, QUEUE_POLL_MS))
+    scheduleNextQueuePoll(0);
     setInterval(processWebhookQueueOnce, QUEUE_POLL_MS);
   });
   attachClientErrorDiagnostics(server, logger);
