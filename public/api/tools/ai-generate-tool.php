@@ -291,139 +291,130 @@ PROMPT;
             if ($apiKey === '') continue;
 
             if ($prov === 'gemini') {
-                $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['gemini_model'] ?? 'gemini-3.5-flash'))) ?: 'gemini-3.5-flash';
-                $candidates = $isSpecificKey ? [$baseModel] : array_unique([$baseModel, 'gemini-2.5-flash', 'gemini-flash-latest']);
-                foreach ($candidates as $candModel) {
-                    try {
-                        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$candModel}:generateContent?key={$apiKey}";
-                        $ch = curl_init($url);
-                        curl_setopt_array($ch, [
-                            CURLOPT_POST => true,
-                            CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 20,
-                            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                            CURLOPT_POSTFIELDS => json_encode([
-                                'contents' => [
-                                    ['parts' => [['text' => $promptPayload]]]
-                                ],
-                                'generationConfig' => [
-                                    'temperature' => 0.2,
-                                    'maxOutputTokens' => 1500,
-                                    'responseMimeType' => 'application/json'
-                                ]
-                            ])
-                        ]);
-                        $resp = curl_exec($ch);
-                        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        curl_close($ch);
+                $candModel = trim((string) ($kRecord['model'] ?? ($aiSettings['gemini_model'] ?? ''))) ?: (config_env('DEFAULT_GEMINI_MODEL') ?: 'gemini-2.5-flash');
+                try {
+                    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$candModel}:generateContent?key={$apiKey}";
+                    $ch = curl_init($url);
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 20,
+                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                        CURLOPT_POSTFIELDS => json_encode([
+                            'contents' => [
+                                ['parts' => [['text' => $promptPayload]]]
+                            ],
+                            'generationConfig' => [
+                                'temperature' => 0.2,
+                                'maxOutputTokens' => 1500,
+                                'responseMimeType' => 'application/json'
+                            ]
+                        ])
+                    ]);
+                    $resp = curl_exec($ch);
+                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
 
-                        if ($code === 200 && $resp) {
-                            $json = json_decode($resp, true);
-                            $content = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
-                            $parsed = json_decode(trim($content), true);
-                            if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
-                                $aiResult = $parsed;
-                                $usedProvider = "Google Gemini ({$candModel})";
-                                break 2;
-                            }
-                        } else {
-                            $errJson = json_decode((string) $resp, true);
-                            $lastAiError = $errJson['error']['message'] ?? "Gemini HTTP $code";
+                    if ($code === 200 && $resp) {
+                        $json = json_decode($resp, true);
+                        $content = $json['candidates'][0]['content']['parts'][0]['text'] ?? '';
+                        $parsed = json_decode(trim($content), true);
+                        if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
+                            $aiResult = $parsed;
+                            $usedProvider = "Google Gemini ({$candModel})";
+                            break 2;
                         }
-                    } catch (\Throwable $e) {
-                        $lastAiError = $e->getMessage();
+                    } else {
+                        $errJson = json_decode((string) $resp, true);
+                        $lastAiError = $errJson['error']['message'] ?? "Gemini HTTP $code";
                     }
+                } catch (\Throwable $e) {
+                    $lastAiError = $e->getMessage();
                 }
             } elseif ($prov === 'groq') {
-                $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['groq_model'] ?? 'openai/gpt-oss-120b'))) ?: 'openai/gpt-oss-120b';
-                $candidates = $isSpecificKey ? [$baseModel] : array_unique([$baseModel, 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile']);
-                foreach ($candidates as $candModel) {
-                    try {
-                        $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
-                        curl_setopt_array($ch, [
-                            CURLOPT_POST => true,
-                            CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 20,
-                            CURLOPT_HTTPHEADER => [
-                                'Content-Type: application/json',
-                                "Authorization: Bearer {$apiKey}"
+                $candModel = trim((string) ($kRecord['model'] ?? ($aiSettings['groq_model'] ?? ''))) ?: (config_env('DEFAULT_GROQ_MODEL') ?: 'llama-3.3-70b-versatile');
+                try {
+                    $ch = curl_init('https://api.groq.com/openai/v1/chat/completions');
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 20,
+                        CURLOPT_HTTPHEADER => [
+                            'Content-Type: application/json',
+                            "Authorization: Bearer {$apiKey}"
+                        ],
+                        CURLOPT_POSTFIELDS => json_encode([
+                            'model' => $candModel,
+                            'messages' => [
+                                ['role' => 'user', 'content' => $promptPayload]
                             ],
-                            CURLOPT_POSTFIELDS => json_encode([
-                                'model' => $candModel,
-                                'messages' => [
-                                    ['role' => 'user', 'content' => $promptPayload]
-                                ],
-                                'temperature' => 0.2,
-                                'max_tokens' => 1500,
-                                'response_format' => ['type' => 'json_object']
-                            ])
-                        ]);
-                        $resp = curl_exec($ch);
-                        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        curl_close($ch);
+                            'temperature' => 0.2,
+                            'max_tokens' => 1500,
+                            'response_format' => ['type' => 'json_object']
+                        ])
+                    ]);
+                    $resp = curl_exec($ch);
+                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
 
-                        if ($code === 200 && $resp) {
-                            $json = json_decode($resp, true);
-                            $content = $json['choices'][0]['message']['content'] ?? '';
-                            $parsed = json_decode(trim($content), true);
-                            if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
-                                $aiResult = $parsed;
-                                $usedProvider = "Groq ({$candModel})";
-                                break 2;
-                            }
-                        } else {
-                            $errJson = json_decode((string) $resp, true);
-                            $lastAiError = $errJson['error']['message'] ?? "Groq HTTP $code";
+                    if ($code === 200 && $resp) {
+                        $json = json_decode($resp, true);
+                        $content = $json['choices'][0]['message']['content'] ?? '';
+                        $parsed = json_decode(trim($content), true);
+                        if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
+                            $aiResult = $parsed;
+                            $usedProvider = "Groq ({$candModel})";
+                            break 2;
                         }
-                    } catch (\Throwable $e) {
-                        $lastAiError = $e->getMessage();
+                    } else {
+                        $errJson = json_decode((string) $resp, true);
+                        $lastAiError = $errJson['error']['message'] ?? "Groq HTTP $code";
                     }
+                } catch (\Throwable $e) {
+                    $lastAiError = $e->getMessage();
                 }
             } elseif ($prov === 'openrouter') {
-                $baseModel = trim((string) ($kRecord['model'] ?? ($aiSettings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free'))) ?: 'meta-llama/llama-3.3-70b-instruct:free';
-                $candidates = $isSpecificKey ? [$baseModel] : array_unique([$baseModel, 'meta-llama/llama-3.3-70b-instruct:free', 'meta-llama/llama-3.3-70b-instruct']);
-                foreach ($candidates as $candModel) {
-                    try {
-                        $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
-                        curl_setopt_array($ch, [
-                            CURLOPT_POST => true,
-                            CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 20,
-                            CURLOPT_HTTPHEADER => [
-                                'Content-Type: application/json',
-                                "Authorization: Bearer {$apiKey}"
+                $candModel = trim((string) ($kRecord['model'] ?? ($aiSettings['openrouter_model'] ?? ''))) ?: (config_env('DEFAULT_OPENROUTER_MODEL') ?: 'meta-llama/llama-3.3-70b-instruct');
+                try {
+                    $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
+                    curl_setopt_array($ch, [
+                        CURLOPT_POST => true,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 20,
+                        CURLOPT_HTTPHEADER => [
+                            'Content-Type: application/json',
+                            "Authorization: Bearer {$apiKey}"
+                        ],
+                        CURLOPT_POSTFIELDS => json_encode([
+                            'model' => $candModel,
+                            'messages' => [
+                                ['role' => 'user', 'content' => $promptPayload]
                             ],
-                            CURLOPT_POSTFIELDS => json_encode([
-                                'model' => $candModel,
-                                'messages' => [
-                                    ['role' => 'user', 'content' => $promptPayload]
-                                ],
-                                'temperature' => 0.2,
-                                'max_tokens' => 1500
-                            ])
-                        ]);
-                        $resp = curl_exec($ch);
-                        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        curl_close($ch);
+                            'temperature' => 0.2,
+                            'max_tokens' => 1500
+                        ])
+                    ]);
+                    $resp = curl_exec($ch);
+                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
 
-                        if ($code === 200 && $resp) {
-                            $json = json_decode($resp, true);
-                            $content = $json['choices'][0]['message']['content'] ?? '';
-                            $content = preg_replace('/^```(?:json)?\s*/i', '', trim($content));
-                            $content = preg_replace('/\s*```$/', '', $content);
-                            $parsed = json_decode(trim($content), true);
-                            if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
-                                $aiResult = $parsed;
-                                $usedProvider = "OpenRouter ({$candModel})";
-                                break 2;
-                            }
-                        } else {
-                            $errJson = json_decode((string) $resp, true);
-                            $lastAiError = $errJson['error']['message'] ?? "OpenRouter HTTP $code";
+                    if ($code === 200 && $resp) {
+                        $json = json_decode($resp, true);
+                        $content = $json['choices'][0]['message']['content'] ?? '';
+                        $content = preg_replace('/^\`\`\`(?:json)?\s*/i', '', trim($content));
+                        $content = preg_replace('/\s*\`\`\`$/', '', $content);
+                        $parsed = json_decode(trim($content), true);
+                        if (is_array($parsed) && !empty($parsed['tool_slug']) && !empty($parsed['execution_config'])) {
+                            $aiResult = $parsed;
+                            $usedProvider = "OpenRouter ({$candModel})";
+                            break 2;
                         }
-                    } catch (\Throwable $e) {
-                        $lastAiError = $e->getMessage();
+                    } else {
+                        $errJson = json_decode((string) $resp, true);
+                        $lastAiError = $errJson['error']['message'] ?? "OpenRouter HTTP $code";
                     }
+                } catch (\Throwable $e) {
+                    $lastAiError = $e->getMessage();
                 }
             }
         }

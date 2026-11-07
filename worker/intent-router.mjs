@@ -156,6 +156,28 @@ export const SYSTEM_CONFIRM_TOOL = {
 /**
  * System tool declaration for cancel_pending_action
  */
+
+/**
+ * System tool declaration for inspect_recent_actions
+ */
+export const SYSTEM_INSPECT_TOOL = {
+  tool_slug: 'inspect_recent_actions',
+  display_name: '🔍 Inspect Recent Actions',
+  category: 'system_action',
+  description: 'Inspect verified recent executed actions and their exact parameters from this conversation history (e.g. to recall what email was drafted or sent, review recently executed tool arguments, or verify action parameters).',
+  parameters_schema: {
+    type: 'OBJECT',
+    properties: {
+      limit: {
+        type: 'INTEGER',
+        description: 'Number of recent executed actions to retrieve (1 to 5, default 2).'
+      }
+    }
+  },
+  rbac_roles: ['admin', 'customer', 'guest'],
+  is_active: true
+};
+
 export const SYSTEM_CANCEL_TOOL = {
   tool_slug: 'cancel_pending_action',
   display_name: '❌ Cancel Pending Action',
@@ -217,6 +239,12 @@ export function composeSkillsAndTools(intents = [], allTools = [], isPersonalMod
       `• If approved (e.g. user says "yes", "confirm", "proceed", "send", "bhej do"), call confirm_pending_action with action_code="${pa.action_code}".\n` +
       `• If cancelled (e.g. user says "no", "cancel", "stop", "mat bhejo"), call cancel_pending_action with action_code="${pa.action_code}".`
     );
+  }
+
+  
+  // Action Audit Inspection Tool: Always expose so model can recall recently executed actions
+  if (!candidateTools.some(t => t.tool_slug === 'inspect_recent_actions')) {
+    candidateTools.push(SYSTEM_INSPECT_TOOL);
   }
 
   return {

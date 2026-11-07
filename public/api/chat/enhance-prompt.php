@@ -180,155 +180,148 @@ foreach ($providerOrder as $prov) {
         if ($apiKey === '') continue;
 
         if ($prov === 'gemini') {
-            $baseModel = preg_replace('/^models\//', '', trim((string) ($kRecord['model'] ?? ($settings['gemini_model'] ?? 'gemini-3.5-flash-lite')))) ?: 'gemini-3.5-flash-lite';
-            $candidates = array_unique(array_filter([$baseModel, 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-flash-lite-latest']));
-            foreach ($candidates as $candModel) {
-                try {
-                    $url = "https://generativelanguage.googleapis.com/v1beta/models/{$candModel}:generateContent?key={$apiKey}";
-                    $ch = curl_init($url);
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST => true,
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT => 20,
-                        CURLOPT_SSL_VERIFYPEER => false,
-                        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                        CURLOPT_POSTFIELDS => json_encode([
-                            'contents' => [
-                                ['parts' => [['text' => $metaPrompt]]]
-                            ],
-                            'generationConfig' => [
-                                'temperature' => 0.2,
-                                'maxOutputTokens' => 1000,
-                            ]
-                        ])
-                    ]);
-                    $resp = curl_exec($ch);
-                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $curlErr = curl_error($ch);
-                    curl_close($ch);
+            $candModel = preg_replace('/^models\//', '', trim((string) ($kRecord['model'] ?? ($settings['gemini_model'] ?? '')))) ?: (config_env('DEFAULT_GEMINI_MODEL') ?: 'gemini-2.5-flash');
+            try {
+                $url = "https://generativelanguage.googleapis.com/v1beta/models/{$candModel}:generateContent?key={$apiKey}";
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 20,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => json_encode([
+                        'contents' => [
+                            ['parts' => [['text' => $metaPrompt]]]
+                        ],
+                        'generationConfig' => [
+                            'temperature' => 0.2,
+                            'maxOutputTokens' => 1000,
+                        ]
+                    ])
+                ]);
+                $resp = curl_exec($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr = curl_error($ch);
+                curl_close($ch);
 
-                    if ($code === 200 && $resp) {
-                        $data = json_decode((string) $resp, true);
-                        $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-                        if (!empty(trim((string) $text))) {
-                            $enhanced = trim((string) $text);
-                            $usedProvider = "Google Gemini ({$candModel})";
-                            if (!empty($kRecord['id'])) {
-                                $pdo->prepare('UPDATE ai_provider_keys SET status = "active", last_error = NULL, last_used_at = NOW(), fail_count = 0 WHERE id = ? AND user_id = ?')->execute([(int) $kRecord['id'], $userId]);
-                            }
-                            break 2;
-                        }
-                    } else {
-                        $lastError = "Gemini [{$code}]: " . ($curlErr ?: substr((string) $resp, 0, 150));
+                if ($code === 200 && $resp) {
+                    $data = json_decode((string) $resp, true);
+                    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+                    if (!empty(trim((string) $text))) {
+                        $enhanced = trim((string) $text);
+                        $usedProvider = "Google Gemini ({$candModel})";
                         if (!empty($kRecord['id'])) {
-                            $pdo->prepare('UPDATE ai_provider_keys SET status = "error", last_error = ?, fail_count = fail_count + 1 WHERE id = ? AND user_id = ?')->execute([substr($lastError, 0, 255), (int) $kRecord['id'], $userId]);
+                            $pdo->prepare('UPDATE ai_provider_keys SET status = "active", last_error = NULL, last_used_at = NOW(), fail_count = 0 WHERE id = ? AND user_id = ?')->execute([(int) $kRecord['id'], $userId]);
                         }
+                        break 2;
                     }
-                } catch (\Throwable $e) {
-                    $lastError = "Gemini exception: " . $e->getMessage();
+                } else {
+                    $lastError = "Gemini [{$code}]: " . ($curlErr ?: substr((string) $resp, 0, 150));
+                    if (!empty($kRecord['id'])) {
+                        $pdo->prepare('UPDATE ai_provider_keys SET status = "error", last_error = ?, fail_count = fail_count + 1 WHERE id = ? AND user_id = ?')->execute([substr($lastError, 0, 255), (int) $kRecord['id'], $userId]);
+                    }
                 }
+            } catch (\Throwable $e) {
+                $lastError = "Gemini exception: " . $e->getMessage();
             }
         } elseif ($prov === 'groq') {
-            $baseModel = trim((string) ($kRecord['model'] ?? ($settings['groq_model'] ?? 'openai/gpt-oss-120b'))) ?: 'openai/gpt-oss-120b';
-            $candidates = array_unique(array_filter([$baseModel, 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b']));
-            foreach ($candidates as $candModel) {
-                try {
-                    $url = 'https://api.groq.com/openai/v1/chat/completions';
-                    $ch = curl_init($url);
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST => true,
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT => 20,
-                        CURLOPT_SSL_VERIFYPEER => false,
-                        CURLOPT_HTTPHEADER => [
-                            'Content-Type: application/json',
-                            "Authorization: Bearer {$apiKey}"
+            $candModel = trim((string) ($kRecord['model'] ?? ($settings['groq_model'] ?? ''))) ?: (config_env('DEFAULT_GROQ_MODEL') ?: 'llama-3.3-70b-versatile');
+            try {
+                $url = 'https://api.groq.com/openai/v1/chat/completions';
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 20,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_HTTPHEADER => [
+                        'Content-Type: application/json',
+                        "Authorization: Bearer {$apiKey}"
+                    ],
+                    CURLOPT_POSTFIELDS => json_encode([
+                        'model' => $candModel,
+                        'messages' => [
+                            ['role' => 'user', 'content' => $metaPrompt]
                         ],
-                        CURLOPT_POSTFIELDS => json_encode([
-                            'model' => $candModel,
-                            'messages' => [
-                                ['role' => 'user', 'content' => $metaPrompt]
-                            ],
-                            'temperature' => 0.2,
-                            'max_tokens' => 1000,
-                        ])
-                    ]);
-                    $resp = curl_exec($ch);
-                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $curlErr = curl_error($ch);
-                    curl_close($ch);
+                        'temperature' => 0.2,
+                        'max_tokens' => 1000
+                    ])
+                ]);
+                $resp = curl_exec($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr = curl_error($ch);
+                curl_close($ch);
 
-                    if ($code === 200 && $resp) {
-                        $data = json_decode((string) $resp, true);
-                        $text = $data['choices'][0]['message']['content'] ?? '';
-                        if (!empty(trim((string) $text))) {
-                            $enhanced = trim((string) $text);
-                            $usedProvider = "Groq ({$candModel})";
-                            if (!empty($kRecord['id'])) {
-                                $pdo->prepare('UPDATE ai_provider_keys SET status = "active", last_error = NULL, last_used_at = NOW(), fail_count = 0 WHERE id = ? AND user_id = ?')->execute([(int) $kRecord['id'], $userId]);
-                            }
-                            break 2;
-                        }
-                    } else {
-                        $lastError = "Groq [{$code}]: " . ($curlErr ?: substr((string) $resp, 0, 150));
+                if ($code === 200 && $resp) {
+                    $data = json_decode((string) $resp, true);
+                    $text = $data['choices'][0]['message']['content'] ?? '';
+                    if (!empty(trim((string) $text))) {
+                        $enhanced = trim((string) $text);
+                        $usedProvider = "Groq ({$candModel})";
                         if (!empty($kRecord['id'])) {
-                            $pdo->prepare('UPDATE ai_provider_keys SET status = "error", last_error = ?, fail_count = fail_count + 1 WHERE id = ? AND user_id = ?')->execute([substr($lastError, 0, 255), (int) $kRecord['id'], $userId]);
+                            $pdo->prepare('UPDATE ai_provider_keys SET status = "active", last_error = NULL, last_used_at = NOW(), fail_count = 0 WHERE id = ? AND user_id = ?')->execute([(int) $kRecord['id'], $userId]);
                         }
+                        break 2;
                     }
-                } catch (\Throwable $e) {
-                    $lastError = "Groq exception: " . $e->getMessage();
+                } else {
+                    $lastError = "Groq [{$code}]: " . ($curlErr ?: substr((string) $resp, 0, 150));
+                    if (!empty($kRecord['id'])) {
+                        $pdo->prepare('UPDATE ai_provider_keys SET status = "error", last_error = ?, fail_count = fail_count + 1 WHERE id = ? AND user_id = ?')->execute([substr($lastError, 0, 255), (int) $kRecord['id'], $userId]);
+                    }
                 }
+            } catch (\Throwable $e) {
+                $lastError = "Groq exception: " . $e->getMessage();
             }
         } elseif ($prov === 'openrouter') {
-            $baseModel = trim((string) ($kRecord['model'] ?? ($settings['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free'))) ?: 'meta-llama/llama-3.3-70b-instruct:free';
-            $candidates = array_unique(array_filter([$baseModel, 'meta-llama/llama-3.3-70b-instruct:free', 'meta-llama/llama-3.3-70b-instruct']));
-            foreach ($candidates as $candModel) {
-                try {
-                    $url = 'https://openrouter.ai/api/v1/chat/completions';
-                    $ch = curl_init($url);
-                    curl_setopt_array($ch, [
-                        CURLOPT_POST => true,
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_TIMEOUT => 20,
-                        CURLOPT_SSL_VERIFYPEER => false,
-                        CURLOPT_HTTPHEADER => [
-                            'Content-Type: application/json',
-                            "Authorization: Bearer {$apiKey}"
+            $candModel = trim((string) ($kRecord['model'] ?? ($settings['openrouter_model'] ?? ''))) ?: (config_env('DEFAULT_OPENROUTER_MODEL') ?: 'meta-llama/llama-3.3-70b-instruct');
+            try {
+                $url = 'https://openrouter.ai/api/v1/chat/completions';
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_POST => true,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 20,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_HTTPHEADER => [
+                        'Content-Type: application/json',
+                        "Authorization: Bearer {$apiKey}",
+                        'HTTP-Referer: ' . base_url(''),
+                        'X-Title: WhatsGateway Prompt Enhancer'
+                    ],
+                    CURLOPT_POSTFIELDS => json_encode([
+                        'model' => $candModel,
+                        'messages' => [
+                            ['role' => 'user', 'content' => $metaPrompt]
                         ],
-                        CURLOPT_POSTFIELDS => json_encode([
-                            'model' => $candModel,
-                            'messages' => [
-                                ['role' => 'user', 'content' => $metaPrompt]
-                            ],
-                            'temperature' => 0.2,
-                            'max_tokens' => 1000,
-                        ])
-                    ]);
-                    $resp = curl_exec($ch);
-                    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    $curlErr = curl_error($ch);
-                    curl_close($ch);
+                        'temperature' => 0.2,
+                        'max_tokens' => 1000
+                    ])
+                ]);
+                $resp = curl_exec($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr = curl_error($ch);
+                curl_close($ch);
 
-                    if ($code === 200 && $resp) {
-                        $data = json_decode((string) $resp, true);
-                        $text = $data['choices'][0]['message']['content'] ?? '';
-                        if (!empty(trim((string) $text))) {
-                            $enhanced = trim((string) $text);
-                            $usedProvider = "OpenRouter ({$candModel})";
-                            if (!empty($kRecord['id'])) {
-                                $pdo->prepare('UPDATE ai_provider_keys SET status = "active", last_error = NULL, last_used_at = NOW(), fail_count = 0 WHERE id = ? AND user_id = ?')->execute([(int) $kRecord['id'], $userId]);
-                            }
-                            break 2;
-                        }
-                    } else {
-                        $lastError = "OpenRouter [{$code}]: " . ($curlErr ?: substr((string) $resp, 0, 150));
+                if ($code === 200 && $resp) {
+                    $data = json_decode((string) $resp, true);
+                    $text = $data['choices'][0]['message']['content'] ?? '';
+                    if (!empty(trim((string) $text))) {
+                        $enhanced = trim((string) $text);
+                        $usedProvider = "OpenRouter ({$candModel})";
                         if (!empty($kRecord['id'])) {
-                            $pdo->prepare('UPDATE ai_provider_keys SET status = "error", last_error = ?, fail_count = fail_count + 1 WHERE id = ? AND user_id = ?')->execute([substr($lastError, 0, 255), (int) $kRecord['id'], $userId]);
+                            $pdo->prepare('UPDATE ai_provider_keys SET status = "active", last_error = NULL, last_used_at = NOW(), fail_count = 0 WHERE id = ? AND user_id = ?')->execute([(int) $kRecord['id'], $userId]);
                         }
+                        break 2;
                     }
-                } catch (\Throwable $e) {
-                    $lastError = "OpenRouter exception: " . $e->getMessage();
+                } else {
+                    $lastError = "OpenRouter [{$code}]: " . ($curlErr ?: substr((string) $resp, 0, 150));
+                    if (!empty($kRecord['id'])) {
+                        $pdo->prepare('UPDATE ai_provider_keys SET status = "error", last_error = ?, fail_count = fail_count + 1 WHERE id = ? AND user_id = ?')->execute([substr($lastError, 0, 255), (int) $kRecord['id'], $userId]);
+                    }
                 }
+            } catch (\Throwable $e) {
+                $lastError = "OpenRouter exception: " . $e->getMessage();
             }
         }
     }

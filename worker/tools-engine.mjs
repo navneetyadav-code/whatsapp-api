@@ -1162,6 +1162,10 @@ export class UniversalToolsRegistry {
       return { cancelled: true, message: `Action "${actionCode}" has been discarded safely.` };
     }
 
+    if (toolName === 'inspect_recent_actions' || toolName === 'builtin_audit_inspect') {
+      return await handleInspectRecentActions(args, context);
+    }
+
     // 1. Locate tool in catalog
     const tool = tools.find(t => t.tool_slug === toolName);
 

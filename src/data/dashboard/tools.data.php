@@ -60,7 +60,7 @@ if (!empty($aiRow['gemini_api_key'])) {
             'id' => 'legacy_gemini',
             'provider' => 'gemini',
             'label' => 'Legacy Gemini Key',
-            'model' => $aiRow['gemini_model'] ?? 'gemini-3.5-flash',
+            'model' => $aiRow['gemini_model'] ?: (config_env('DEFAULT_GEMINI_MODEL') ?: 'gemini-2.5-flash'),
             'priority' => 99,
             'is_active' => 1,
             'status' => 'active'
@@ -77,7 +77,7 @@ if (!empty($aiRow['groq_api_key'])) {
             'id' => 'legacy_groq',
             'provider' => 'groq',
             'label' => 'Legacy Groq Key',
-            'model' => $aiRow['groq_model'] ?? 'openai/gpt-oss-120b',
+            'model' => $aiRow['groq_model'] ?: (config_env('DEFAULT_GROQ_MODEL') ?: 'llama-3.3-70b-versatile'),
             'priority' => 99,
             'is_active' => 1,
             'status' => 'active'
@@ -94,7 +94,7 @@ if (!empty($aiRow['openrouter_api_key'])) {
             'id' => 'legacy_openrouter',
             'provider' => 'openrouter',
             'label' => 'Legacy OpenRouter Key',
-            'model' => $aiRow['openrouter_model'] ?? 'meta-llama/llama-3.3-70b-instruct:free',
+            'model' => $aiRow['openrouter_model'] ?: (config_env('DEFAULT_OPENROUTER_MODEL') ?: 'meta-llama/llama-3.3-70b-instruct'),
             'priority' => 99,
             'is_active' => 1,
             'status' => 'active'

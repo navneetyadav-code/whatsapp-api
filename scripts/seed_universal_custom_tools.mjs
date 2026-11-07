@@ -142,6 +142,25 @@ async function seed() {
       is_active: 1
     },
 
+// 5b. Built-in Action Audit Inspector
+    {
+      tool_slug: 'inspect_recent_actions',
+      display_name: '🔍 Action Audit Inspector',
+      category: 'builtin',
+      description: 'Inspect verified recent executed actions and their exact parameters from this conversation history (e.g. to recall what email body was sent, what parameters were executed, or review recent actions).',
+      parameters_schema: {
+        type: 'OBJECT',
+        properties: {
+          limit: { type: 'INTEGER', description: 'Number of recent executed actions to retrieve (1 to 5, default 2)' }
+        }
+      },
+      execution_config: {
+        handler: 'inspect_recent_actions'
+      },
+      rbac_roles: ['guest', 'customer', 'admin'],
+      is_active: 1
+    },
+
     // 6. Shared Hosting Dual-Environment API: AssistGroup CRM Connector
     {
       tool_slug: 'crm_dual_env',
