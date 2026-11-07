@@ -155,13 +155,13 @@ $messageId = enqueue_message((int) $user['user_id'], (int) $user['id'], $to, $me
 $requestId = log_api_request((int) $user['user_id'], (int) $user['id'], 'send', 200);
 
 $cleanTo = preg_replace('/\D/', '', $to);
-$wamid = 'wamid.' . bin2hex(random_bytes(16));
 
 json_response([
-    // Standard Hub API fields
+    // Standard Gateway API fields
     'ok' => true,
     'status' => 'queued',
     'message_id' => $messageId,
+    'provider_message_id' => null,
     'request_id' => $requestId,
     'recipient' => $cleanTo,
     'type' => $payloadType,
@@ -177,7 +177,7 @@ json_response([
     ],
     'messages' => [
         [
-            'id' => $wamid,
+            'id' => (string) $messageId,
             'message_status' => 'accepted',
         ],
     ],
