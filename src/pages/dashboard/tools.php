@@ -5,27 +5,43 @@
         <div class="flex items-center gap-3">
             <h1 class="text-xl font-bold text-slate-900 tracking-tight">Tools & Integrations</h1>
             <div class="flex items-center gap-1.5">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span id="activeToolsBadge"><?= count(array_filter($userTools, fn($t) => !empty($t['is_active']))) ?>/<?= count($userTools) ?> Active</span>
-                </span>
-                <span class="text-xs text-slate-400 font-mono hidden sm:inline">| <?= count($recentInvocations) ?> logged calls</span>
+                <span id="invocationsBadge" class="text-xs text-slate-500 font-mono"><?= count($recentInvocations) ?> logged calls</span>
             </div>
         </div>
 
         <div class="flex items-center gap-2 flex-wrap">
-            <button type="button" id="toolsExportToggleBtn" onclick="toggleExportMode()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer" title="Select and export tools into a ZIP package">
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                <span id="toolsExportToggleBtnText">Export ZIP</span>
+            <!-- Unified ZIP Package Dropdown (Export & Import) -->
+            <div class="relative inline-block text-left" id="zipDropdownContainer">
+                <button type="button" id="zipDropdownTrigger" onclick="toggleZipDropdown(event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer" aria-haspopup="true" aria-expanded="false" title="ZIP Package Tools (Import / Export)">
+                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    <span id="zipDropdownTriggerText">ZIP Package</span>
+                    <svg class="w-3.5 h-3.5 text-slate-400 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div id="zipDropdownMenu" class="hidden absolute right-0 mt-1.5 w-52 rounded-xl bg-white border border-slate-200 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <button type="button" onclick="closeZipDropdown(); toggleExportMode();" class="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors text-left cursor-pointer">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        <div>
+                            <div class="font-semibold text-slate-800">Export ZIP</div>
+                            <div class="text-[10px] text-slate-400">Bundle selected tools into package</div>
+                        </div>
+                    </button>
+                    <div class="border-t border-slate-100 my-1"></div>
+                    <button type="button" onclick="closeZipDropdown(); openToolsImportModal();" class="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors text-left cursor-pointer">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                        <div>
+                            <div class="font-semibold text-slate-800">Import ZIP</div>
+                            <div class="text-[10px] text-slate-400">Upload & inspect a tools archive</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Delete Multiple Tools Button -->
+            <button type="button" id="bulkDeleteToggleBtn" onclick="toggleDeleteMode()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer" title="Select and delete multiple tools">
+                <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <span id="bulkDeleteToggleBtnText">Delete</span>
             </button>
-            <button type="button" onclick="openToolsImportModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer" title="Import tools from a ZIP package">
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                <span>Import ZIP</span>
-            </button>
-            <button type="button" onclick="openPresetsModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
-                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                <span>Presets</span>
-            </button>
+
             <button type="button" onclick="openAiImporterModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/90 shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
                 <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
                 <span>Import cURL / AI</span>
@@ -39,12 +55,11 @@
 
     <!-- Compact Whitelisted Admin Phones Bar (Single-Row) -->
     <div class="bg-white rounded-xl border border-slate-200/90 px-3.5 py-2.5 shadow-2xs">
-        <form method="post" action="<?= e(base_url('index.php?page=ai-tools-config-save')) ?>" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <form method="post" action="<?= e(base_url('index.php?page=ai-tools-config-save')) ?>" onsubmit="handleAdminPhonesSubmit(event)" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <div class="flex items-center gap-2 shrink-0">
                 <svg class="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 <label for="adminPhonesInput" class="text-xs font-bold text-slate-800 whitespace-nowrap">Admin Phone Numbers</label>
-                <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200/80">RBAC</span>
             </div>
             <div class="flex items-center gap-2 flex-1 sm:max-w-xl sm:ml-auto">
                 <input type="text" id="adminPhonesInput" name="admin_phones" value="<?= e(implode(', ', $toolsConfig['admin_phones'] ?? [])) ?>" class="w-full text-xs font-mono px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50/60 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-colors" placeholder="+14155552671, +919876543210">
@@ -97,16 +112,16 @@
 
     <!-- VIEW 1: TOOLS GRID -->
     <div id="viewToolsSection">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5" id="toolsCardsGrid">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 <?= !$userTools ? 'hidden' : '' ?>" id="toolsCardsGrid">
             <?php foreach ($userTools as $tool): 
                 $cat = $tool['category'];
                 $paramsCount = count($tool['parameters_schema']['properties'] ?? []);
                 $method = $cat === 'rest_api' ? ($tool['execution_config']['method'] ?? 'GET') : ($cat === 'webhook' ? 'POST' : ($cat === 'shared_env_api' ? 'PROD' : 'BUILTIN'));
                 $targetUrl = $cat === 'rest_api' ? ($tool['execution_config']['url'] ?? '') : ($cat === 'webhook' ? ($tool['execution_config']['target_url'] ?? '') : ($cat === 'shared_env_api' ? ($tool['execution_config']['base_url'] ?? '') : ($tool['execution_config']['handler'] ?? $tool['tool_slug'])));
             ?>
-                <div class="tool-card bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-2xs hover:shadow-card transition-all flex flex-col justify-between group relative" data-tool-id="<?= (int) $tool['id'] ?>" data-tool-slug="<?= e($tool['tool_slug']) ?>" data-category="<?= e($cat) ?>" data-tool="<?= htmlspecialchars(json_encode($tool, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>" onclick="handleCardExportSelect(this, event)">
+                <div class="tool-card bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-2xs hover:shadow-card transition-all flex flex-col justify-between group relative" data-tool-id="<?= (int) $tool['id'] ?>" data-tool-slug="<?= e($tool['tool_slug']) ?>" data-category="<?= e($cat) ?>" data-tool="<?= htmlspecialchars(json_encode($tool, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>" onclick="handleCardClick(this, event)">
                     <div>
-                        <!-- Header: Method Badge, Title, Toggle, Export Selection Indicator -->
+                        <!-- Header: Method Badge, Title, Toggle, Selection Indicators -->
                         <div class="flex items-start justify-between gap-2 mb-2">
                             <div class="flex items-center gap-1.5 min-w-0 flex-1">
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 <?= $cat === 'rest_api' ? 'bg-sky-50 text-sky-700 border border-sky-200/80' : ($cat === 'shared_env_api' ? 'bg-purple-50 text-purple-700 border border-purple-200/80' : ($cat === 'webhook' ? 'bg-amber-50 text-amber-700 border border-amber-200/80' : 'bg-slate-100 text-slate-700 border border-slate-200')) ?>">
@@ -118,19 +133,22 @@
                             </div>
 
                             <div class="flex items-center gap-1 shrink-0">
-                                <form method="post" action="<?= e(base_url('index.php?page=custom-tool-toggle')) ?>" class="inline tool-toggle-form">
-                                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                                    <input type="hidden" name="id" value="<?= (int) $tool['id'] ?>">
-                                    <button type="submit" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer <?= !empty($tool['is_active']) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200' ?>" title="<?= !empty($tool['is_active']) ? 'Disable tool' : 'Enable tool' ?>">
-                                        <span class="w-1.5 h-1.5 rounded-full <?= !empty($tool['is_active']) ? 'bg-emerald-500' : 'bg-slate-400' ?>"></span>
-                                        <span><?= !empty($tool['is_active']) ? 'Active' : 'Off' ?></span>
-                                    </button>
-                                </form>
+                                <button type="button" onclick="handleToolToggle(<?= (int) $tool['id'] ?>, this, event)" class="tool-toggle-btn inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer <?= !empty($tool['is_active']) ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200' ?>" data-active="<?= !empty($tool['is_active']) ? '1' : '0' ?>" title="<?= !empty($tool['is_active']) ? 'Disable tool' : 'Enable tool' ?>">
+                                    <span class="w-1.5 h-1.5 rounded-full <?= !empty($tool['is_active']) ? 'bg-emerald-500' : 'bg-slate-400' ?>"></span>
+                                    <span class="toggle-status-text"><?= !empty($tool['is_active']) ? 'Active' : 'Off' ?></span>
+                                </button>
 
-                                <!-- Export Selection Indicator (Radio / Checkbox style) -->
+                                <!-- Export Selection Indicator -->
                                 <div class="export-indicator-wrap hidden" title="Select tool for export">
                                     <div class="w-5 h-5 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs group-hover:border-indigo-400">
                                         <svg class="w-3 h-3 text-white hidden export-check-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                </div>
+
+                                <!-- Delete Selection Indicator -->
+                                <div class="delete-indicator-wrap hidden" title="Select tool for deletion">
+                                    <div class="w-5 h-5 rounded-md border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 delete-check-box shadow-2xs group-hover:border-rose-400">
+                                        <svg class="w-3.5 h-3.5 text-white hidden delete-check-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                                     </div>
                                 </div>
                             </div>
@@ -148,7 +166,7 @@
                             <?= e($tool['description']) ?>
                         </p>
 
-                        <!-- Meta Chips: Parameters & RBAC Roles -->
+                        <!-- Meta Chips: Parameters -->
                         <div class="flex items-center justify-between text-[10px] pb-2 text-slate-400">
                             <span class="font-mono text-slate-600 bg-slate-100/80 px-1.5 py-0.5 rounded">
                                 <?= $paramsCount ?> param<?= $paramsCount === 1 ? '' : 's' ?>
@@ -175,39 +193,30 @@
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 <span>Edit</span>
                             </button>
-                            <form method="post" action="<?= e(base_url('index.php?page=custom-tool-delete')) ?>" onsubmit="return confirm('Delete this tool?');" class="inline">
-                                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
-                                <input type="hidden" name="id" value="<?= (int) $tool['id'] ?>">
-                                <button type="submit" class="w-6 h-6 inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer" title="Delete tool">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                </button>
-                            </form>
+                            <button type="button" onclick="handleSingleToolDelete(<?= (int) $tool['id'] ?>, '<?= e(addslashes($tool['display_name'])) ?>', this, event)" class="w-6 h-6 inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer" title="Delete tool">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
             <?php endforeach; ?>
         </div>
 
-        <?php if (!$userTools): ?>
-            <div class="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center shadow-2xs">
-                <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center mx-auto mb-2.5">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </div>
-                <h3 class="text-xs font-bold text-slate-900 mb-1">No Tools Configured</h3>
-                <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">Add a custom REST endpoint, import a ZIP package, or install from presets.</p>
-                <div class="flex items-center justify-center gap-2">
-                    <button type="button" onclick="openCustomToolDrawer()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
-                        + Add Tool
-                    </button>
-                    <button type="button" onclick="openToolsImportModal()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/90 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
-                        Import ZIP Package
-                    </button>
-                    <button type="button" onclick="openPresetsModal()" class="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
-                        Browse Presets
-                    </button>
-                </div>
+        <div id="toolsEmptyState" class="<?= $userTools ? 'hidden' : '' ?> bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center shadow-2xs">
+            <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center mx-auto mb-2.5">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </div>
-        <?php endif; ?>
+            <h3 class="text-xs font-bold text-slate-900 mb-1">No Tools Configured</h3>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">Add a custom REST endpoint or import a ZIP package to get started.</p>
+            <div class="flex items-center justify-center gap-2">
+                <button type="button" onclick="openCustomToolDrawer()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
+                    + Add Tool
+                </button>
+                <button type="button" onclick="openToolsImportModal()" class="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/90 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer">
+                    Import ZIP Package
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Floating Export Selection Action Bar (Docked at bottom of viewport) -->
@@ -233,16 +242,51 @@
                 <button type="button" onclick="deselectAllExportTools()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer">
                     Clear
                 </button>
+                <button type="button" id="submitExportPackageBtn" onclick="submitExportPackage()" disabled class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
+                    Export Selected
+                </button>
                 <button type="button" onclick="exitExportMode()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
                     Cancel
-                </button>
-                <button type="button" id="exportSubmitBtn" onclick="submitExportPackage()" disabled class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white shadow-md transition-all active:scale-[0.98] cursor-pointer">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    <span>Download ZIP (<span id="exportSubmitCount">0</span>)</span>
                 </button>
             </div>
         </div>
     </div>
+
+    <!-- Floating Bulk Delete Action Bar (Docked at bottom of viewport) -->
+    <div id="deleteSelectionBar" class="fixed bottom-6 inset-x-0 mx-auto max-w-2xl px-4 z-40 hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div class="bg-slate-900/95 backdrop-blur-md text-white border border-rose-500/30 rounded-2xl shadow-2xl p-3 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-400 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </div>
+                <div>
+                    <div class="text-xs font-bold leading-tight flex items-center gap-1.5">
+                        <span>Delete Selection Mode</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/30 text-rose-300 font-mono font-bold" id="deleteSelectionCountBadge">0 selected</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Click tool cards to select multiple tools for bulk removal.</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <button type="button" onclick="selectAllDeleteTools()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer">
+                    Select All
+                </button>
+                <button type="button" onclick="deselectAllDeleteTools()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer">
+                    Clear
+                </button>
+                <button type="button" id="submitBulkDeleteBtn" onclick="submitBulkDelete()" disabled class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
+                    Delete Selected
+                </button>
+                <button type="button" onclick="exitDeleteMode()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container (Bottom Right) -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2.5 pointer-events-none max-w-sm w-full"></div>
 
     <!-- VIEW 2: EXECUTION LOG TABLE -->
     <div id="viewInvocationsSection" class="hidden">
@@ -312,101 +356,112 @@
 </div>
 
 <!-- ========================================================= -->
-<!-- CUSTOM TOOL BUILDER DRAWER                               -->
+<!-- CUSTOM TOOL BUILDER DRAWER (REDESIGNED)                   -->
 <!-- ========================================================= -->
-<div id="customToolDrawer" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 hidden">
-    <div class="bg-white rounded-xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto custom-scrollbar animate-in fade-in zoom-in-95 duration-150">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-            <h3 id="toolDrawerTitle" class="text-sm font-bold text-slate-900">Add Tool</h3>
-            <button type="button" onclick="closeCustomToolDrawer()" class="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer" aria-label="Close">
+<div id="customToolDrawer" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 hidden">
+    <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200/90 animate-in fade-in zoom-in-95 duration-150">
+        <!-- Drawer Header -->
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <div>
+                    <h3 id="toolDrawerTitle" class="text-sm font-bold text-slate-900 tracking-tight">Add Custom Tool</h3>
+                    <p class="text-xs text-slate-500">Define an API or webhook the AI agent can execute during conversations.</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeCustomToolDrawer()" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer" aria-label="Close">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
 
-        <form method="post" action="<?= e(base_url('index.php?page=custom-tool-save')) ?>" class="space-y-4">
+        <!-- Drawer Body -->
+        <form id="customToolForm" onsubmit="handleCustomToolSubmit(event)" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
             <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="tool_id" id="modalToolId" value="0">
 
-            <!-- Optional Preset Pre-Fill -->
-            <div class="flex items-center justify-between gap-2 p-2 bg-slate-50 border border-slate-200/80 rounded-lg">
-                <span class="text-xs font-semibold text-slate-700">Load Template:</span>
-                <select id="builderPresetSelect" onchange="if(this.value){ loadPresetToDrawer(this.value); this.value=''; }" class="text-xs font-medium px-2 py-1 rounded border border-slate-200 bg-white text-slate-800 cursor-pointer">
-                    <option value="">-- Choose Preset... --</option>
-                    <?php foreach (($appStorePresets ?? []) as $ap): ?>
-                        <option value="<?= e($ap['slug']) ?>"><?= e($ap['title']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <!-- Type Selector -->
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1.5">Type</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <label class="flex items-center justify-center gap-2 p-2 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-white cursor-pointer text-xs font-semibold text-slate-800">
-                        <input type="radio" name="category" value="rest_api" checked onchange="handleCategorySelection(this.value)" class="w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-900 shrink-0">
-                        <span>REST API</span>
-                    </label>
-                    <label class="flex items-center justify-center gap-2 p-2 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-white cursor-pointer text-xs font-semibold text-slate-800">
-                        <input type="radio" name="category" value="webhook" onchange="handleCategorySelection(this.value)" class="w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-900 shrink-0">
-                        <span>Webhook</span>
-                    </label>
-                    <label class="flex items-center justify-center gap-2 p-2 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-white cursor-pointer text-xs font-semibold text-slate-800">
-                        <input type="radio" name="category" value="shared_env_api" onchange="handleCategorySelection(this.value)" class="w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-900 shrink-0">
-                        <span>Production</span>
+            <!-- SECTION 1: TOOL IDENTITY & CATEGORY -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                        1. Tool Details & Type
+                    </span>
+                    <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" name="is_active" id="modalIsActive" value="1" checked class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 relative"></div>
+                        <span class="text-xs font-semibold text-slate-700">Tool Active</span>
                     </label>
                 </div>
-            </div>
 
-            <!-- Identity -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Category Visual Cards -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Title *</label>
-                    <input type="text" name="display_name" id="modalDisplayName" required oninput="autoGenerateSlug(this.value)" placeholder="e.g. Order Status" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                    <label class="block text-xs font-semibold text-slate-700 mb-2">Integration Type</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <label class="tool-cat-radio-card flex flex-col p-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50 cursor-pointer transition-all shadow-2xs" data-category="rest_api">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-xs text-slate-900">REST API</span>
+                                <input type="radio" name="category" value="rest_api" checked onchange="handleCategorySelection(this.value)" class="w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-900">
+                            </div>
+                            <p class="text-[11px] text-slate-500 leading-snug">HTTP GET, POST, PUT, DELETE with query/path params and JSON body.</p>
+                        </label>
+
+                        <label class="tool-cat-radio-card flex flex-col p-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50 cursor-pointer transition-all shadow-2xs" data-category="webhook">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-xs text-slate-900">Webhook</span>
+                                <input type="radio" name="category" value="webhook" onchange="handleCategorySelection(this.value)" class="w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-900">
+                            </div>
+                            <p class="text-[11px] text-slate-500 leading-snug">Fire-and-forget payload POST to Zapier, Make, n8n, or internal webhook.</p>
+                        </label>
+
+                        <label class="tool-cat-radio-card flex flex-col p-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/50 cursor-pointer transition-all shadow-2xs" data-category="shared_env_api">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-bold text-xs text-slate-900">Production</span>
+                                <input type="radio" name="category" value="shared_env_api" onchange="handleCategorySelection(this.value)" class="w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-900">
+                            </div>
+                            <p class="text-[11px] text-slate-500 leading-snug">Secure backend endpoint using pre-configured base URL and Bearer token.</p>
+                        </label>
+                    </div>
                 </div>
+
+                <!-- Display Name & Tool Slug -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tool Name *</label>
+                        <input type="text" name="display_name" id="modalDisplayName" required oninput="autoGenerateSlug(this.value)" placeholder="e.g. Check Order Status" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tool Slug (Function Identifier) *</label>
+                        <input type="text" name="tool_slug" id="modalToolSlug" required placeholder="check_order_status" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
+                    </div>
+                </div>
+
+                <!-- Description for AI Model -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">Slug (Identifier) *</label>
-                    <input type="text" name="tool_slug" id="modalToolSlug" required placeholder="order_status" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-xs font-semibold text-slate-700">Description for AI Model *</label>
+                        <span class="text-[10px] text-slate-400">Tells the AI when to invoke this tool</span>
+                    </div>
+                    <textarea name="description" id="modalDescription" rows="2" required placeholder="e.g. Call this function when the customer inquires about their package tracking or order delivery status." class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg resize-none bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all"></textarea>
                 </div>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-slate-700 mb-1">Description (When AI Should Call) *</label>
-                <textarea name="description" id="modalDescription" rows="2" required placeholder="e.g. Fetches shipping status and ETA for order number" class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg resize-none bg-white"></textarea>
-            </div>
-
-            <!-- Roles & Active -->
-            <div class="flex items-center justify-between gap-4 pt-1 text-xs">
-                <div class="flex items-center gap-3">
-                    <span class="font-bold text-slate-700">Roles:</span>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" name="rbac_roles[]" value="admin" checked class="w-4 h-4 rounded text-purple-600 border-slate-300 focus:ring-purple-500 shrink-0">
-                        <span>Admin</span>
-                    </label>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" name="rbac_roles[]" value="customer" checked class="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 shrink-0">
-                        <span>Customer</span>
-                    </label>
-                    <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" name="rbac_roles[]" value="guest" checked class="w-4 h-4 rounded text-slate-600 border-slate-300 focus:ring-slate-500 shrink-0">
-                        <span>Guest</span>
-                    </label>
+            <!-- SECTION 2: ENDPOINT & EXECUTION -->
+            <div class="space-y-4 pt-2">
+                <div class="border-b border-slate-100 pb-2">
+                    <span class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                        2. Execution Endpoint
+                    </span>
                 </div>
-                <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                    <input type="checkbox" name="is_active" id="modalIsActive" value="1" checked class="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 shrink-0">
-                    <span class="font-semibold text-slate-800">Active</span>
-                </label>
-            </div>
-
-            <!-- Endpoint Configuration -->
-            <div class="pt-2 border-t border-slate-100">
-                <label class="block text-xs font-bold text-slate-700 mb-2">Endpoint</label>
 
                 <!-- REST API Fields -->
-                <div id="fieldsRestApi" class="space-y-2.5 p-3 bg-slate-50/80 rounded-lg border border-slate-200/90 text-xs">
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                <div id="fieldsRestApi" class="space-y-3.5 bg-slate-50/70 p-4 rounded-xl border border-slate-200/80">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div class="sm:col-span-1">
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Method</label>
-                            <select name="rest_method" id="modalRestMethod" class="w-full text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-white font-mono font-bold">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">HTTP Method</label>
+                            <select name="rest_method" id="modalRestMethod" class="w-full text-xs px-2.5 py-2 border border-slate-200 rounded-lg bg-white font-mono font-bold text-slate-900">
                                 <option value="GET">GET</option>
                                 <option value="POST">POST</option>
                                 <option value="PUT">PUT</option>
@@ -414,75 +469,88 @@
                             </select>
                         </div>
                         <div class="sm:col-span-3">
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Endpoint URL (use {param} placeholders)</label>
-                            <input type="text" name="rest_url" id="modalRestUrl" placeholder="https://api.example.com/orders/{order_id}" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Endpoint URL (use {param} placeholders) *</label>
+                            <input type="text" name="rest_url" id="modalRestUrl" placeholder="https://api.example.com/v1/orders/{order_id}" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Auth Header (optional)</label>
-                            <input type="text" name="rest_auth_header" id="modalRestAuth" placeholder="Bearer token... or wa_live_..." class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Authorization Header (optional)</label>
+                            <input type="text" name="rest_auth_header" id="modalRestAuth" placeholder="Bearer your_api_token..." class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-semibold text-slate-600 mb-1">Response Path Filter (optional)</label>
-                            <input type="text" name="rest_response_path" id="modalRestPath" placeholder="data or result.status" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Response Path Filter (optional)</label>
+                            <input type="text" name="rest_response_path" id="modalRestPath" placeholder="e.g. data or result.status" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
                         </div>
                     </div>
 
                     <div>
                         <div class="flex items-center justify-between mb-1">
-                            <label class="block text-[11px] font-semibold text-slate-600">Custom Headers (JSON)</label>
-                            <span class="text-[10px] text-slate-400">e.g. {"X-API-Key": "wa_live_...", "Accept": "application/json"}</span>
+                            <label class="block text-xs font-semibold text-slate-700">Custom Headers (JSON)</label>
+                            <span class="text-[10px] text-slate-400">Optional</span>
                         </div>
-                        <textarea name="headers_json" id="modalHeadersJson" rows="2" placeholder='{"X-API-Key": "wa_live_..."}' class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg resize-y bg-white"></textarea>
+                        <textarea name="headers_json" id="modalHeadersJson" rows="2" placeholder='{"X-Custom-Header": "value"}' class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg resize-y bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all"></textarea>
                     </div>
 
                     <div>
-                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Body Template (for POST/PUT)</label>
-                        <textarea name="rest_body_template" id="modalRestBodyTemplate" rows="2" placeholder='{ "order_id": "{order_id}" }' class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg resize-y bg-white"></textarea>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-semibold text-slate-700">Body Template (for POST / PUT)</label>
+                            <span class="text-[10px] text-slate-400">Use {param} placeholders</span>
+                        </div>
+                        <textarea name="rest_body_template" id="modalRestBodyTemplate" rows="2" placeholder='{ "order_id": "{order_id}", "status": "{status}" }' class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg resize-y bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all"></textarea>
                     </div>
                 </div>
 
                 <!-- Webhook Fields -->
-                <div id="fieldsWebhook" class="p-3 bg-amber-50/50 rounded-lg border border-amber-200 hidden text-xs">
-                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">Webhook URL (POST)</label>
-                    <input type="text" name="webhook_url" id="modalWebhookUrl" placeholder="https://hooks.zapier.com/..." class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                <div id="fieldsWebhook" class="bg-amber-50/40 p-4 rounded-xl border border-amber-200/80 hidden">
+                    <label class="block text-xs font-semibold text-slate-800 mb-1">Webhook Target URL (POST) *</label>
+                    <input type="text" name="webhook_url" id="modalWebhookUrl" placeholder="https://hooks.zapier.com/hooks/catch/..." class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
                 </div>
 
                 <!-- Production Fields -->
-                <div id="fieldsSharedEnv" class="p-3 bg-purple-50/50 rounded-lg border border-purple-200 hidden text-xs">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div id="fieldsSharedEnv" class="bg-purple-50/40 p-4 rounded-xl border border-purple-200/80 hidden space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Base URL</label>
-                            <input type="text" name="shared_live_url" id="modalSharedLiveUrl" placeholder="https://api.example.com/v1" class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                            <label class="block text-xs font-semibold text-slate-800 mb-1">Base URL</label>
+                            <input type="text" name="shared_live_url" id="modalSharedLiveUrl" placeholder="https://api.yourdomain.com/v1" class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
                         </div>
                         <div>
-                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Bearer Token</label>
-                            <input type="password" name="shared_live_token" id="modalSharedLiveToken" placeholder="token..." class="w-full text-xs font-mono px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white">
+                            <label class="block text-xs font-semibold text-slate-800 mb-1">Bearer Token</label>
+                            <input type="password" name="shared_live_token" id="modalSharedLiveToken" placeholder="Secret Token..." class="w-full text-xs font-mono px-3 py-2 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Parameters -->
-            <div class="pt-2 border-t border-slate-100">
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-xs font-bold text-slate-700">Parameters</label>
-                    <button type="button" onclick="addParameterCard()" class="text-xs font-semibold text-slate-900 hover:text-indigo-600 cursor-pointer">
-                        + Add Parameter
+            <!-- SECTION 3: PARAMETERS SCHEMA -->
+            <div class="space-y-3 pt-2">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        3. Input Parameters
+                    </span>
+                    <button type="button" onclick="addParameterCard()" class="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span>Add Parameter</span>
                     </button>
                 </div>
-                <div id="parameterCardsContainer" class="space-y-2"></div>
+
+                <div id="parameterCardsContainer" class="space-y-2.5"></div>
             </div>
 
-            <!-- Footer Actions -->
-            <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button type="button" onclick="closeCustomToolDrawer()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
+            <!-- Hidden roles for backend persistence -->
+            <input type="hidden" name="rbac_roles[]" value="admin">
+            <input type="hidden" name="rbac_roles[]" value="customer">
+            <input type="hidden" name="rbac_roles[]" value="guest">
+
+            <!-- Drawer Footer Actions -->
+            <div class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeCustomToolDrawer()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer">
                     Cancel
                 </button>
-                <button type="submit" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-all active:scale-[0.98] cursor-pointer">
-                    Save Tool
+                <button type="submit" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm transition-all active:scale-[0.98] cursor-pointer inline-flex items-center gap-1.5">
+                    <span>Save Tool</span>
                 </button>
             </div>
         </form>
@@ -878,7 +946,7 @@
                 <svg class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 <div class="leading-relaxed">
                     <span class="font-bold text-slate-800">Sandboxed & Security Verified:</span>
-                    <span>Archives are inspected in memory with Zip-Slip defense, anti-Zip-Bomb quotas, SSRF protocol whitelisting (http/https only), and RBAC role normalization.</span>
+                    <span>Archives are inspected in memory with Zip-Slip defense, anti-Zip-Bomb quotas, SSRF protocol whitelisting (http/https only), and role normalization.</span>
                 </div>
             </div>
 
@@ -952,6 +1020,7 @@
 </div>
 
 <script>
+    const toolsCsrfToken = '<?= e(csrf_token()) ?>';
     const appStorePresetsCatalog = <?= json_encode($appStorePresets ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     const availableAiKeysCatalog = <?= json_encode($allAiKeysForModal ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
     const defaultAiProviderPriority = <?= json_encode($defaultProviderPriority ?? 'gemini') ?>;
@@ -1129,6 +1198,7 @@
         container.innerHTML = '';
         addParameterCard();
 
+        if (document.getElementById('modalIsActive')) document.getElementById('modalIsActive').checked = true;
         document.getElementById('customToolDrawer').classList.remove('hidden');
     }
 
@@ -1214,6 +1284,7 @@
         for (const [pName, pObj] of Object.entries(props)) {
             addParameterCard(pName, (pObj.type || 'STRING').toUpperCase(), pObj.description || '', reqs.includes(pName));
         }
+        if (document.getElementById('modalIsActive')) document.getElementById('modalIsActive').checked = !!toolData.is_active;
     }
 
     let activeTestingTool = null;
@@ -1869,71 +1940,82 @@
         }
     }
 
-    function saveGeneratedToolDirectly() {
+    async function saveGeneratedToolDirectly() {
         if (!currentGeneratedTool) return;
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '<?= e(base_url('index.php?page=custom-tool-save')) ?>';
-
-        const addField = (name, val) => {
-            const inp = document.createElement('input');
-            inp.type = 'hidden';
-            inp.name = name;
-            inp.value = val;
-            form.appendChild(inp);
-        };
-
-        addField('csrf_token', '<?= e(csrf_token()) ?>');
-        addField('tool_id', '0');
-        addField('tool_slug', currentGeneratedTool.tool_slug || '');
-        addField('display_name', currentGeneratedTool.display_name || '');
-        addField('category', currentGeneratedTool.category || 'rest_api');
-        addField('description', currentGeneratedTool.description || '');
-        addField('is_active', '1');
+        const formData = new FormData();
+        formData.append('csrf_token', toolsCsrfToken);
+        formData.append('tool_id', '0');
+        formData.append('tool_slug', currentGeneratedTool.tool_slug || '');
+        formData.append('display_name', currentGeneratedTool.display_name || '');
+        formData.append('category', currentGeneratedTool.category || 'rest_api');
+        formData.append('description', currentGeneratedTool.description || '');
+        formData.append('is_active', '1');
 
         const exec = currentGeneratedTool.execution_config || {};
         if (currentGeneratedTool.category === 'rest_api') {
-            addField('rest_method', exec.method || 'GET');
-            addField('rest_url', exec.url || '');
+            formData.append('rest_method', exec.method || 'GET');
+            formData.append('rest_url', exec.url || '');
             if (exec.headers?.Authorization) {
-                addField('rest_auth_header', exec.headers.Authorization);
+                formData.append('rest_auth_header', exec.headers.Authorization);
             }
             if (exec.headers) {
-                addField('headers_json', typeof exec.headers === 'string' ? exec.headers : JSON.stringify(exec.headers));
+                formData.append('headers_json', typeof exec.headers === 'string' ? exec.headers : JSON.stringify(exec.headers));
             }
             if (exec.body_template) {
-                addField('body_template', typeof exec.body_template === 'string' ? exec.body_template : JSON.stringify(exec.body_template));
+                formData.append('body_template', typeof exec.body_template === 'string' ? exec.body_template : JSON.stringify(exec.body_template));
             }
-            addField('rest_response_path', exec.response_path || '');
+            formData.append('rest_response_path', exec.response_path || '');
         } else if (currentGeneratedTool.category === 'shared_env_api') {
-            addField('shared_live_url', exec.base_url || '');
-            addField('shared_live_token', exec.bearer_token || '');
+            formData.append('shared_live_url', exec.base_url || '');
+            formData.append('shared_live_token', exec.bearer_token || '');
         } else if (currentGeneratedTool.category === 'webhook') {
-            addField('webhook_url', exec.target_url || '');
+            formData.append('webhook_url', exec.target_url || '');
         }
 
         (currentGeneratedTool.rbac_roles || ['guest', 'customer', 'admin']).forEach(r => {
-            addField('rbac_roles[]', r);
+            formData.append('rbac_roles[]', r);
         });
 
         const params = Array.isArray(currentGeneratedTool.parameters) ? currentGeneratedTool.parameters : [];
         params.forEach(p => {
-            addField('param_names[]', p.name || '');
-            addField('param_types[]', p.type || 'STRING');
-            addField('param_descriptions[]', p.description || '');
+            formData.append('param_names[]', p.name || '');
+            formData.append('param_types[]', p.type || 'STRING');
+            formData.append('param_descriptions[]', p.description || '');
             if (p.required) {
-                addField('param_requireds[]', '1');
+                formData.append('param_requireds[]', '1');
             }
         });
 
-        document.body.appendChild(form);
-        form.submit();
+        try {
+            const res = await fetch('<?= e(base_url('index.php?page=custom-tool-save')) ?>', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to save generated tool.');
+            }
+
+            closeAiImporterModal();
+            if (data.tool) {
+                upsertToolCardInDom(data.tool);
+            } else {
+                await refreshToolsList();
+            }
+            showToast(data.message || `Custom Tool "${currentGeneratedTool.display_name}" created.`, 'success');
+        } catch (err) {
+            showToast(err.message || 'Error saving generated tool.', 'error');
+        }
     }
 
     // =========================================================
     // TOOLS ZIP EXPORT LOGIC (RADIO / CHECKBOX SELECTION MODE)
     // =========================================================
-    const toolsCsrfToken = '<?= e(csrf_token()) ?>';
     let isExportMode = false;
     const selectedExportToolIds = new Set();
 
@@ -2300,7 +2382,7 @@
                             <div class="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
                                 <span>${paramsCount} parameter${paramsCount === 1 ? '' : 's'}</span>
                                 <span>•</span>
-                                <span>RBAC: ${(t.rbac_roles || ['guest', 'customer', 'admin']).join(', ')}</span>
+                                <span>Roles: ${(t.rbac_roles || ['guest', 'customer', 'admin']).join(', ')}</span>
                             </div>
                         </div>
                     </div>
@@ -2401,7 +2483,8 @@
             }
 
             closeToolsImportModal();
-            window.location.reload();
+            await refreshToolsList();
+            showToast(data.message || `Successfully imported ${data.imported_count || 1} tool(s).`, 'success');
         } catch (err) {
             commitBtn.innerHTML = originalContent;
             commitBtn.disabled = false;
@@ -2421,4 +2504,629 @@
             closePresetsModal();
         }
     });
+
+    // Toast Notification System (Bottom-Right, non-blocking)
+    function showToast(message, type = 'success', duration = 3500) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+
+        const toast = document.createElement('div');
+        toast.className = 'pointer-events-auto bg-slate-900/95 text-white backdrop-blur-md rounded-xl p-3.5 shadow-2xl border border-slate-700/80 flex items-start gap-3 transform transition-all duration-200 translate-y-3 opacity-0';
+
+        let iconSvg = '';
+        if (type === 'success') {
+            iconSvg = `<div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg></div>`;
+        } else if (type === 'error') {
+            iconSvg = `<div class="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></div>`;
+        } else if (type === 'warning') {
+            iconSvg = `<div class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg></div>`;
+        } else {
+            iconSvg = `<div class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 mt-0.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>`;
+        }
+
+        toast.innerHTML = `
+            ${iconSvg}
+            <div class="flex-1 text-xs text-slate-200 leading-snug pt-0.5 font-medium">${escapeHtml(message)}</div>
+            <button type="button" class="text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0 ml-1 p-0.5" onclick="this.closest('.pointer-events-auto').remove()">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        `;
+
+        container.appendChild(toast);
+        requestAnimationFrame(() => {
+            toast.classList.remove('translate-y-3', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+        });
+
+        setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.remove(), 250);
+        }, duration);
+    }
+
+    // ZIP Package Dropdown Toggle
+    function toggleZipDropdown(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const menu = document.getElementById('zipDropdownMenu');
+        if (menu) menu.classList.toggle('hidden');
+    }
+
+    function closeZipDropdown() {
+        const menu = document.getElementById('zipDropdownMenu');
+        if (menu) menu.classList.add('hidden');
+    }
+
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('zipDropdownContainer');
+        if (container && !container.contains(e.target)) {
+            closeZipDropdown();
+        }
+    });
+
+    // Unified Card Click Handler (Export mode or Delete mode)
+    function handleCardClick(cardEl, event) {
+        if (isExportMode) {
+            handleCardExportSelect(cardEl, event);
+        } else if (isDeleteMode) {
+            handleCardDeleteSelect(cardEl, event);
+        }
+    }
+
+    // Async Tool Activation Toggle
+    async function handleToolToggle(toolId, btnEl, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        const currentActive = btnEl.dataset.active === '1';
+        const newActive = !currentActive;
+
+        // Optimistic UI update
+        btnEl.dataset.active = newActive ? '1' : '0';
+        btnEl.className = `tool-toggle-btn inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${newActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`;
+        const dot = btnEl.querySelector('.rounded-full');
+        if (dot) dot.className = `w-1.5 h-1.5 rounded-full ${newActive ? 'bg-emerald-500' : 'bg-slate-400'}`;
+        const textSpan = btnEl.querySelector('.toggle-status-text');
+        if (textSpan) textSpan.textContent = newActive ? 'Active' : 'Off';
+
+        try {
+            const res = await fetch('<?= e(base_url('index.php?page=custom-tool-toggle')) ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': toolsCsrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ id: toolId, csrf_token: toolsCsrfToken }),
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to toggle tool.');
+            }
+
+            const card = btnEl.closest('.tool-card');
+            if (card) {
+                const toolData = JSON.parse(card.getAttribute('data-tool') || '{}');
+                toolData.is_active = data.is_active ? 1 : 0;
+                card.setAttribute('data-tool', JSON.stringify(toolData));
+            }
+
+            showToast(data.message || (newActive ? 'Tool activated' : 'Tool deactivated'), 'success');
+        } catch (err) {
+            btnEl.dataset.active = currentActive ? '1' : '0';
+            btnEl.className = `tool-toggle-btn inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${currentActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`;
+            if (dot) dot.className = `w-1.5 h-1.5 rounded-full ${currentActive ? 'bg-emerald-500' : 'bg-slate-400'}`;
+            if (textSpan) textSpan.textContent = currentActive ? 'Active' : 'Off';
+            showToast(err.message || 'Failed to update tool status', 'error');
+        }
+    }
+
+    // Single Tool Delete via AJAX
+    async function handleSingleToolDelete(toolId, toolName, btnEl, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        if (!confirm(`Are you sure you want to delete "${toolName}"?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch('<?= e(base_url('index.php?page=custom-tool-delete')) ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': toolsCsrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ ids: [toolId], csrf_token: toolsCsrfToken }),
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to delete tool.');
+            }
+
+            const card = btnEl.closest('.tool-card');
+            if (card) {
+                card.style.transition = 'all 0.25s ease-out';
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    card.remove();
+                    updateToolsCount();
+                }, 250);
+            }
+
+            showToast(data.message || `Tool "${toolName}" removed.`, 'success');
+        } catch (err) {
+            showToast(err.message || 'Error deleting tool.', 'error');
+        }
+    }
+
+    // Bulk Delete Selection Mode
+    let isDeleteMode = false;
+    const selectedDeleteToolIds = new Set();
+
+    function toggleDeleteMode() {
+        if (isExportMode) exitExportMode();
+        if (!isDeleteMode) {
+            enterDeleteMode();
+        } else {
+            exitDeleteMode();
+        }
+    }
+
+    function enterDeleteMode() {
+        isDeleteMode = true;
+        selectedDeleteToolIds.clear();
+
+        const toggleBtn = document.getElementById('bulkDeleteToggleBtn');
+        const toggleBtnText = document.getElementById('bulkDeleteToggleBtnText');
+        const deleteBar = document.getElementById('deleteSelectionBar');
+        const cardsGrid = document.getElementById('toolsCardsGrid');
+
+        if (toggleBtn) {
+            toggleBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 border border-rose-300 text-rose-700 shadow-2xs transition-all cursor-pointer';
+        }
+        if (toggleBtnText) toggleBtnText.textContent = 'Cancel Delete';
+        if (deleteBar) deleteBar.classList.remove('hidden');
+
+        document.querySelectorAll('.delete-indicator-wrap').forEach(el => el.classList.remove('hidden'));
+        document.querySelectorAll('.tool-toggle-btn').forEach(el => el.classList.add('hidden'));
+
+        if (cardsGrid) cardsGrid.classList.add('delete-mode-active');
+        document.querySelectorAll('.tool-card').forEach(card => {
+            card.classList.add('cursor-pointer', 'select-none');
+            const footer = card.querySelector('.tool-card-footer');
+            if (footer) footer.style.pointerEvents = 'none';
+        });
+
+        updateDeleteUI();
+    }
+
+    function exitDeleteMode() {
+        isDeleteMode = false;
+        selectedDeleteToolIds.clear();
+
+        const toggleBtn = document.getElementById('bulkDeleteToggleBtn');
+        const toggleBtnText = document.getElementById('bulkDeleteToggleBtnText');
+        const deleteBar = document.getElementById('deleteSelectionBar');
+        const cardsGrid = document.getElementById('toolsCardsGrid');
+
+        if (toggleBtn) {
+            toggleBtn.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 shadow-2xs transition-all active:scale-[0.98] cursor-pointer';
+        }
+        if (toggleBtnText) toggleBtnText.textContent = 'Delete';
+        if (deleteBar) deleteBar.classList.add('hidden');
+
+        document.querySelectorAll('.delete-indicator-wrap').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tool-toggle-btn').forEach(el => el.classList.remove('hidden'));
+
+        if (cardsGrid) cardsGrid.classList.remove('delete-mode-active');
+        document.querySelectorAll('.tool-card').forEach(card => {
+            card.classList.remove('cursor-pointer', 'select-none', 'ring-2', 'ring-rose-500', 'border-rose-400', 'bg-rose-50/20');
+            const box = card.querySelector('.delete-check-box');
+            if (box) box.className = 'w-5 h-5 rounded-md border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 delete-check-box shadow-2xs group-hover:border-rose-400';
+            const check = card.querySelector('.delete-check-svg');
+            if (check) check.classList.add('hidden');
+            const footer = card.querySelector('.tool-card-footer');
+            if (footer) footer.style.pointerEvents = '';
+        });
+    }
+
+    function handleCardDeleteSelect(cardEl, event) {
+        if (!isDeleteMode) return;
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        const toolId = parseInt(cardEl.dataset.toolId, 10);
+        if (!toolId) return;
+
+        if (selectedDeleteToolIds.has(toolId)) {
+            selectedDeleteToolIds.delete(toolId);
+        } else {
+            selectedDeleteToolIds.add(toolId);
+        }
+
+        updateDeleteCardState(cardEl, selectedDeleteToolIds.has(toolId));
+        updateDeleteUI();
+    }
+
+    function updateDeleteCardState(cardEl, isSelected) {
+        const box = cardEl.querySelector('.delete-check-box');
+        const checkSvg = cardEl.querySelector('.delete-check-svg');
+
+        if (isSelected) {
+            cardEl.classList.add('ring-2', 'ring-rose-500', 'border-rose-400', 'bg-rose-50/20');
+            if (box) {
+                box.className = 'w-5 h-5 rounded-md border-2 border-rose-600 bg-rose-600 flex items-center justify-center transition-all duration-150 delete-check-box shadow-2xs';
+            }
+            if (checkSvg) checkSvg.classList.remove('hidden');
+        } else {
+            cardEl.classList.remove('ring-2', 'ring-rose-500', 'border-rose-400', 'bg-rose-50/20');
+            if (box) {
+                box.className = 'w-5 h-5 rounded-md border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 delete-check-box shadow-2xs group-hover:border-rose-400';
+            }
+            if (checkSvg) checkSvg.classList.add('hidden');
+        }
+    }
+
+    function selectAllDeleteTools() {
+        document.querySelectorAll('.tool-card').forEach(card => {
+            if (!card.classList.contains('hidden')) {
+                const toolId = parseInt(card.dataset.toolId, 10);
+                if (toolId) {
+                    selectedDeleteToolIds.add(toolId);
+                    updateDeleteCardState(card, true);
+                }
+            }
+        });
+        updateDeleteUI();
+    }
+
+    function deselectAllDeleteTools() {
+        selectedDeleteToolIds.clear();
+        document.querySelectorAll('.tool-card').forEach(card => {
+            updateDeleteCardState(card, false);
+        });
+        updateDeleteUI();
+    }
+
+    function updateDeleteUI() {
+        const count = selectedDeleteToolIds.size;
+        const badge = document.getElementById('deleteSelectionCountBadge');
+        const submitBtn = document.getElementById('submitBulkDeleteBtn');
+        if (badge) badge.textContent = `${count} selected`;
+        if (submitBtn) {
+            submitBtn.disabled = count === 0;
+            submitBtn.textContent = count > 0 ? `Delete (${count})` : 'Delete Selected';
+        }
+    }
+
+    async function submitBulkDelete() {
+        const ids = Array.from(selectedDeleteToolIds);
+        if (ids.length === 0) {
+            showToast('Please select at least one tool to delete.', 'warning');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete ${ids.length} selected tool(s)? This action cannot be undone.`)) {
+            return;
+        }
+
+        const submitBtn = document.getElementById('submitBulkDeleteBtn');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Deleting...';
+
+        try {
+            const res = await fetch('<?= e(base_url('index.php?page=custom-tool-delete')) ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': toolsCsrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ ids: ids, csrf_token: toolsCsrfToken }),
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to delete tools.');
+            }
+
+            ids.forEach(id => {
+                const card = document.querySelector(`.tool-card[data-tool-id="${id}"]`);
+                if (card) {
+                    card.style.transition = 'all 0.25s ease-out';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.95)';
+                    setTimeout(() => card.remove(), 250);
+                }
+            });
+
+            setTimeout(() => {
+                exitDeleteMode();
+                updateToolsCount();
+                showToast(data.message || `Successfully deleted ${ids.length} tool(s).`, 'success');
+            }, 300);
+
+        } catch (err) {
+            showToast(err.message || 'Error deleting tools.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    }
+
+    // Save Admin Phones via AJAX
+    async function handleAdminPhonesSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const saveBtn = form.querySelector('button[type="submit"]');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+
+        try {
+            const formData = new FormData(form);
+            const res = await fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to save admin phone numbers.');
+            }
+            showToast(data.message || 'Admin phone numbers saved successfully.', 'success');
+        } catch (err) {
+            showToast(err.message || 'Error saving admin phones.', 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
+    }
+
+    // Custom Tool Form Submission via AJAX
+    async function handleCustomToolSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const saveBtn = form.querySelector('button[type="submit"]');
+        const originalBtnContent = saveBtn.innerHTML;
+
+        const headersJsonInput = document.getElementById('modalHeadersJson');
+        if (headersJsonInput && headersJsonInput.value.trim()) {
+            try {
+                JSON.parse(headersJsonInput.value.trim());
+            } catch (err) {
+                showToast('Invalid JSON in Custom Headers field', 'error');
+                headersJsonInput.focus();
+                return;
+            }
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> <span>Saving...</span>`;
+
+        try {
+            const formData = new FormData(form);
+            const res = await fetch('<?= e(base_url('index.php?page=custom-tool-save')) ?>', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Failed to save custom tool.');
+            }
+
+            closeCustomToolDrawer();
+
+            if (data.tool) {
+                upsertToolCardInDom(data.tool);
+            } else {
+                await refreshToolsList();
+            }
+
+            showToast(data.message || 'Custom Tool saved successfully!', 'success');
+        } catch (err) {
+            showToast(err.message || 'Error saving tool.', 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalBtnContent;
+        }
+    }
+
+    // Render Tool Card HTML
+    function renderToolCardHtml(tool) {
+        const cat = tool.category || 'rest_api';
+        const paramsCount = Object.keys(tool.parameters_schema?.properties || {}).length;
+        let method = 'GET';
+        let targetUrl = '';
+        const exec = tool.execution_config || {};
+        if (cat === 'rest_api') {
+            method = exec.method || 'GET';
+            targetUrl = exec.url || '';
+        } else if (cat === 'webhook') {
+            method = 'POST';
+            targetUrl = exec.target_url || '';
+        } else if (cat === 'shared_env_api') {
+            method = 'PROD';
+            targetUrl = exec.base_url || '';
+        } else {
+            method = 'BUILTIN';
+            targetUrl = exec.handler || tool.tool_slug;
+        }
+
+        const isActive = !!tool.is_active;
+        const catBadgeClass = cat === 'rest_api'
+            ? 'bg-sky-50 text-sky-700 border border-sky-200/80'
+            : (cat === 'shared_env_api'
+                ? 'bg-purple-50 text-purple-700 border border-purple-200/80'
+                : (cat === 'webhook'
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200/80'
+                    : 'bg-slate-100 text-slate-700 border border-slate-200'));
+
+        const jsonStr = escapeHtml(JSON.stringify(tool));
+
+        return `
+        <div class="tool-card bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-2xs hover:shadow-card transition-all flex flex-col justify-between group relative" data-tool-id="${tool.id}" data-tool-slug="${escapeHtml(tool.tool_slug)}" data-category="${escapeHtml(cat)}" data-tool="${jsonStr}" onclick="handleCardClick(this, event)">
+            <div>
+                <div class="flex items-start justify-between gap-2 mb-2">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 ${catBadgeClass}">
+                            ${escapeHtml(method)}
+                        </span>
+                        <h3 class="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate" title="${escapeHtml(tool.display_name)}">
+                            ${escapeHtml(tool.display_name)}
+                        </h3>
+                    </div>
+
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" onclick="handleToolToggle(${tool.id}, this, event)" class="tool-toggle-btn inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors cursor-pointer ${isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}" data-active="${isActive ? '1' : '0'}" title="${isActive ? 'Disable tool' : 'Enable tool'}">
+                            <span class="w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
+                            <span class="toggle-status-text">${isActive ? 'Active' : 'Off'}</span>
+                        </button>
+
+                        <div class="export-indicator-wrap hidden" title="Select tool for export">
+                            <div class="w-5 h-5 rounded-full border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 export-radio-circle shadow-2xs group-hover:border-indigo-400">
+                                <svg class="w-3 h-3 text-white hidden export-check-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                        </div>
+
+                        <div class="delete-indicator-wrap hidden" title="Select tool for deletion">
+                            <div class="w-5 h-5 rounded-md border-2 border-slate-300 bg-white flex items-center justify-center transition-all duration-150 delete-check-box shadow-2xs group-hover:border-rose-400">
+                                <svg class="w-3.5 h-3.5 text-white hidden delete-check-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5 mb-2 font-mono text-[10px] text-slate-500 bg-slate-50/80 px-2 py-1 rounded border border-slate-200/60 truncate">
+                    <span class="text-slate-800 font-semibold shrink-0">${escapeHtml(tool.tool_slug)}</span>
+                    <span class="text-slate-300">|</span>
+                    <span class="truncate text-slate-600" title="${escapeHtml(targetUrl)}">${escapeHtml(targetUrl)}</span>
+                </div>
+
+                <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mb-3 min-h-[2rem]">
+                    ${escapeHtml(tool.description || '')}
+                </p>
+
+                <div class="flex items-center justify-between text-[10px] pb-2 text-slate-400">
+                    <span class="font-mono text-slate-600 bg-slate-100/80 px-1.5 py-0.5 rounded">
+                        ${paramsCount} param${paramsCount === 1 ? '' : 's'}
+                    </span>
+                    <div class="flex items-center gap-1">
+                        ${(tool.rbac_roles || ['guest', 'customer', 'admin']).map(r => `
+                            <span class="px-1 py-0.2 rounded text-[9px] font-mono uppercase ${r === 'admin' ? 'bg-purple-50 text-purple-700' : (r === 'customer' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600')}">
+                                ${escapeHtml(r)}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-card-footer pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 transition-opacity">
+                <button type="button" onclick="handleToolTest(this)" class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-md transition-colors cursor-pointer active:scale-95">
+                    <svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Test</span>
+                </button>
+
+                <div class="flex items-center gap-1">
+                    <button type="button" onclick="handleToolEdit(this)" class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-50 rounded-md transition-colors cursor-pointer">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        <span>Edit</span>
+                    </button>
+                    <button type="button" onclick="handleSingleToolDelete(${tool.id}, '${escapeHtml(tool.display_name)}', this, event)" class="w-6 h-6 inline-flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer" title="Delete tool">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // Upsert Tool Card in DOM without page reload
+    function upsertToolCardInDom(tool) {
+        const grid = document.getElementById('toolsCardsGrid');
+        const emptyState = document.getElementById('toolsEmptyState');
+        if (emptyState) emptyState.classList.add('hidden');
+        if (grid) grid.classList.remove('hidden');
+
+        const existingCard = document.querySelector(`.tool-card[data-tool-id="${tool.id}"]`);
+        const tempContainer = document.createElement('div');
+        tempContainer.innerHTML = renderToolCardHtml(tool).trim();
+        const newCard = tempContainer.firstElementChild;
+
+        if (existingCard) {
+            existingCard.replaceWith(newCard);
+        } else if (grid) {
+            grid.prepend(newCard);
+        }
+
+        updateToolsCount();
+    }
+
+    // Refresh Tools List from API without page reload
+    async function refreshToolsList() {
+        try {
+            const res = await fetch('<?= e(base_url('index.php?page=custom-tools-list')) ?>', {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (data.ok && Array.isArray(data.tools)) {
+                const grid = document.getElementById('toolsCardsGrid');
+                const emptyState = document.getElementById('toolsEmptyState');
+                if (data.tools.length === 0) {
+                    if (grid) {
+                        grid.innerHTML = '';
+                        grid.classList.add('hidden');
+                    }
+                    if (emptyState) emptyState.classList.remove('hidden');
+                } else {
+                    if (emptyState) emptyState.classList.add('hidden');
+                    if (grid) {
+                        grid.classList.remove('hidden');
+                        grid.innerHTML = data.tools.map(renderToolCardHtml).join('');
+                    }
+                }
+                updateToolsCount(data.tools.length);
+            }
+        } catch (_) {}
+    }
+
+    // Update Tools Tab and Badge Counts
+    function updateToolsCount(customCount = null) {
+        const cards = document.querySelectorAll('.tool-card');
+        const count = customCount !== null ? customCount : cards.length;
+        const tabBtn = document.getElementById('mainTabToolsBtn');
+        if (tabBtn) {
+            tabBtn.textContent = `Installed Tools (${count})`;
+        }
+        const emptyState = document.getElementById('toolsEmptyState');
+        const grid = document.getElementById('toolsCardsGrid');
+        if (count === 0) {
+            if (emptyState) emptyState.classList.remove('hidden');
+            if (grid) grid.classList.add('hidden');
+        } else {
+            if (emptyState) emptyState.classList.add('hidden');
+            if (grid) grid.classList.remove('hidden');
+        }
+    }
 </script>

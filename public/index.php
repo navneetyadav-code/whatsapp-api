@@ -810,7 +810,8 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $toolId,
             $userId
         ]);
-        flash('success', 'Custom Tool "' . $displayName . '" updated successfully.');
+        $flashMsg = 'Custom Tool "' . $displayName . '" updated successfully.';
+        flash('success', $flashMsg);
     } else {
         $stmt = $pdo->prepare(
             'INSERT INTO ai_custom_tools 
@@ -832,20 +833,75 @@ if ($page === 'custom-tool-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             json_encode(array_values($rbacRoles)),
             $isActive
         ]);
-        flash('success', 'Custom Tool "' . $displayName . '" registered and active.');
+        $flashMsg = 'Custom Tool "' . $displayName . '" registered and active.';
+        flash('success', $flashMsg);
+    }
+
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+        || (!empty($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false);
+
+    if ($isAjax) {
+        $fetchStmt = $pdo->prepare('SELECT * FROM ai_custom_tools WHERE tool_slug = ? AND user_id = ? LIMIT 1');
+        $fetchStmt->execute([$toolSlug, $userId]);
+        $savedTool = $fetchStmt->fetch(PDO::FETCH_ASSOC);
+        if ($savedTool) {
+            $savedTool['parameters_schema'] = json_decode($savedTool['parameters_schema'] ?? '{}', true);
+            $savedTool['execution_config'] = json_decode($savedTool['execution_config'] ?? '{}', true);
+            $savedTool['rbac_roles'] = json_decode($savedTool['rbac_roles'] ?? '[]', true);
+        }
+        json_response([
+            'ok' => true,
+            'tool' => $savedTool,
+            'message' => $flashMsg
+        ]);
     }
 
     redirect_to('index.php?page=tools');
+}
+
+if ($page === 'custom-tools-list' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $user = require_auth();
+    $userId = (int) $user['id'];
+    $stmt = Database::pdo()->prepare('SELECT * FROM ai_custom_tools WHERE user_id = ? ORDER BY id ASC');
+    $stmt->execute([$userId]);
+    $tools = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($tools as &$t) {
+        $t['parameters_schema'] = !empty($t['parameters_schema']) ? json_decode((string) $t['parameters_schema'], true) : [];
+        $t['execution_config'] = !empty($t['execution_config']) ? json_decode((string) $t['execution_config'], true) : [];
+        $t['rbac_roles'] = !empty($t['rbac_roles']) ? json_decode((string) $t['rbac_roles'], true) : ['guest', 'customer', 'admin'];
+    }
+    unset($t);
+    json_response(['ok' => true, 'tools' => $tools]);
 }
 
 if ($page === 'custom-tool-toggle' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();
     $userId = (int) $user['id'];
-    $toolId = (int) ($_POST['id'] ?? 0);
+    $input = request_json();
+    $toolId = (int) ($input['id'] ?? $_POST['id'] ?? 0);
 
     $stmt = Database::pdo()->prepare('UPDATE ai_custom_tools SET is_active = 1 - is_active WHERE id = ? AND user_id = ?');
     $stmt->execute([$toolId, $userId]);
+
+    $stmtStatus = Database::pdo()->prepare('SELECT is_active, display_name FROM ai_custom_tools WHERE id = ? AND user_id = ?');
+    $stmtStatus->execute([$toolId, $userId]);
+    $row = $stmtStatus->fetch(PDO::FETCH_ASSOC);
+    $isActive = (int) ($row['is_active'] ?? 0);
+    $displayName = $row['display_name'] ?? 'Tool';
+
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+        || (!empty($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false);
+
+    if ($isAjax) {
+        json_response([
+            'ok' => true,
+            'is_active' => $isActive,
+            'message' => $isActive ? "Tool \"{$displayName}\" is now active." : "Tool \"{$displayName}\" has been deactivated."
+        ]);
+    }
 
     flash('success', 'Tool activation status updated.');
     redirect_to('index.php?page=tools');
@@ -855,12 +911,41 @@ if ($page === 'custom-tool-delete' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $user = require_auth();
     verify_csrf();
     $userId = (int) $user['id'];
-    $toolId = (int) ($_POST['id'] ?? 0);
+    $pdo = Database::pdo();
 
-    $stmt = Database::pdo()->prepare('DELETE FROM ai_custom_tools WHERE id = ? AND user_id = ?');
-    $stmt->execute([$toolId, $userId]);
+    $input = request_json();
+    $rawIds = $input['ids'] ?? $_POST['ids'] ?? $_POST['id'] ?? [];
+    if (is_string($rawIds)) {
+        $rawIds = explode(',', $rawIds);
+    }
+    $ids = array_values(array_filter(array_map('intval', (array) $rawIds), fn($id) => $id > 0));
 
-    flash('success', 'Tool removed from account catalog.');
+    if (empty($ids)) {
+        $singleId = (int) ($input['id'] ?? $_POST['id'] ?? 0);
+        if ($singleId > 0) {
+            $ids = [$singleId];
+        }
+    }
+
+    if (!empty($ids)) {
+        $inClause = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare("DELETE FROM ai_custom_tools WHERE id IN ($inClause) AND user_id = ?");
+        $params = array_merge($ids, [$userId]);
+        $stmt->execute($params);
+    }
+
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+        || (!empty($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false);
+
+    $count = count($ids);
+    $msg = $count === 1 ? 'Tool removed from account catalog.' : "Successfully deleted $count tools.";
+
+    if ($isAjax) {
+        json_response(['ok' => true, 'deleted_ids' => $ids, 'message' => $msg]);
+    }
+
+    flash('success', $msg);
     redirect_to('index.php?page=tools');
 }
 
@@ -1111,6 +1196,18 @@ if ($page === 'ai-tools-config-save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $updateStmt = $pdo->prepare('UPDATE ai_agent_settings SET tools_config = ? WHERE user_id = ?');
     $updateStmt->execute([json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), $userId]);
+
+    $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+        || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false)
+        || (!empty($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false);
+
+    if ($isAjax) {
+        json_response([
+            'ok' => true,
+            'message' => 'Admin whitelisted phone numbers saved successfully.',
+            'admin_phones' => $adminPhones
+        ]);
+    }
 
     flash('success', 'Admin whitelisted phone numbers saved successfully.');
     redirect_to('index.php?page=tools');
