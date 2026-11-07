@@ -46,7 +46,11 @@ services:
       WORKER_TOKEN: ${WORKER_TOKEN:-generate-a-strong-secret-token-32-chars-long}
     volumes:
       - whatsgateway_sessions:/var/www/html/whatsapp-api-data/sessions
+      - whatsgateway_uploads:/var/www/html/public/uploads
+      - whatsgateway_backups:/var/www/html/storage/backups
 
 volumes:
   whatsgateway_mysql_data:
   whatsgateway_sessions:
+  whatsgateway_uploads:
+  whatsgateway_backups:
