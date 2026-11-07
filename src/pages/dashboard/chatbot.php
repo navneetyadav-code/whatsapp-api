@@ -358,7 +358,11 @@ DIRECTIVES:
         try {
             const res = await fetch('<?= e(base_url('api/chat/enhance-prompt.php')) ?>', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '<?= e(csrf_token()) ?>',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 body: JSON.stringify({
                     raw_text: rawText,
                     tone: toneSelect ? toneSelect.value : 'professional_warm',
@@ -505,7 +509,11 @@ DIRECTIVES:
         try {
             const res = await fetch('<?= e(base_url('api/chat/switch-mode.php')) ?>', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '<?= e(csrf_token()) ?>',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
                 body: JSON.stringify({
                     mode: targetMode,
                     owner_name: ownerName,

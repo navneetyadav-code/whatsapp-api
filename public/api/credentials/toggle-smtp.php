@@ -10,6 +10,8 @@ if (!$user) {
     exit;
 }
 
+verify_api_csrf();
+
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $id = (int) ($input['id'] ?? 0);
 $isActive = !empty($input['is_active']) ? 1 : 0;

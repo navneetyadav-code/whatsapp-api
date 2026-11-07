@@ -33,6 +33,7 @@ import { ChatPresenceManager } from './chat-presence.mjs';
 import { ChatResolutionEngine } from './chat-resolution.mjs';
 import { detectIntents, composeSkillsAndTools, getRelevantTrainingExamples } from './intent-router.mjs';
 import { UniversalToolsRegistry } from './tools-engine.mjs';
+import { decryptCredential } from './crypto-helper.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv(resolve(__dirname, '..', '.env'));
@@ -1636,14 +1637,15 @@ function normalizeInboundMessage(userId, msg, session = {}, resolvedSenderPhone 
             if (pKeys && pKeys.length > 0) {
               for (const pk of pKeys) {
                 const prov = (pk.provider || '').toLowerCase();
-                if (prov === 'gemini' && !aiSettings.gemini_api_key && pk.api_key) {
-                  aiSettings.gemini_api_key = pk.api_key;
+                const decryptedKey = decryptCredential(pk.api_key);
+                if (prov === 'gemini' && !aiSettings.gemini_api_key && decryptedKey) {
+                  aiSettings.gemini_api_key = decryptedKey;
                   if (pk.model) aiSettings.gemini_model = pk.model;
-                } else if (prov === 'groq' && !aiSettings.groq_api_key && pk.api_key) {
-                  aiSettings.groq_api_key = pk.api_key;
+                } else if (prov === 'groq' && !aiSettings.groq_api_key && decryptedKey) {
+                  aiSettings.groq_api_key = decryptedKey;
                   if (pk.model) aiSettings.groq_model = pk.model;
-                } else if (prov === 'openrouter' && !aiSettings.openrouter_api_key && pk.api_key) {
-                  aiSettings.openrouter_api_key = pk.api_key;
+                } else if (prov === 'openrouter' && !aiSettings.openrouter_api_key && decryptedKey) {
+                  aiSettings.openrouter_api_key = decryptedKey;
                   if (pk.model) aiSettings.openrouter_model = pk.model;
                 }
               }

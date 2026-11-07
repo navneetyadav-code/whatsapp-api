@@ -176,7 +176,7 @@ foreach ($providerOrder as $prov) {
     if (empty($keys)) continue;
 
     foreach ($keys as $kRecord) {
-        $apiKey = trim((string) ($kRecord['api_key'] ?? ''));
+        $apiKey = decrypt_credential(trim((string) ($kRecord['api_key'] ?? '')));
         if ($apiKey === '') continue;
 
         if ($prov === 'gemini') {

@@ -168,7 +168,7 @@ function client_ip(): string
     // Only inspect reverse-proxy headers if the direct connecting socket is a trusted proxy or loopback
     $isProxy = in_array($remote, ['127.0.0.1', '::1'], true)
         || str_starts_with($remote, '10.')
-        || str_starts_with($remote, '172.')
+        || (filter_var($remote, FILTER_VALIDATE_IP) !== false && filter_var($remote, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false)
         || str_starts_with($remote, '192.168.');
 
     if ($isProxy) {

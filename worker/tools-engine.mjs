@@ -14,6 +14,7 @@
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { ChatFactMemory } from './chat-fact-memory.mjs';
+import { assertSafeWebhookUrl } from './ssrf-validator.mjs';
 
 // ---------------------------------------------------------------------------
 // 1. BUILT-IN CORE UTILITIES
@@ -720,6 +721,13 @@ async function executeCustomRestApi(executionConfig, args = {}) {
     return { error: 'Invalid URL protocol. Only HTTP and HTTPS are permitted.' };
   }
 
+  // Security guardrail: SSRF validation against private/loopback/cloud metadata IPs
+  try {
+    await assertSafeWebhookUrl(finalUrl, { allowHttp: true });
+  } catch (ssrfErr) {
+    return { error: `SSRF validation failed: ${ssrfErr.message}` };
+  }
+
   const method = (executionConfig.method || 'GET').toUpperCase();
   const headers = {
     'Accept': 'application/json',
@@ -1003,6 +1011,16 @@ async function executeWebhookTool(executionConfig, args = {}) {
   const targetUrl = executionConfig.target_url || '';
   if (!targetUrl) {
     return { error: 'Webhook target URL is not configured.' };
+  }
+
+  // Security guardrail: SSRF validation against private/loopback/cloud metadata IPs
+  try {
+    await assertSafeWebhookUrl(targetUrl);
+  } catch (ssrfErr) {
+    return {
+      dispatched: false,
+      error: `SSRF validation failed: ${ssrfErr.message}`
+    };
   }
 
   const headers = {

@@ -12,6 +12,9 @@ function get_chat_authenticated_user(): array
 {
     $user = current_user();
     if ($user) {
+        if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['POST', 'PUT', 'DELETE', 'PATCH'], true)) {
+            verify_api_csrf();
+        }
         return $user;
     }
 

@@ -10,6 +10,8 @@ if (!$user) {
     exit;
 }
 
+verify_api_csrf();
+
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $id = !empty($input['id']) ? (int) $input['id'] : null;
 $label = trim((string) ($input['label'] ?? 'Primary SMTP'));
@@ -59,7 +61,7 @@ try {
             exit;
         }
 
-        $finalPassword = ($password !== '') ? $password : (string) $existing['password'];
+        $finalPassword = ($password !== '') ? encrypt_credential($password) : (string) $existing['password'];
 
         $upStmt = $pdo->prepare(
             'UPDATE user_smtp_credentials
@@ -79,7 +81,7 @@ try {
              (user_id, label, host, port, encryption, username, password, from_email, from_name, priority, is_active, status)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, "active")'
         );
-        $insStmt->execute([$userId, $label, $host, $port, $encryption, $username, $password, $fromEmail, $fromName, $priority]);
+        $insStmt->execute([$userId, $label, $host, $port, $encryption, $username, encrypt_credential($password), $fromEmail, $fromName, $priority]);
         $smtpId = (int) $pdo->lastInsertId();
     }
 

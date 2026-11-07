@@ -10,6 +10,8 @@ if (!$user) {
     exit;
 }
 
+verify_api_csrf();
+
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $id = !empty($input['id']) ? (int) $input['id'] : null;
 $provider = trim((string) ($input['provider'] ?? ''));
@@ -28,7 +30,7 @@ if ($id !== null) {
         $provider = (string) $keyRow['provider'];
         $keyModel = !empty($keyRow['model']) ? trim((string) $keyRow['model']) : null;
         if ($apiKey === '') {
-            $apiKey = (string) $keyRow['api_key'];
+            $apiKey = decrypt_credential((string) $keyRow['api_key']);
         }
     }
 }

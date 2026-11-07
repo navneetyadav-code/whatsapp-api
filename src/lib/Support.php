@@ -128,7 +128,45 @@ function verify_csrf(): void
     if (!is_string($token) || !hash_equals(csrf_token(), $token)) {
         http_response_code(419);
         exit('Invalid security token.');
+
     }
+}
+
+function verify_api_csrf(): void
+{
+    if (!empty($_SERVER['HTTP_X_API_KEY'])) {
+        return;
+    }
+
+    $token = $_POST['csrf_token']
+        ?? $_SERVER['HTTP_X_CSRF_TOKEN']
+        ?? '';
+
+    if ($token === '') {
+        $raw = file_get_contents('php://input');
+        if (!empty($raw)) {
+            $json = json_decode($raw, true);
+            if (is_array($json) && !empty($json['csrf_token'])) {
+                $token = (string) $json['csrf_token'];
+            }
+        }
+    }
+
+    if (is_string($token) && $token !== '' && !empty($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token)) {
+        return;
+    }
+
+    $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+    if (strcasecmp($requestedWith, 'XMLHttpRequest') === 0) {
+        return;
+    }
+
+    http_response_code(403);
+    json_response([
+        'ok' => false,
+        'error' => 'CSRF validation failed. Missing valid CSRF token or X-Requested-With header.'
+    ], 403);
+    exit;
 }
 
 function flash(string $type, string $message): void

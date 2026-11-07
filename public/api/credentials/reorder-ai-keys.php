@@ -10,6 +10,8 @@ if (!$user) {
     exit;
 }
 
+verify_api_csrf();
+
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $order = $input['order'] ?? []; // Array of { id: int, priority: int }
 

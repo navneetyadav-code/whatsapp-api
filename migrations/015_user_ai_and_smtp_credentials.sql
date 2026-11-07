@@ -1,5 +1,6 @@
 -- Migration 015: User-Level Multi-Key AI Providers & Isolated SMTP Credentials
 -- Adds multi-key auto-failover support for Gemini, Groq, OpenRouter and isolated user SMTP servers.
+-- Security: Sensitive credentials (api_key, password) are encrypted at rest using AES-256-GCM.
 
 CREATE TABLE IF NOT EXISTS `ai_provider_keys` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,

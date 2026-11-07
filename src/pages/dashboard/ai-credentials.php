@@ -735,6 +735,16 @@
 
 <!-- ================= JAVASCRIPT CONTROLLERS ================= -->
 <script>
+const CSRF_TOKEN = '<?= e(csrf_token()) ?>';
+function apiFetch(url, options = {}) {
+    options.headers = {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CSRF_TOKEN,
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(options.headers || {})
+    };
+    return fetch(url, options);
+}
 function toggleAccordion(id) {
     const el = document.getElementById(id);
     const chevron = document.getElementById('chevron-' + id);
@@ -838,7 +848,7 @@ async function handleSaveAiKey(e) {
     };
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/save-ai-key.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/save-ai-key.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -878,7 +888,7 @@ async function testModalAiKey() {
     resultBox.innerText = `Connecting to ${provider.toUpperCase()}...`;
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/test-ai-key.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/test-ai-key.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: keyId, provider, api_key: apiKey, model })
@@ -908,7 +918,7 @@ async function testAiKey(id, provider) {
     }
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/test-ai-key.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/test-ai-key.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, provider })
@@ -933,7 +943,7 @@ async function testAiKey(id, provider) {
 
 async function toggleKeyActive(id, newActive) {
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/toggle-ai-key.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/toggle-ai-key.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, is_active: newActive })
@@ -953,7 +963,7 @@ async function deleteAiKey(id, label) {
     if (!confirm(`Delete key "${label}"?`)) return;
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/delete-ai-key.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/delete-ai-key.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id })
@@ -1029,7 +1039,7 @@ async function handleSaveSmtp(e) {
     };
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/save-smtp.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/save-smtp.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -1071,7 +1081,7 @@ async function testModalSmtpConn() {
     resultBox.innerText = `Connecting to ${host}:${port}...`;
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/test-smtp.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/test-smtp.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, host, port, encryption, username, password })
@@ -1101,7 +1111,7 @@ async function testSmtp(id) {
     }
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/test-smtp.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/test-smtp.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id })
@@ -1154,7 +1164,7 @@ async function handleSendRealTestEmail(e) {
     resultBox.innerText = `Dispatching test email to ${recipient}...`;
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/test-smtp.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/test-smtp.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, test_recipient: recipient })
@@ -1179,7 +1189,7 @@ async function handleSendRealTestEmail(e) {
 
 async function toggleSmtpActive(id, newActive) {
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/toggle-smtp.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/toggle-smtp.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id, is_active: newActive })
@@ -1199,7 +1209,7 @@ async function deleteSmtp(id, label) {
     if (!confirm(`Delete SMTP server "${label}"?`)) return;
 
     try {
-        const res = await fetch('<?= e(base_url('api/credentials/delete-smtp.php')) ?>', {
+        const res = await apiFetch('<?= e(base_url('api/credentials/delete-smtp.php')) ?>', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id })

@@ -10,6 +10,8 @@ if (!$user) {
     exit;
 }
 
+verify_api_csrf();
+
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $id = !empty($input['id']) ? (int) $input['id'] : null;
 $provider = trim((string) ($input['provider'] ?? ''));
@@ -55,7 +57,7 @@ try {
             exit;
         }
 
-        $finalKey = ($apiKey !== '') ? $apiKey : $existing['api_key'];
+        $finalKey = ($apiKey !== '') ? encrypt_credential($apiKey) : $existing['api_key'];
         $finalModel = ($model !== '') ? $model : ($existing['model'] ?? null);
 
         $updateStmt = $pdo->prepare(
@@ -76,7 +78,7 @@ try {
             'INSERT INTO ai_provider_keys (user_id, provider, label, api_key, model, priority, is_active, status)
              VALUES (?, ?, ?, ?, ?, ?, 1, "active")'
         );
-        $insertStmt->execute([$userId, $provider, $label, $apiKey, $model ?: null, $priority]);
+        $insertStmt->execute([$userId, $provider, $label, encrypt_credential($apiKey), $model ?: null, $priority]);
         $keyId = (int) $pdo->lastInsertId();
     }
 

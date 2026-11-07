@@ -10,6 +10,8 @@ if (!$user) {
     exit;
 }
 
+verify_api_csrf();
+
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 $id = !empty($input['id']) ? (int) $input['id'] : null;
 $host = trim((string) ($input['host'] ?? ''));
@@ -34,7 +36,7 @@ if ($id !== null) {
         if ($port <= 0) $port = (int) $smtpRow['port'];
         if ($encryption === '') $encryption = (string) $smtpRow['encryption'];
         if ($username === '') $username = (string) $smtpRow['username'];
-        if ($password === '') $password = (string) $smtpRow['password'];
+        if ($password === '') $password = decrypt_credential((string) $smtpRow['password']);
         if ($fromEmail === '') $fromEmail = (string) $smtpRow['from_email'];
         if ($fromName === '') $fromName = (string) $smtpRow['from_name'];
     }

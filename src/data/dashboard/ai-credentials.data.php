@@ -20,6 +20,7 @@ $groqKeys = [];
 $openrouterKeys = [];
 
 foreach ($allKeys as $k) {
+    $k['api_key'] = decrypt_credential((string) $k['api_key']);
     if ($k['provider'] === 'gemini') {
         $geminiKeys[] = $k;
     } elseif ($k['provider'] === 'groq') {
@@ -38,6 +39,10 @@ $smtpStmt = $pdo->prepare(
 );
 $smtpStmt->execute([$userId]);
 $smtpServers = $smtpStmt->fetchAll(PDO::FETCH_ASSOC);
+foreach ($smtpServers as &$s) {
+    $s['password'] = decrypt_credential((string) ($s['password'] ?? ''));
+}
+unset($s);
 
 // 3. Fetch AI Agent Settings (for Provider Priority and Agent Mode context)
 $aiStmt = $pdo->prepare(

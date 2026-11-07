@@ -29,5 +29,6 @@ require_once __DIR__ . '/lib/CurlImporter.php';
 require_once __DIR__ . '/lib/AntiBotBypass.php';
 require_once __DIR__ . '/lib/ToolsPackageService.php';
 require_once __DIR__ . '/lib/DatabaseMaintenance.php';
+require_once __DIR__ . '/lib/Crypto.php';
 
 Database::configure($config['db']);
